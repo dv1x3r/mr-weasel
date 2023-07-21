@@ -36,7 +36,13 @@ func (m *Manager) Start() {
 }
 
 func (m *Manager) processMessage(message *tgclient.Message) {
-
+	if message.Text == "ping" {
+		msg, err := m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
+			ChatId: message.Chat.ID,
+			Text:   "pong!",
+		})
+		_, _ = msg, err
+	}
 }
 
 func (m *Manager) processCallbackQuery(cq *tgclient.CallbackQuery) {

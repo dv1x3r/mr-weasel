@@ -37,30 +37,6 @@ type APICaller interface {
 	Method() string
 }
 
-type GetMeConfig struct {
-}
-
-func (GetMeConfig) Method() string {
-	return "getMe"
-}
-
-// This object contains information required by GetUpdates request.
-type GetUpdatesConfig struct {
-	// Optional. Identifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates.
-	// An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id.
-	Offset int `json:"offset,omitempty"`
-	// Optional. Limits the number of updates to be retrieved. Values between 1-100 are accepted. Defaults to 100.
-	Limit int `json:"limit,omitempty"`
-	// Optional. Timeout in seconds for long polling. Defaults to 0, i.e. usual short polling. Should be positive, short polling should be used for testing purposes only.
-	Timeout int `json:"timeout,omitempty"`
-	// Optional. A JSON-serialized list of the update types you want your bot to receive. For example, specify [“message”, “edited_channel_post”, “callback_query”] to only receive updates of these types.
-	AllowedUpdates []string `json:"allowed_updates,omitempty"`
-}
-
-func (GetUpdatesConfig) Method() string {
-	return "getUpdates"
-}
-
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
 type Update struct {
 	// The update's unique identifier
@@ -123,6 +99,25 @@ type Message struct {
 	Text string `json:"text,omitempty"`
 	// Optional. Inline keyboard attached to the message. login_url buttons are represented as ordinary url buttons.
 	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+}
+
+// This object represents one special entity in a text message. For example, hashtags, usernames, URLs, etc.
+type MessageEntity struct {
+	// Type of the entity.
+	// "mention", "hashtag", "cashtag", "bot_command", "url", "email", "phone_number" etc.
+	Type string `json:"type"`
+	// Offset in UTF-16 code units to the start of the entity.
+	Offset int `json:"offset"`
+	// Length of the entity in UTF-16 code units.
+	Length int `json:"length"`
+	// Optional. For “text_link” only, URL that will be opened after user taps on the text.
+	Url string `json:"url,omitempty"`
+	// Optional. For “text_mention” only, the mentioned user.
+	User *User `json:"user,omitempty"`
+	// Optional. For “pre” only, the programming language of the entity text.
+	Language string `json:"language,omitempty"`
+	// Optional. For “custom_emoji” only, unique identifier of the custom emoji. Use getCustomEmojiStickers to get full information about the sticker.
+	CustomEmojiId string `json:"custom_emoji_id,omitempty"`
 }
 
 // This object represents an inline keyboard that appears right next to the message it belongs to.

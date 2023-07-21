@@ -9,7 +9,7 @@ import (
 
 func main() {
 	token := os.Getenv("TG_TOKEN")
-	tgClient, err := tgclient.New(token)
+	tgClient, err := tgclient.New(token, true)
 	if err != nil {
 		panic(err)
 	}

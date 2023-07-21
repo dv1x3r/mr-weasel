@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -16,20 +17,22 @@ const apiEndpoint = "https://api.telegram.org/bot%s/%s"
 type Client struct {
 	client *http.Client
 	token  string
+	debug  bool
 	Me     User
 }
 
-func New(token string) (*Client, error) {
+func New(token string, debug bool) (*Client, error) {
 	c := &Client{
 		client: &http.Client{Timeout: 120 * time.Second},
 		token:  token,
+		debug:  debug,
 	}
 
 	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
-		log.Println("Failed to start the bot")
+		log.Println("[ERROR]", "Failed to start the bot")
 	} else {
-		log.Printf("Logged in as [%s]", me.Username)
+		log.Printf("[INFO] Logged in as [%s]", me.Username)
 	}
 	c.Me = me
 
@@ -70,7 +73,7 @@ func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update
 // Use this method to receive incoming updates using long polling. Returns a Channel with Update objects.
 func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
 	ch := make(chan Update, chanSize)
-	log.Println("Goroutine GetUpdatesChan started")
+	log.Println("[INFO]", "Goroutine GetUpdatesChan started")
 
 	go func() {
 		for {
@@ -84,24 +87,41 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 			updates, err := c.GetUpdates(ctx, cfg)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
-					log.Println("Goroutine GetUpdatesChan closed")
+					log.Println("[INFO]", "Goroutine GetUpdatesChan closed")
 					close(ch)
 					return
 				} else {
-					log.Println("Failed to get updates, retrying in 3 seconds...")
+					log.Println("[WARN]", "Failed to get updates, retrying in 3 seconds...")
 					time.Sleep(time.Second * 3)
 					continue
 				}
 			}
 
 			for _, update := range updates {
-				cfg.Offset = update.UpdateID + 1
+				if update.UpdateID >= cfg.Offset {
+					cfg.Offset = update.UpdateID + 1
+				}
 				ch <- update
 			}
 		}
 	}()
 
 	return ch
+}
+
+func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
+	res, err := c.makeRequest(ctx, cfg)
+	if err != nil {
+		return Message{}, err
+	}
+
+	message := Message{}
+	err = json.Unmarshal(res.Result, &message)
+	if err != nil {
+		return Message{}, fmt.Errorf("Updates Unmarshal: %w", err)
+	}
+
+	return message, nil
 }
 
 func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
@@ -113,6 +133,10 @@ func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, 
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if c.debug {
+		log.Println("[DEBUG]", cfg.Method(), strings.TrimSuffix(string(params.Bytes()), "\n"))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, params)
