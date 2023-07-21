@@ -13,26 +13,31 @@ import (
 
 const apiEndpoint = "https://api.telegram.org/bot%s/%s"
 
-type Telegram struct {
+type Client struct {
 	client *http.Client
 	token  string
 	Me     User
 }
 
-func New(token string, timeout time.Duration) (*Telegram, error) {
-	tg := &Telegram{
-		client: &http.Client{Timeout: timeout},
+func New(token string) (*Client, error) {
+	tg := &Client{
+		client: &http.Client{Timeout: 120},
 		token:  token,
 	}
 
 	me, err := tg.GetMe(context.Background(), GetMeConfig{})
+	if err != nil {
+		log.Println("Failed to start the bot")
+	} else {
+		log.Printf("Logged in as [%s]", me.Username)
+	}
 	tg.Me = me
 
 	return tg, err
 }
 
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
-func (tg *Telegram) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
+func (tg *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 	res, err := tg.makeRequest(ctx, cfg)
 	if err != nil {
 		return User{}, err
@@ -47,7 +52,7 @@ func (tg *Telegram) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
-func (tg *Telegram) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
+func (tg *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
 	res, err := tg.makeRequest(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -63,9 +68,9 @@ func (tg *Telegram) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Upd
 }
 
 // Use this method to receive incoming updates using long polling. Returns a Channel with Update objects.
-func (tg *Telegram) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
+func (tg *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
 	c := make(chan Update, chanSize)
-	log.Println("Starting GetUpdates channel goroutine")
+	log.Println("Goroutine GetUpdatesChan started")
 
 	go func() {
 		for {
@@ -79,7 +84,7 @@ func (tg *Telegram) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, ch
 			updates, err := tg.GetUpdates(ctx, cfg)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
-					log.Println("Closing GetUpdates channel")
+					log.Println("Goroutine GetUpdatesChan closed")
 					close(c)
 					return
 				} else {
@@ -99,7 +104,7 @@ func (tg *Telegram) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, ch
 	return c
 }
 
-func (tg *Telegram) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
+func (tg *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
 	url := fmt.Sprintf(apiEndpoint, tg.token, cfg.Method())
 
 	params := new(bytes.Buffer)
