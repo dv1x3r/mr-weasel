@@ -2,17 +2,17 @@ package main
 
 import (
 	_ "github.com/joho/godotenv/autoload"
-	"mr-weasel/api/telegram"
-	"mr-weasel/manager"
+	tgclient "mr-weasel/client/telegram"
+	tgmanager "mr-weasel/manager/telegram"
 	"os"
 )
 
 func main() {
 	token := os.Getenv("TG_TOKEN")
-	tg, err := telegram.New(token)
+	tgClient, err := tgclient.New(token)
 	if err != nil {
 		panic(err)
 	}
-	tgmng := manager.NewTelegramManager(tg)
-	tgmng.Start()
+	tgManager := tgmanager.New(tgClient)
+	tgManager.Start()
 }

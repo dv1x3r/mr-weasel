@@ -1,4 +1,4 @@
-package telegram
+package tgclient
 
 import (
 	"encoding/json"

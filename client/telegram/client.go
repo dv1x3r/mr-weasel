@@ -1,4 +1,4 @@
-package telegram
+package tgclient
 
 import (
 	"bytes"
@@ -20,40 +20,40 @@ type Client struct {
 }
 
 func New(token string) (*Client, error) {
-	tg := &Client{
-		client: &http.Client{Timeout: 120},
+	c := &Client{
+		client: &http.Client{Timeout: 120 * time.Second},
 		token:  token,
 	}
 
-	me, err := tg.GetMe(context.Background(), GetMeConfig{})
+	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
 		log.Println("Failed to start the bot")
 	} else {
 		log.Printf("Logged in as [%s]", me.Username)
 	}
-	tg.Me = me
+	c.Me = me
 
-	return tg, err
+	return c, err
 }
 
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
-func (tg *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
-	res, err := tg.makeRequest(ctx, cfg)
+func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
+	res, err := c.makeRequest(ctx, cfg)
 	if err != nil {
 		return User{}, err
 	}
 
-	err = json.Unmarshal(res.Result, &tg.Me)
+	err = json.Unmarshal(res.Result, &c.Me)
 	if err != nil {
 		return User{}, fmt.Errorf("GetMe Unmarshal: %w", err)
 	}
 
-	return tg.Me, nil
+	return c.Me, nil
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
-func (tg *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
-	res, err := tg.makeRequest(ctx, cfg)
+func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
+	res, err := c.makeRequest(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -68,24 +68,24 @@ func (tg *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Updat
 }
 
 // Use this method to receive incoming updates using long polling. Returns a Channel with Update objects.
-func (tg *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
-	c := make(chan Update, chanSize)
+func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
+	ch := make(chan Update, chanSize)
 	log.Println("Goroutine GetUpdatesChan started")
 
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				close(c)
+				close(ch)
 				return
 			default:
 			}
 
-			updates, err := tg.GetUpdates(ctx, cfg)
+			updates, err := c.GetUpdates(ctx, cfg)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					log.Println("Goroutine GetUpdatesChan closed")
-					close(c)
+					close(ch)
 					return
 				} else {
 					log.Println("Failed to get updates, retrying in 3 seconds...")
@@ -96,16 +96,16 @@ func (tg *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chan
 
 			for _, update := range updates {
 				cfg.Offset = update.UpdateID + 1
-				c <- update
+				ch <- update
 			}
 		}
 	}()
 
-	return c
+	return ch
 }
 
-func (tg *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
-	url := fmt.Sprintf(apiEndpoint, tg.token, cfg.Method())
+func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
+	url := fmt.Sprintf(apiEndpoint, c.token, cfg.Method())
 
 	params := new(bytes.Buffer)
 	if cfg != nil {
@@ -121,7 +121,7 @@ func (tg *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse,
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := tg.client.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
