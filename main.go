@@ -1,10 +1,12 @@
 package main
 
 import (
-	_ "github.com/joho/godotenv/autoload"
 	tgclient "mr-weasel/client/telegram"
+	"mr-weasel/commands/ping"
 	tgmanager "mr-weasel/manager/telegram"
 	"os"
+
+	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {
@@ -14,5 +16,6 @@ func main() {
 		panic(err)
 	}
 	tgManager := tgmanager.New(tgClient)
+	tgManager.RegisterCommand(ping.PingCommand{})
 	tgManager.Start()
 }

@@ -30,7 +30,7 @@ func New(token string, debug bool) (*Client, error) {
 
 	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
-		log.Println("[ERROR]", "Failed to start the bot")
+		log.Println("[ERROR] Failed to start the bot")
 	} else {
 		log.Printf("[INFO] Logged in as [%s]", me.Username)
 	}
@@ -136,7 +136,7 @@ func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, 
 	}
 
 	if c.debug {
-		log.Println("[DEBUG]", cfg.Method(), strings.TrimSuffix(string(params.Bytes()), "\n"))
+		log.Println("[DEBUG] Request", cfg.Method(), strings.TrimSpace(string(params.Bytes())))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, params)
@@ -169,6 +169,10 @@ func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, 
 			Message:            apiRes.Description,
 			ResponseParameters: parameters,
 		}
+	}
+
+	if c.debug {
+		log.Println("[DEBUG] Response", cfg.Method(), strings.TrimSpace(string(apiRes.Result)))
 	}
 
 	return apiRes, nil
