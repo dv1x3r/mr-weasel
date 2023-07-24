@@ -109,6 +109,8 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 	if err != nil {
 		log.Printf("[ERROR] %+v %s \n", cmd, err)
 		return
+	} else {
+		log.Printf("[INFO] %+v succeeded \n", cmd)
 	}
 
 	if res.Action != "" {
@@ -123,7 +125,7 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 		Text:   res.Text,
 	})
 	if err != nil {
-		log.Printf("[ERROR] Sending a response:", err)
+		log.Println("[ERROR] Sending a response:", err)
 	}
 }
 
