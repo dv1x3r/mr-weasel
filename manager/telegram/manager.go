@@ -27,13 +27,15 @@ type HandlerFunc = func(Input) (Output, error)
 
 type Manager struct {
 	client   *tgclient.Client       // Telegram API Client
+	debug    bool                   // Enable debug output.
 	commands map[string]HandlerFunc // Map of all registered command handlers.
 	states   map[int64]string       // Map of all active user states (active commands).
 }
 
-func New(client *tgclient.Client) *Manager {
+func New(client *tgclient.Client, debug bool) *Manager {
 	m := &Manager{
 		client:   client,
+		debug:    debug,
 		commands: make(map[string]HandlerFunc),
 		states:   make(map[int64]string),
 	}
@@ -66,6 +68,10 @@ func (m *Manager) Start() {
 	}
 }
 
+func parseInput(text string) (HandlerFunc, Input) {
+	return nil, Input{}
+}
+
 func (m *Manager) processMessage(message *tgclient.Message) {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
@@ -81,6 +87,9 @@ func (m *Manager) processMessage(message *tgclient.Message) {
 
 	fn := m.commands[prefix]
 	if fn == nil {
+		if m.debug {
+			log.Println("[DEBUG]", prefix, "handler not found")
+		}
 		return
 	}
 
@@ -92,6 +101,7 @@ func (m *Manager) processMessage(message *tgclient.Message) {
 
 	res, err := fn(input)
 	if err != nil {
+		log.Println("[ERROR]", prefix, err)
 		return
 	}
 
@@ -99,6 +109,10 @@ func (m *Manager) processMessage(message *tgclient.Message) {
 		ChatId: message.Chat.ID,
 		Text:   res.Text,
 	})
+
+	if m.debug {
+		log.Println("[DEBUG]", prefix, "succeeded")
+	}
 }
 
 func (m *Manager) processCallbackQuery(cq *tgclient.CallbackQuery) {

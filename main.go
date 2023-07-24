@@ -11,11 +11,11 @@ import (
 
 func main() {
 	token := os.Getenv("TG_TOKEN")
-	tgClient, err := tgclient.New(token, true)
+	tgClient, err := tgclient.New(token, false)
 	if err != nil {
 		panic(err)
 	}
-	tgManager := tgmanager.New(tgClient)
+	tgManager := tgmanager.New(tgClient, true)
 	tgManager.RegisterCommand(ping.PingCommand{})
 	tgManager.Start()
 }
