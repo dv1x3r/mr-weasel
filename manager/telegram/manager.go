@@ -7,47 +7,48 @@ import (
 	"strings"
 )
 
-type Input struct {
+type User struct {
+	UserID int64
+}
+
+type Command struct {
 	Prefix string
 	Action string
 	Args   string
-	User   tgclient.User
 }
 
-type Output struct {
-	Text  string
-	State string
+type Result struct {
+	Text   string
+	Action string
 }
 
 type Handler interface {
 	Prefix() string
 	Description() string
-	ExecuteTelegram(Input) (Output, error)
+	ExecuteTelegram(User, Command) (Result, error)
 }
 
-type HandlerFunc = func(Input) (Output, error)
+type HandlerFunc = func(User, Command) (Result, error)
 
 type Manager struct {
 	client   *tgclient.Client       // Telegram API Client
 	debug    bool                   // Enable debug output.
 	commands map[string]HandlerFunc // Map of all registered command handlers.
-	states   map[int64]string       // Map of all active user states (active commands).
+	states   map[int64]Command      // Map of all active user states (active commands).
 }
 
 func New(client *tgclient.Client, debug bool) *Manager {
-	m := &Manager{
+	return &Manager{
 		client:   client,
 		debug:    debug,
 		commands: make(map[string]HandlerFunc),
-		states:   make(map[int64]string),
+		states:   make(map[int64]Command),
 	}
-	return m
 }
 
-func (m *Manager) RegisterCommand(cmd Handler) {
-	prefix := "/" + cmd.Prefix()
-	handler := cmd.ExecuteTelegram
-	m.commands[prefix] = handler
+func (m *Manager) RegisterCommand(h Handler) {
+	prefix := "/" + h.Prefix()
+	m.commands[prefix] = h.ExecuteTelegram
 	log.Printf("[INFO] %s registered \n", prefix)
 }
 
@@ -70,8 +71,7 @@ func (m *Manager) Start() {
 	}
 }
 
-// Parse Telegram message in the following format: /prefix:action args
-func parseMessage(message *tgclient.Message) Input {
+func readCommand(message *tgclient.Message) Command {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
 			return arr[i]
@@ -79,44 +79,51 @@ func parseMessage(message *tgclient.Message) Input {
 		return ""
 	}
 
-	textSplit := strings.SplitN(message.Text, " ", 2)
-	command, args := safeGet(textSplit, 0), safeGet(textSplit, 1)
+	s := strings.SplitN(message.Text, " ", 2)
+	command, args := safeGet(s, 0), safeGet(s, 1)
 
-	commandSplit := strings.Split(command, ":")
-	prefix, action := safeGet(commandSplit, 0), safeGet(commandSplit, 1)
+	s = strings.Split(command, ":")
+	prefix, action := safeGet(s, 0), safeGet(s, 1)
 
-	var user tgclient.User
-	if message.From != nil {
-		user = *message.From
-	}
-
-	return Input{Prefix: prefix, Action: action, Args: args, User: user}
+	return Command{Prefix: prefix, Action: action, Args: args}
 }
 
-func (m *Manager) processMessage(message *tgclient.Message) {
-	input := parseMessage(message)
+func (m *Manager) processMessage(msg *tgclient.Message) {
+	usr := User{UserID: msg.From.ID}
 
-	fn := m.commands[input.Prefix]
-	if fn == nil {
-		if m.debug {
-			log.Println("[DEBUG]", input.Prefix, "handler not found")
+	cmd := readCommand(msg)          // Split message by /prefix:action args
+	fn, ok := m.commands[cmd.Prefix] // Check if prefix command exists
+	if !ok {
+		cmd, ok = m.states[usr.UserID] // Check if user has an active state
+		if !ok {
+			if m.debug {
+				log.Println("[DEBUG] Handler not found:", msg.Text)
+			}
+			return
 		}
-		return
+		fn = m.commands[cmd.Prefix] // User a function from the active state
+		cmd.Args = msg.Text         // Set text from the message input as args
 	}
 
-	res, err := fn(input)
+	res, err := fn(usr, cmd)
 	if err != nil {
-		log.Println("[ERROR]", input.Prefix, err)
+		log.Printf("[ERROR] %+v %s \n", cmd, err)
 		return
 	}
 
-	m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
-		ChatId: message.Chat.ID,
+	if res.Action != "" {
+		cmd.Action = res.Action
+		m.states[usr.UserID] = cmd
+	} else {
+		delete(m.states, usr.UserID)
+	}
+
+	_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
+		ChatId: msg.Chat.ID,
 		Text:   res.Text,
 	})
-
-	if m.debug {
-		log.Println("[DEBUG]", input.Prefix, "succeeded")
+	if err != nil {
+		log.Printf("[ERROR] Sending a response:", err)
 	}
 }
 

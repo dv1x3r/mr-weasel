@@ -1,12 +1,11 @@
 package main
 
 import (
+	_ "github.com/joho/godotenv/autoload"
 	tgclient "mr-weasel/client/telegram"
 	"mr-weasel/commands/ping"
 	tgmanager "mr-weasel/manager/telegram"
 	"os"
-
-	_ "github.com/joho/godotenv/autoload"
 )
 
 func main() {

@@ -1,7 +1,6 @@
 package ping
 
 import (
-	"fmt"
 	tg "mr-weasel/manager/telegram"
 )
 
@@ -15,7 +14,12 @@ func (PingCommand) Description() string {
 	return "answers with pong!"
 }
 
-func (PingCommand) ExecuteTelegram(input tg.Input) (tg.Output, error) {
-	s := fmt.Sprintf("Pong! %s - %s - %s - %s", input.Prefix, input.Action, input.Args, input.User.Username)
-	return tg.Output{Text: s}, nil
+func (PingCommand) ExecuteTelegram(user tg.User, cmd tg.Command) (tg.Result, error) {
+	if cmd.Args == "" {
+		return tg.Result{Text: "What is your name?", Action: "welcome"}, nil
+	}
+	if cmd.Action == "welcome" {
+		return tg.Result{Text: "Welcome, " + cmd.Args}, nil
+	}
+	return tg.Result{Text: "pong!"}, nil
 }
