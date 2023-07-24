@@ -1,6 +1,9 @@
 package ping
 
-import tg "mr-weasel/manager/telegram"
+import (
+	"fmt"
+	tg "mr-weasel/manager/telegram"
+)
 
 type PingCommand struct{}
 
@@ -13,5 +16,6 @@ func (PingCommand) Description() string {
 }
 
 func (PingCommand) ExecuteTelegram(input tg.Input) (tg.Output, error) {
-	return tg.Output{Text: "pong!"}, nil
+	s := fmt.Sprintf("Pong! %s - %s - %s - %s", input.Prefix, input.Action, input.Args, input.User.Username)
+	return tg.Output{Text: s}, nil
 }

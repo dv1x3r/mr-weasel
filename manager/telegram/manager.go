@@ -8,13 +8,15 @@ import (
 )
 
 type Input struct {
-	User tgclient.User // User who initiated command.
-	Text string        // Original message text.
+	Prefix string
+	Action string
+	Args   string
+	User   tgclient.User
 }
 
 type Output struct {
-	Text  string // New message text.
-	State string // Set user state.
+	Text  string
+	State string
 }
 
 type Handler interface {
@@ -68,11 +70,8 @@ func (m *Manager) Start() {
 	}
 }
 
-func parseInput(text string) (HandlerFunc, Input) {
-	return nil, Input{}
-}
-
-func (m *Manager) processMessage(message *tgclient.Message) {
+// Parse Telegram message in the following format: /prefix:action args
+func parseMessage(message *tgclient.Message) Input {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
 			return arr[i]
@@ -80,28 +79,34 @@ func (m *Manager) processMessage(message *tgclient.Message) {
 		return ""
 	}
 
-	s := strings.SplitN(message.Text, " ", 2)
-	prefix := safeGet(s, 0)
-	// subcommand := strings.Split(prefix, ":")
-	args := safeGet(s, 1)
+	textSplit := strings.SplitN(message.Text, " ", 2)
+	command, args := safeGet(textSplit, 0), safeGet(textSplit, 1)
 
-	fn := m.commands[prefix]
+	commandSplit := strings.Split(command, ":")
+	prefix, action := safeGet(commandSplit, 0), safeGet(commandSplit, 1)
+
+	var user tgclient.User
+	if message.From != nil {
+		user = *message.From
+	}
+
+	return Input{Prefix: prefix, Action: action, Args: args, User: user}
+}
+
+func (m *Manager) processMessage(message *tgclient.Message) {
+	input := parseMessage(message)
+
+	fn := m.commands[input.Prefix]
 	if fn == nil {
 		if m.debug {
-			log.Println("[DEBUG]", prefix, "handler not found")
+			log.Println("[DEBUG]", input.Prefix, "handler not found")
 		}
 		return
 	}
 
-	input := Input{}
-	if message.From != nil {
-		input.User = *message.From
-	}
-	input.Text = args
-
 	res, err := fn(input)
 	if err != nil {
-		log.Println("[ERROR]", prefix, err)
+		log.Println("[ERROR]", input.Prefix, err)
 		return
 	}
 
@@ -111,7 +116,7 @@ func (m *Manager) processMessage(message *tgclient.Message) {
 	})
 
 	if m.debug {
-		log.Println("[DEBUG]", prefix, "succeeded")
+		log.Println("[DEBUG]", input.Prefix, "succeeded")
 	}
 }
 
