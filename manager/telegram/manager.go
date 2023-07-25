@@ -91,6 +91,10 @@ func readCommand(msg *tgclient.Message) Command {
 	s = strings.Split(command, ":")
 	prefix, action := safeGet(s, 0), safeGet(s, 1)
 
+	if msg.From == nil {
+		return Command{}
+	}
+
 	return Command{UserID: msg.From.ID, Prefix: prefix, Action: action, Args: args}
 }
 
@@ -100,12 +104,14 @@ func (m *Manager) getCommandHandler(msg *tgclient.Message) (Command, HandlerFunc
 	if ok {
 		return cmd, fn
 	}
-	cmd, ok = m.states[msg.From.ID] // Check if the user has an active state
+
+	cmd, ok = m.states[msg.From.ID] // Check if user has an active state
 	if ok {
 		fn = m.commands[cmd.Prefix] // Get the command handler for that state
 		cmd.Args = msg.Text         // Set text from the message input as args
 		return cmd, fn
 	}
+
 	return Command{}, nil
 }
 
@@ -122,11 +128,10 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 	if err != nil {
 		log.Printf("[ERROR] %+v %s \n", cmd, err)
 		return
-	} else {
-		log.Printf("[INFO] %+v succeeded \n", cmd)
 	}
 
-	m.updateState(cmd, res)
+	m.updateState(cmd, res) // Manage stateful commands
+	log.Printf("[INFO] %+v succeeded \n", cmd)
 
 	_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
 		ChatId: msg.Chat.ID,
