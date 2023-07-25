@@ -1,6 +1,5 @@
 package tgclient
 
-// A simple method for testing your bot's authentication token. Requires no parameters.
 type GetMeConfig struct {
 }
 
@@ -8,7 +7,6 @@ func (GetMeConfig) Method() string {
 	return "getMe"
 }
 
-// Use this method to receive incoming updates using long polling.
 type GetUpdatesConfig struct {
 	// Optional. Identifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates.
 	// An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id.
@@ -25,29 +23,28 @@ func (GetUpdatesConfig) Method() string {
 	return "getUpdates"
 }
 
-// Use this method to send text messages.
 type SendMessageConfig struct {
 	// Unique identifier for the target chat or username.
 	ChatId int64 `json:"chat_id"`
-	// Unique identifier for the target message thread (topic) of the forum; for forum supergroups only.
+	// Optional. Unique identifier for the target message thread (topic) of the forum; for forum supergroups only.
 	MessageThreadId int `json:"message_thread_id,omitempty"`
 	// Text of the message to be sent, 1-4096 characters after entities parsing.
 	Text string `json:"text"`
-	// Mode for parsing entities in the message text. See formatting options for more details.
+	// Optional. Mode for parsing entities in the message text. See formatting options for more details.
 	ParseMode string `json:"parse_mode,omitempty"`
-	// A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode.
+	// Optional. A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode.
 	Entities []MessageEntity `json:"entities,omitempty"`
-	// Disables link previews for links in this message.
+	// Optional. Disables link previews for links in this message.
 	DisableWebPagePreview bool `json:"disable_web_page_preview,omitempty"`
-	// Sends the message silently. Users will receive a notification with no sound.
+	// Optional. Sends the message silently. Users will receive a notification with no sound.
 	DisableNotification bool `json:"disable_notification,omitempty"`
-	// Protects the contents of the sent message from forwarding and saving.
+	// Optional. Protects the contents of the sent message from forwarding and saving.
 	ProtectContent bool `json:"protect_content,omitempty"`
-	// If the message is a reply, ID of the original message.
+	// Optional. If the message is a reply, ID of the original message.
 	ReplyToMessageId int `json:"reply_to_message_id,omitempty"`
-	// Pass True if the message should be sent even if the specified replied-to message is not found.
+	// Optional. Pass True if the message should be sent even if the specified replied-to message is not found.
 	AllowSendingWithoutReply bool `json:"allow_sending_without_reply,omitempty"`
-	// Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
+	// Optional. Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
 	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
 
@@ -55,13 +52,12 @@ func (SendMessageConfig) Method() string {
 	return "sendMessage"
 }
 
-// Use this method to change the list of the bot's commands.
 type SetMyCommandsConfig struct {
 	// A JSON-serialized list of bot commands to be set as the list of the bot's commands. At most 100 commands can be specified.
 	Commands []BotCommand `json:"commands"`
-	// A JSON-serialized object, describing scope of users for which the commands are relevant. Defaults to BotCommandScopeDefault.
+	// Optional. A JSON-serialized object, describing scope of users for which the commands are relevant. Defaults to BotCommandScopeDefault.
 	Scope *BotCommandScope `json:"scope,omitempty"`
-	// A two-letter ISO 639-1 language code. If empty, commands will be applied to all users from the given scope, for whose language there are no dedicated commands.
+	// Optional. A two-letter ISO 639-1 language code. If empty, commands will be applied to all users from the given scope, for whose language there are no dedicated commands.
 	LanguageCode string `json:"language_code,omitempty"`
 }
 

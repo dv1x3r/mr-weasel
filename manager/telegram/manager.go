@@ -28,29 +28,44 @@ type Handler interface {
 type HandlerFunc = func(Command) (Result, error)
 
 type Manager struct {
-	client   *tgclient.Client       // Telegram API Client
-	debug    bool                   // Enable debug output.
-	commands map[string]HandlerFunc // Map of all registered command handlers.
-	states   map[int64]Command      // Map of all active user states (active commands).
+	client   *tgclient.Client   // Telegram API Client
+	debug    bool               // Enable debug output.
+	commands map[string]Handler // Map of all registered command handlers.
+	states   map[int64]Command  // Map of all active user states (active commands).
 }
 
 func New(client *tgclient.Client, debug bool) *Manager {
 	return &Manager{
 		client:   client,
 		debug:    debug,
-		commands: make(map[string]HandlerFunc),
+		commands: make(map[string]Handler),
 		states:   make(map[int64]Command),
 	}
 }
 
-func (m *Manager) RegisterCommand(h Handler) {
-	prefix := "/" + h.Prefix()
-	m.commands[prefix] = h.ExecuteTelegram
+func (m *Manager) RegisterCommand(handler Handler) {
+	prefix := "/" + handler.Prefix()
+	m.commands[prefix] = handler
 	log.Printf("[INFO] %s registered \n", prefix)
 }
 
 func (m *Manager) UploadCommands() {
-	// m.client.SetMyCommands(ctx)
+	botCommands := make([]tgclient.BotCommand, 0, len(m.commands))
+	for _, handler := range m.commands {
+		botCommands = append(botCommands, tgclient.BotCommand{
+			Command:     handler.Prefix(),
+			Description: handler.Description(),
+		})
+	}
+
+	res, err := m.client.SetMyCommands(context.Background(), tgclient.SetMyCommandsConfig{
+		Commands: botCommands,
+	})
+	if err != nil {
+		log.Println("[ERROR] UploadCommands", err)
+	}
+
+	log.Println("[INFO] UploadCommands:", res)
 }
 
 func (m *Manager) Start() {
@@ -102,33 +117,33 @@ func readCommand(msg *tgclient.Message) Command {
 	return Command{UserID: msg.From.ID, Prefix: prefix, Action: action, Args: args}
 }
 
-func (m *Manager) getCommandHandler(msg *tgclient.Message) (Command, HandlerFunc) {
-	cmd := readCommand(msg)          // Split message by /prefix:action args
-	fn, ok := m.commands[cmd.Prefix] // Get the command handler (if exists)
+func (m *Manager) getCommandHandler(msg *tgclient.Message) (Command, Handler) {
+	cmd := readCommand(msg)               // Split message by /prefix:action args
+	handler, ok := m.commands[cmd.Prefix] // Get the command handler (if exists)
 	if ok {
-		return cmd, fn
+		return cmd, handler
 	}
 
 	cmd, ok = m.states[msg.From.ID] // Check if user has an active state
 	if ok {
-		fn = m.commands[cmd.Prefix] // Get the command handler for that state
-		cmd.Args = msg.Text         // Set text from the message input as args
-		return cmd, fn
+		handler = m.commands[cmd.Prefix] // Get the command handler for that state
+		cmd.Args = msg.Text              // Set text from the message input as args
+		return cmd, handler
 	}
 
 	return Command{}, nil
 }
 
 func (m *Manager) processMessage(msg *tgclient.Message) {
-	cmd, fn := m.getCommandHandler(msg)
-	if fn == nil {
+	cmd, handler := m.getCommandHandler(msg)
+	if handler == nil {
 		if m.debug {
 			log.Println("[DEBUG] Handler not found:", msg.Text)
 		}
 		return
 	}
 
-	res, err := fn(cmd)
+	res, err := handler.ExecuteTelegram(cmd)
 	if err != nil {
 		log.Printf("[ERROR] %+v %s \n", cmd, err)
 		return

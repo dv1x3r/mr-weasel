@@ -16,5 +16,6 @@ func main() {
 	}
 	tgManager := tgmanager.New(tgClient, true)
 	tgManager.RegisterCommand(ping.PingCommand{})
+	tgManager.UploadCommands()
 	tgManager.Start()
 }

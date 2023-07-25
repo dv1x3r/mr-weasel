@@ -18,7 +18,6 @@ type Client struct {
 	client *http.Client
 	token  string
 	debug  bool
-	Me     User
 }
 
 func New(token string, debug bool) (*Client, error) {
@@ -34,7 +33,6 @@ func New(token string, debug bool) (*Client, error) {
 	} else {
 		log.Printf("[INFO] Logged in as [%s]", me.Username)
 	}
-	c.Me = me
 
 	return c, err
 }
@@ -46,12 +44,9 @@ func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 		return User{}, err
 	}
 
-	err = json.Unmarshal(res.Result, &c.Me)
-	if err != nil {
-		return User{}, fmt.Errorf("GetMe Unmarshal: %w", err)
-	}
-
-	return c.Me, nil
+	user := User{}
+	err = json.Unmarshal(res.Result, &user)
+	return user, err
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
@@ -63,14 +58,10 @@ func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update
 
 	updates := []Update{}
 	err = json.Unmarshal(res.Result, &updates)
-	if err != nil {
-		return nil, fmt.Errorf("Updates Unmarshal: %w", err)
-	}
-
-	return updates, nil
+	return updates, err
 }
 
-// Use this method to receive incoming updates using long polling. Returns a Channel with Update objects.
+// Use this method to receive incoming updates using long polling. Starts a background goroutine, and returns a Channel with Update objects.
 func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
 	ch := make(chan Update, chanSize)
 	log.Println("[INFO]", "Goroutine GetUpdatesChan started")
@@ -109,6 +100,7 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
+// Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
 	res, err := c.makeRequest(ctx, cfg)
 	if err != nil {
@@ -117,15 +109,19 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 
 	message := Message{}
 	err = json.Unmarshal(res.Result, &message)
-	if err != nil {
-		return Message{}, fmt.Errorf("Updates Unmarshal: %w", err)
-	}
-
-	return message, nil
+	return message, err
 }
 
+// Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
-	return false, nil
+	res, err := c.makeRequest(ctx, cfg)
+	if err != nil {
+		return false, err
+	}
+
+	value := false
+	err = json.Unmarshal(res.Result, &value)
+	return value, err
 }
 
 func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
