@@ -151,3 +151,18 @@ type CallbackQuery struct {
 	// Optional. Data associated with the callback button. Be aware that the message originated the query can contain no callback buttons with this data.
 	Data string `json:"data,omitempty"`
 }
+
+// This object represents a bot command.
+type BotCommand struct {
+	// Text of the command; 1-32 characters. Can contain only lowercase English letters, digits and underscores.
+	Command string `json:"command"`
+	// Description of the command; 1-256 characters.
+	Description string `json:"description"`
+}
+
+// This object represents the scope to which bot commands are applied.
+type BotCommandScope struct {
+	Type   string `json:"type"`
+	ChatID int64  `json:"chat_id,omitempty"`
+	UserID int64  `json:"user_id,omitempty"`
+}

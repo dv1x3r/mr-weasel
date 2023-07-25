@@ -1,7 +1,6 @@
 package tgclient
 
 // A simple method for testing your bot's authentication token. Requires no parameters.
-// Returns basic information about the bot in form of a User object.
 type GetMeConfig struct {
 }
 
@@ -10,7 +9,6 @@ func (GetMeConfig) Method() string {
 }
 
 // Use this method to receive incoming updates using long polling.
-// Returns an Array of Update objects.
 type GetUpdatesConfig struct {
 	// Optional. Identifier of the first update to be returned. Must be greater by one than the highest among the identifiers of previously received updates.
 	// An update is considered confirmed as soon as getUpdates is called with an offset higher than its update_id.
@@ -28,7 +26,6 @@ func (GetUpdatesConfig) Method() string {
 }
 
 // Use this method to send text messages.
-// On success, the sent Message is returned.
 type SendMessageConfig struct {
 	// Unique identifier for the target chat or username.
 	ChatId int64 `json:"chat_id"`
@@ -56,4 +53,18 @@ type SendMessageConfig struct {
 
 func (SendMessageConfig) Method() string {
 	return "sendMessage"
+}
+
+// Use this method to change the list of the bot's commands.
+type SetMyCommandsConfig struct {
+	// A JSON-serialized list of bot commands to be set as the list of the bot's commands. At most 100 commands can be specified.
+	Commands []BotCommand `json:"commands"`
+	// A JSON-serialized object, describing scope of users for which the commands are relevant. Defaults to BotCommandScopeDefault.
+	Scope *BotCommandScope `json:"scope,omitempty"`
+	// A two-letter ISO 639-1 language code. If empty, commands will be applied to all users from the given scope, for whose language there are no dedicated commands.
+	LanguageCode string `json:"language_code,omitempty"`
+}
+
+func (SetMyCommandsConfig) Method() string {
+	return "setMyCommands"
 }

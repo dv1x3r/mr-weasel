@@ -49,6 +49,10 @@ func (m *Manager) RegisterCommand(h Handler) {
 	log.Printf("[INFO] %s registered \n", prefix)
 }
 
+func (m *Manager) UploadCommands() {
+	// m.client.SetMyCommands(ctx)
+}
+
 func (m *Manager) Start() {
 	cfg := tgclient.GetUpdatesConfig{
 		Timeout:        60,

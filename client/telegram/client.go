@@ -124,6 +124,10 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 	return message, nil
 }
 
+func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
+	return false, nil
+}
+
 func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
 	url := fmt.Sprintf(apiEndpoint, c.token, cfg.Method())
 
