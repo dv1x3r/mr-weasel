@@ -18,11 +18,12 @@ type Client struct {
 	client *http.Client
 	token  string
 	debug  bool
+	Me     User
 }
 
 func New(token string, debug bool) (*Client, error) {
 	c := &Client{
-		client: &http.Client{Timeout: 120 * time.Second},
+		client: &http.Client{Timeout: 100 * time.Second},
 		token:  token,
 		debug:  debug,
 	}
@@ -46,6 +47,8 @@ func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 
 	user := User{}
 	err = json.Unmarshal(res.Result, &user)
+	c.Me = user
+
 	return user, err
 }
 

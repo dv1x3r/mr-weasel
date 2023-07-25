@@ -7,62 +7,68 @@ import (
 	"strings"
 )
 
-type Command struct {
+type User struct {
 	UserID int64
+}
+
+type Payload struct {
 	Prefix string
 	Action string
-	Args   string
+	Text   string
 }
 
 type Result struct {
 	Text   string
+	Action string
+	Markup *tgclient.InlineKeyboardMarkup
+}
+
+type State struct {
+	Prefix string
 	Action string
 }
 
 type Handler interface {
 	Prefix() string
 	Description() string
-	ExecuteTelegram(Command) (Result, error)
+	ExecuteTelegram(User, Payload) (Result, error)
 }
-
-type HandlerFunc = func(Command) (Result, error)
 
 type Manager struct {
 	client   *tgclient.Client   // Telegram API Client
 	debug    bool               // Enable debug output.
-	commands map[string]Handler // Map of all registered command handlers.
-	states   map[int64]Command  // Map of all active user states (active commands).
+	handlers map[string]Handler // Map of all registered command handlers.
+	states   map[int64]State    // Map of all active user states (active commands).
 }
 
 func New(client *tgclient.Client, debug bool) *Manager {
 	return &Manager{
 		client:   client,
 		debug:    debug,
-		commands: make(map[string]Handler),
-		states:   make(map[int64]Command),
+		handlers: make(map[string]Handler),
+		states:   make(map[int64]State),
 	}
 }
 
-func (m *Manager) RegisterCommand(handler Handler) {
+func (m *Manager) AddCommand(handler Handler) {
 	prefix := "/" + handler.Prefix()
-	m.commands[prefix] = handler
+	m.handlers[prefix] = handler
 	log.Printf("[INFO] %s registered \n", prefix)
 }
 
-func (m *Manager) UploadCommands() {
-	botCommands := make([]tgclient.BotCommand, 0, len(m.commands))
-	for _, handler := range m.commands {
+func (m *Manager) SetCommands() {
+	botCommands := make([]tgclient.BotCommand, 0, len(m.handlers))
+	for _, handler := range m.handlers {
 		botCommands = append(botCommands, tgclient.BotCommand{
 			Command:     handler.Prefix(),
 			Description: handler.Description(),
 		})
 	}
 
-	res, err := m.client.SetMyCommands(context.Background(), tgclient.SetMyCommandsConfig{
-		Commands: botCommands,
-	})
+	cfg := tgclient.SetMyCommandsConfig{Commands: botCommands}
+	res, err := m.client.SetMyCommands(context.Background(), cfg)
 	if err != nil {
-		log.Println("[ERROR] UploadCommands", err)
+		log.Println("[ERROR] UploadCommands:", err)
 	}
 
 	log.Println("[INFO] UploadCommands:", res)
@@ -70,6 +76,7 @@ func (m *Manager) UploadCommands() {
 
 func (m *Manager) Start() {
 	cfg := tgclient.GetUpdatesConfig{
+		Offset:         -1,
 		Timeout:        60,
 		AllowedUpdates: []string{"message", "callback_query"},
 	}
@@ -87,16 +94,7 @@ func (m *Manager) Start() {
 	}
 }
 
-func (m *Manager) updateState(cmd Command, res Result) {
-	if res.Action != "" {
-		cmd.Action = res.Action
-		m.states[cmd.UserID] = cmd
-	} else {
-		delete(m.states, cmd.UserID)
-	}
-}
-
-func readCommand(msg *tgclient.Message) Command {
+func parsePayload(text string) Payload {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
 			return arr[i]
@@ -104,38 +102,42 @@ func readCommand(msg *tgclient.Message) Command {
 		return ""
 	}
 
-	s := strings.SplitN(msg.Text, " ", 2)
-	command, args := safeGet(s, 0), safeGet(s, 1)
+	s := strings.SplitN(text, " ", 2)
+	command, text := safeGet(s, 0), safeGet(s, 1)
 
 	s = strings.Split(command, ":")
 	prefix, action := safeGet(s, 0), safeGet(s, 1)
 
-	if msg.From == nil {
-		return Command{}
-	}
-
-	return Command{UserID: msg.From.ID, Prefix: prefix, Action: action, Args: args}
+	return Payload{Prefix: prefix, Action: action, Text: text}
 }
 
-func (m *Manager) getCommandHandler(msg *tgclient.Message) (Command, Handler) {
-	cmd := readCommand(msg)               // Split message by /prefix:action args
-	handler, ok := m.commands[cmd.Prefix] // Get the command handler (if exists)
+func (m *Manager) getCommand(message *tgclient.Message) (Payload, Handler) {
+	payload := parsePayload(message.Text)     // Split message by /prefix:action text
+	handler, ok := m.handlers[payload.Prefix] // Get the command handler (if exists)
 	if ok {
-		return cmd, handler
+		return payload, handler
 	}
 
-	cmd, ok = m.states[msg.From.ID] // Check if user has an active state
+	state, ok := m.states[message.From.ID] // Check if user has an active state
 	if ok {
-		handler = m.commands[cmd.Prefix] // Get the command handler for that state
-		cmd.Args = msg.Text              // Set text from the message input as args
-		return cmd, handler
+		payload = Payload{Prefix: state.Prefix, Action: state.Action, Text: message.Text}
+		handler = m.handlers[state.Prefix] // Get the command handler for that state
+		return payload, handler
 	}
 
-	return Command{}, nil
+	return Payload{}, nil
+}
+
+func (m *Manager) updateState(userID int64, prefix string, action string) {
+	if action != "" {
+		m.states[userID] = State{Prefix: prefix, Action: action}
+	} else {
+		delete(m.states, userID)
+	}
 }
 
 func (m *Manager) processMessage(msg *tgclient.Message) {
-	cmd, handler := m.getCommandHandler(msg)
+	payload, handler := m.getCommand(msg)
 	if handler == nil {
 		if m.debug {
 			log.Println("[DEBUG] Handler not found:", msg.Text)
@@ -143,21 +145,24 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 		return
 	}
 
-	res, err := handler.ExecuteTelegram(cmd)
+	res, err := handler.ExecuteTelegram(User{UserID: msg.From.ID}, payload)
 	if err != nil {
-		log.Printf("[ERROR] %+v %s \n", cmd, err)
+		log.Printf("[ERROR] %+v %s \n", payload, err)
 		return
 	}
 
-	m.updateState(cmd, res) // Manage stateful commands
-	log.Printf("[INFO] %+v succeeded \n", cmd)
+	m.updateState(msg.From.ID, payload.Prefix, res.Action)
 
-	_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
-		ChatId: msg.Chat.ID,
-		Text:   res.Text,
-	})
-	if err != nil {
-		log.Println("[ERROR] Sending a response:", err)
+	log.Printf("[INFO] %+v succeeded \n", payload)
+
+	if res.Text != "" {
+		_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
+			ChatId: msg.Chat.ID,
+			Text:   res.Text,
+		})
+		if err != nil {
+			log.Println("[ERROR] Sending a response:", err)
+		}
 	}
 }
 

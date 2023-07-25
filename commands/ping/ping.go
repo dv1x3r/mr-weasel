@@ -9,15 +9,15 @@ func (PingCommand) Prefix() string {
 }
 
 func (PingCommand) Description() string {
-	return "answers with pong!"
+	return "answer with pong"
 }
 
-func (PingCommand) ExecuteTelegram(cmd tg.Command) (tg.Result, error) {
-	if cmd.Args == "me" {
+func (PingCommand) ExecuteTelegram(user tg.User, payload tg.Payload) (tg.Result, error) {
+	if payload.Text == "me" {
 		return tg.Result{Text: "What is your name?", Action: "name"}, nil
 	}
-	if cmd.Action == "name" {
-		return tg.Result{Text: "Pong to " + cmd.Args + "!"}, nil
+	if payload.Action == "name" {
+		return tg.Result{Text: "Pong to " + payload.Text + "!"}, nil
 	}
 	return tg.Result{Text: "pong!"}, nil
 }
