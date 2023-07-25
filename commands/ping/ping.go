@@ -14,7 +14,7 @@ func (PingCommand) Description() string {
 	return "answers with pong!"
 }
 
-func (PingCommand) ExecuteTelegram(user tg.User, cmd tg.Command) (tg.Result, error) {
+func (PingCommand) ExecuteTelegram(cmd tg.Command) (tg.Result, error) {
 	if cmd.Args == "" {
 		return tg.Result{Text: "What is your name?", Action: "welcome"}, nil
 	}

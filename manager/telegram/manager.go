@@ -7,11 +7,8 @@ import (
 	"strings"
 )
 
-type User struct {
-	UserID int64
-}
-
 type Command struct {
+	UserID int64
 	Prefix string
 	Action string
 	Args   string
@@ -25,10 +22,10 @@ type Result struct {
 type Handler interface {
 	Prefix() string
 	Description() string
-	ExecuteTelegram(User, Command) (Result, error)
+	ExecuteTelegram(Command) (Result, error)
 }
 
-type HandlerFunc = func(User, Command) (Result, error)
+type HandlerFunc = func(Command) (Result, error)
 
 type Manager struct {
 	client   *tgclient.Client       // Telegram API Client
@@ -71,7 +68,16 @@ func (m *Manager) Start() {
 	}
 }
 
-func readCommand(message *tgclient.Message) Command {
+func (m *Manager) updateState(cmd Command, res Result) {
+	if res.Action != "" {
+		cmd.Action = res.Action
+		m.states[cmd.UserID] = cmd
+	} else {
+		delete(m.states, cmd.UserID)
+	}
+}
+
+func readCommand(msg *tgclient.Message) Command {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
 			return arr[i]
@@ -79,33 +85,40 @@ func readCommand(message *tgclient.Message) Command {
 		return ""
 	}
 
-	s := strings.SplitN(message.Text, " ", 2)
+	s := strings.SplitN(msg.Text, " ", 2)
 	command, args := safeGet(s, 0), safeGet(s, 1)
 
 	s = strings.Split(command, ":")
 	prefix, action := safeGet(s, 0), safeGet(s, 1)
 
-	return Command{Prefix: prefix, Action: action, Args: args}
+	return Command{UserID: msg.From.ID, Prefix: prefix, Action: action, Args: args}
+}
+
+func (m *Manager) getCommandHandler(msg *tgclient.Message) (Command, HandlerFunc) {
+	cmd := readCommand(msg)          // Split message by /prefix:action args
+	fn, ok := m.commands[cmd.Prefix] // Get the command handler (if exists)
+	if ok {
+		return cmd, fn
+	}
+	cmd, ok = m.states[msg.From.ID] // Check if the user has an active state
+	if ok {
+		fn = m.commands[cmd.Prefix] // Get the command handler for that state
+		cmd.Args = msg.Text         // Set text from the message input as args
+		return cmd, fn
+	}
+	return Command{}, nil
 }
 
 func (m *Manager) processMessage(msg *tgclient.Message) {
-	usr := User{UserID: msg.From.ID}
-
-	cmd := readCommand(msg)          // Split message by /prefix:action args
-	fn, ok := m.commands[cmd.Prefix] // Check if prefix command exists
-	if !ok {
-		cmd, ok = m.states[usr.UserID] // Check if user has an active state
-		if !ok {
-			if m.debug {
-				log.Println("[DEBUG] Handler not found:", msg.Text)
-			}
-			return
+	cmd, fn := m.getCommandHandler(msg)
+	if fn == nil {
+		if m.debug {
+			log.Println("[DEBUG] Handler not found:", msg.Text)
 		}
-		fn = m.commands[cmd.Prefix] // User a function from the active state
-		cmd.Args = msg.Text         // Set text from the message input as args
+		return
 	}
 
-	res, err := fn(usr, cmd)
+	res, err := fn(cmd)
 	if err != nil {
 		log.Printf("[ERROR] %+v %s \n", cmd, err)
 		return
@@ -113,12 +126,7 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 		log.Printf("[INFO] %+v succeeded \n", cmd)
 	}
 
-	if res.Action != "" {
-		cmd.Action = res.Action
-		m.states[usr.UserID] = cmd
-	} else {
-		delete(m.states, usr.UserID)
-	}
+	m.updateState(cmd, res)
 
 	_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
 		ChatId: msg.Chat.ID,
