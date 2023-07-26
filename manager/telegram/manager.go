@@ -50,13 +50,15 @@ func New(client *tgclient.Client, debug bool) *Manager {
 	}
 }
 
-func (m *Manager) AddCommand(handler Handler) {
-	prefix := "/" + handler.Prefix()
-	m.handlers[prefix] = handler
-	log.Printf("[INFO] %s registered \n", prefix)
+func (m *Manager) AddCommands(handlers ...Handler) {
+	for _, handler := range handlers {
+		prefix := "/" + handler.Prefix()
+		m.handlers[prefix] = handler
+		log.Printf("[INFO] %s registered \n", prefix)
+	}
 }
 
-func (m *Manager) SetCommands() {
+func (m *Manager) PublishCommands() {
 	botCommands := make([]tgclient.BotCommand, 0, len(m.handlers))
 	for _, handler := range m.handlers {
 		botCommands = append(botCommands, tgclient.BotCommand{

@@ -17,8 +17,7 @@ func main() {
 		panic(err)
 	}
 	tgManager := tgmanager.New(tgClient, true)
-	tgManager.AddCommand(ping.PingCommand{})
-	tgManager.AddCommand(car.CarCommand{})
-	tgManager.SetCommands()
+	tgManager.AddCommands(ping.PingCommand{}, car.CarCommand{})
+	tgManager.PublishCommands()
 	tgManager.Start()
 }
