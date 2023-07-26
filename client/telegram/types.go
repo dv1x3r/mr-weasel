@@ -131,7 +131,7 @@ type InlineKeyboardButton struct {
 	// Label text on the button
 	Text string `json:"text"`
 	// Optional. Data to be sent in a callback query to the bot when button is pressed, 1-64 bytes.
-	CallbackData *string `json:"callback_data,omitempty"`
+	CallbackData string `json:"callback_data,omitempty"`
 }
 
 // This object represents an incoming callback query from a callback button in an inline keyboard.

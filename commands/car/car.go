@@ -12,12 +12,11 @@ func (CarCommand) Description() string {
 	return "manage car costs"
 }
 
-func (CarCommand) ExecuteTelegram(user tg.User, payload tg.Payload) (tg.Result, error) {
-	// if cmd.Args == "me" {
-	// 	return tg.Result{Text: "What is your name?", Action: "name"}, nil
-	// }
-	// if cmd.Action == "name" {
-	// 	return tg.Result{Text: "Pong to " + cmd.Args + "!"}, nil
-	// }
-	return tg.Result{}, nil
+func (CarCommand) ExecuteTelegram(pl tg.Payload) (tg.Result, error) {
+	keyboard := &tg.InlineKeyboardMarkup{
+		InlineKeyboard: [][]tg.InlineKeyboardButton{
+			{{Text: "abc", CallbackData: "1"}},
+		},
+	}
+	return tg.Result{Text: ".", Keyboard: keyboard}, nil
 }

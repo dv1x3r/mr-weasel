@@ -7,38 +7,38 @@ import (
 	"strings"
 )
 
-type User struct {
-	UserID int64
+type User = tgclient.User
+type InlineKeyboardMarkup = tgclient.InlineKeyboardMarkup
+type InlineKeyboardButton = tgclient.InlineKeyboardButton
+
+type Command struct {
+	Prefix string
+	Action string
+	Text   string
 }
 
 type Payload struct {
-	Prefix string
-	Action string
-	Text   string
+	User    User
+	Command Command
 }
 
 type Result struct {
-	Text   string
-	Action string
-	Markup *tgclient.InlineKeyboardMarkup
-}
-
-type State struct {
-	Prefix string
-	Action string
+	Text     string
+	Action   string
+	Keyboard *InlineKeyboardMarkup
 }
 
 type Handler interface {
 	Prefix() string
 	Description() string
-	ExecuteTelegram(User, Payload) (Result, error)
+	ExecuteTelegram(Payload) (Result, error)
 }
 
 type Manager struct {
 	client   *tgclient.Client   // Telegram API Client
 	debug    bool               // Enable debug output.
 	handlers map[string]Handler // Map of all registered command handlers.
-	states   map[int64]State    // Map of all active user states (active commands).
+	states   map[int64]Command  // Map of all active user states (active commands).
 }
 
 func New(client *tgclient.Client, debug bool) *Manager {
@@ -46,7 +46,7 @@ func New(client *tgclient.Client, debug bool) *Manager {
 		client:   client,
 		debug:    debug,
 		handlers: make(map[string]Handler),
-		states:   make(map[int64]State),
+		states:   make(map[int64]Command),
 	}
 }
 
@@ -96,7 +96,7 @@ func (m *Manager) Start() {
 	}
 }
 
-func parsePayload(text string) Payload {
+func parseCommand(text string) Command {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
 			return arr[i]
@@ -105,41 +105,33 @@ func parsePayload(text string) Payload {
 	}
 
 	s := strings.SplitN(text, " ", 2)
-	command, text := safeGet(s, 0), safeGet(s, 1)
+	cmd, text := safeGet(s, 0), safeGet(s, 1)
 
-	s = strings.Split(command, ":")
+	s = strings.Split(cmd, ":")
 	prefix, action := safeGet(s, 0), safeGet(s, 1)
 
-	return Payload{Prefix: prefix, Action: action, Text: text}
+	return Command{Prefix: prefix, Action: action, Text: text}
 }
 
-func (m *Manager) getCommand(message *tgclient.Message) (Payload, Handler) {
-	payload := parsePayload(message.Text)     // Split message by /prefix:action text
-	handler, ok := m.handlers[payload.Prefix] // Get the command handler (if exists)
+func (m *Manager) getCommandHandler(userID int64, text string) (Command, Handler) {
+	command := parseCommand(text)             // Split message by /prefix:action text
+	handler, ok := m.handlers[command.Prefix] // Get the command handler (if exists)
 	if ok {
-		return payload, handler
+		return command, handler
 	}
 
-	state, ok := m.states[message.From.ID] // Check if user has an active state
+	state, ok := m.states[userID] // Check if user has an active state
 	if ok {
-		payload = Payload{Prefix: state.Prefix, Action: state.Action, Text: message.Text}
+		state.Text = text
 		handler = m.handlers[state.Prefix] // Get the command handler for that state
-		return payload, handler
+		return state, handler
 	}
 
-	return Payload{}, nil
-}
-
-func (m *Manager) updateState(userID int64, prefix string, action string) {
-	if action != "" {
-		m.states[userID] = State{Prefix: prefix, Action: action}
-	} else {
-		delete(m.states, userID)
-	}
+	return Command{}, nil
 }
 
 func (m *Manager) processMessage(msg *tgclient.Message) {
-	payload, handler := m.getCommand(msg)
+	command, handler := m.getCommandHandler(msg.From.ID, msg.Text)
 	if handler == nil {
 		if m.debug {
 			log.Println("[DEBUG] Handler not found:", msg.Text)
@@ -147,24 +139,31 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 		return
 	}
 
-	res, err := handler.ExecuteTelegram(User{UserID: msg.From.ID}, payload)
+	res, err := handler.ExecuteTelegram(Payload{User: *msg.From, Command: command})
 	if err != nil {
-		log.Printf("[ERROR] %+v %s \n", payload, err)
+		log.Printf("[ERROR] %+v %s \n", command, err)
 		return
 	}
 
-	m.updateState(msg.From.ID, payload.Prefix, res.Action)
+	if res.Action != "" {
+		m.states[msg.From.ID] = Command{Prefix: command.Prefix, Action: res.Action}
+	} else {
+		delete(m.states, msg.From.ID)
+	}
 
-	log.Printf("[INFO] %+v succeeded \n", payload)
+	log.Printf("[INFO] %+v succeeded \n", command)
 
-	if res.Text != "" {
-		_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
-			ChatId: msg.Chat.ID,
-			Text:   res.Text,
-		})
-		if err != nil {
-			log.Println("[ERROR] Sending a response:", err)
-		}
+	if res.Text == "" {
+		return
+	}
+
+	_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
+		ChatId:      msg.Chat.ID,
+		Text:        res.Text,
+		ReplyMarkup: res.Keyboard,
+	})
+	if err != nil {
+		log.Println("[ERROR] Sending a response:", err)
 	}
 }
 
