@@ -1,6 +1,8 @@
 package car
 
-import tg "mr-weasel/manager/telegram"
+import (
+	tg "mr-weasel/manager/telegram"
+)
 
 type CarCommand struct{}
 
@@ -13,12 +15,27 @@ func (CarCommand) Description() string {
 }
 
 func (CarCommand) ExecuteTelegram(pl tg.Payload) (tg.Result, error) {
-	keyboard := &tg.InlineKeyboardMarkup{
-		InlineKeyboard: [][]tg.InlineKeyboardButton{
-			{{Text: "abc", CallbackData: "1"}},
-		},
+	switch pl.Command.Action {
+	case "new":
+		newCar()
+	default:
+		listCars()
 	}
-	return tg.Result{Text: ".", Keyboard: keyboard}, nil
+	// keyboard := &tg.InlineKeyboardMarkup{
+	// 	InlineKeyboard: [][]tg.InlineKeyboardButton{
+	// 		{{Text: "abc", CallbackData: "1"}},
+	// 	},
+	// }
+	// return tg.Result{Text: ".", Keyboard: keyboard}, nil
+	return tg.Result{}, nil
+}
+
+func listCars() {
+
+}
+
+func newCar() {
+
 }
 
 /*
@@ -26,24 +43,25 @@ func (CarCommand) ExecuteTelegram(pl tg.Payload) (tg.Result, error) {
 /car
 
 Traveled in the past year: 10,000 KM (+2%)
-Gas Expenses: 1000 EUR (+10%)
-Other Expenses: 500 EUR (-10%)
-License expiration: 01-Jan-2099
+Fuel consumption: 10.0L/100Km
+Fuel expenses: 1000 EUR (+10%)
+Other expenses: 500 EUR (-10%)
 
-Please select your car for additional actions:
+Choose your car from the list below:
 
 | Lexus IS250 (2011) | BMW 520i (2021) |
-| Previous | Next |
+| Previous | Next | NEW |
 
+
+/car:newcar
+
+Please choose a name for your new car.
 
 /car 1
 
-Car name: BMW 520i (2021)
-Traveled in the past year: 10,000 KM (+2%)
-Gas Expenses: 1000 EUR (+10%)
-Other Expenses: 500 EUR (-10%)
+BMW 520i (2021)
 
-| Add Gas | Add Service | Update Attributes
+| Add Gas | Add Service |
 | Edit Gas | Edit Service |
 
 */
