@@ -115,6 +115,18 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 	return message, err
 }
 
+// Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
+func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
+	res, err := c.makeRequest(ctx, cfg)
+	if err != nil {
+		return Message{}, err
+	}
+
+	message := Message{}
+	err = json.Unmarshal(res.Result, &message)
+	return message, err
+}
+
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
 	res, err := c.makeRequest(ctx, cfg)

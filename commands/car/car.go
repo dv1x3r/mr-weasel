@@ -19,6 +19,8 @@ func (CarCommand) ExecuteTelegram(pl tg.Payload) (tg.Result, error) {
 	res := tg.Result{}
 	switch pl.Command.Action {
 	case "new":
+		res.Text = "Please choose a name for your new car."
+		res.Action = "new"
 		newCar()
 	default:
 		res.Text = "Choose your car from the list below:"

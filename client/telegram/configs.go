@@ -52,6 +52,29 @@ func (SendMessageConfig) Method() string {
 	return "sendMessage"
 }
 
+type EditMessageTextConfig struct {
+	// Optional. Required if inline_message_id is not specified. Unique identifier for the target chat or username of the target channel.
+	ChatId int64 `json:"chat_id,omitempty"`
+	// Optional. Required if inline_message_id is not specified. Identifier of the message to edit.
+	MessageID int `json:"message_id,omitempty"`
+	// Optional. Required if chat_id and message_id are not specified. Identifier of the inline message.
+	InlineMessageID string `json:"inline_message_id"`
+	// New text of the message, 1-4096 characters after entities parsing.
+	Text string `json:"text"`
+	// Optional. Mode for parsing entities in the message text. See formatting options for more details.
+	ParseMode string `json:"parse_mode,omitempty"`
+	// Optional. A JSON-serialized list of special entities that appear in message text, which can be specified instead of parse_mode.
+	Entities []MessageEntity `json:"entities,omitempty"`
+	// Optional. Disables link previews for links in this message.
+	DisableWebPagePreview bool `json:"disable_web_page_preview,omitempty"`
+	// Optional. A JSON-serialized object for an inline keyboard.
+	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+}
+
+func (EditMessageTextConfig) Method() string {
+	return "editMessageText"
+}
+
 type SetMyCommandsConfig struct {
 	// A JSON-serialized list of bot commands to be set as the list of the bot's commands. At most 100 commands can be specified.
 	Commands []BotCommand `json:"commands"`

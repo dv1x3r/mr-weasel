@@ -2,6 +2,7 @@ package tgmanager
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"mr-weasel/client/telegram"
 	"strings"
@@ -21,20 +22,20 @@ type Payload struct {
 type Result struct {
 	Action   string
 	Text     string
-	keyboard *tgclient.InlineKeyboardMarkup
+	Keyboard *tgclient.InlineKeyboardMarkup
 }
 
 func (res *Result) AddKeyboardButton(row int, text string, data string) {
-	if res.keyboard == nil {
-		res.keyboard = &tgclient.InlineKeyboardMarkup{}
-		res.keyboard.InlineKeyboard = [][]tgclient.InlineKeyboardButton{}
+	if res.Keyboard == nil {
+		res.Keyboard = &tgclient.InlineKeyboardMarkup{}
+		res.Keyboard.InlineKeyboard = [][]tgclient.InlineKeyboardButton{}
 	}
 
-	for i := len(res.keyboard.InlineKeyboard); i < row+1; i++ {
-		res.keyboard.InlineKeyboard = append(res.keyboard.InlineKeyboard, []tgclient.InlineKeyboardButton{})
+	for i := len(res.Keyboard.InlineKeyboard); i < row+1; i++ {
+		res.Keyboard.InlineKeyboard = append(res.Keyboard.InlineKeyboard, []tgclient.InlineKeyboardButton{})
 	}
 
-	res.keyboard.InlineKeyboard[row] = append(res.keyboard.InlineKeyboard[row], tgclient.InlineKeyboardButton{Text: text, CallbackData: data})
+	res.Keyboard.InlineKeyboard[row] = append(res.Keyboard.InlineKeyboard[row], tgclient.InlineKeyboardButton{Text: text, CallbackData: data})
 }
 
 type Handler interface {
@@ -96,29 +97,50 @@ func (m *Manager) Start() {
 
 	updates := m.client.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
-		if update.Message != nil && update.Message.From != nil {
 
+		if update.Message != nil && update.Message.From != nil {
 			res, err := m.execute(*update.Message.From, update.Message.Text)
 			if err != nil {
-				log.Println("[ERROR] Command execution:", err)
+				log.Println("[ERROR] Message execution:", err)
 				continue
 			}
 
-			if res.Text == "" {
-				continue
-			}
-
-			_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
+			_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
 				ChatId:      update.Message.Chat.ID,
 				Text:        res.Text,
-				ReplyMarkup: res.keyboard,
+				ReplyMarkup: res.Keyboard,
 			})
 			if err != nil {
-				log.Println("[ERROR] Sending a response:", err)
+				log.Println("[ERROR] Sending a text response:", err)
 			}
 
 		} else if update.CallbackQuery != nil {
-			// m.processCallbackQuery(update.CallbackQuery)
+			res, err := m.execute(*update.CallbackQuery.From, update.CallbackQuery.Data)
+			if err != nil {
+				log.Println("[ERROR] Callback execution:", err)
+				continue
+			}
+
+			if res.Keyboard == nil {
+				_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
+					ChatId: update.CallbackQuery.Message.Chat.ID,
+					Text:   res.Text,
+				})
+				if err != nil {
+					log.Println("[ERROR] Sending a callback text response:", err)
+				}
+			} else {
+				_, err = m.client.EditMessageText(ctx, tgclient.EditMessageTextConfig{
+					ChatId:      update.CallbackQuery.Message.Chat.ID,
+					MessageID:   update.CallbackQuery.Message.MessageID,
+					Text:        res.Text,
+					ReplyMarkup: res.Keyboard,
+				})
+				if err != nil {
+					log.Println("[ERROR] Update a callback text response:", err)
+				}
+			}
+
 		}
 	}
 }
@@ -138,6 +160,10 @@ func (m *Manager) execute(user tgclient.User, input string) (Result, error) {
 		m.states[user.ID] = Command{Prefix: command.Prefix, Action: res.Action}
 	} else {
 		delete(m.states, user.ID)
+	}
+
+	if res.Text == "" {
+		return res, fmt.Errorf("command [%v] returned empty text", command.Prefix)
 	}
 
 	return res, nil
