@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-type User = tgclient.User
-type InlineKeyboardMarkup = tgclient.InlineKeyboardMarkup
-type InlineKeyboardButton = tgclient.InlineKeyboardButton
-
 type Command struct {
 	Prefix string
 	Action string
@@ -18,14 +14,27 @@ type Command struct {
 }
 
 type Payload struct {
-	User    User
+	User    tgclient.User
 	Command Command
 }
 
 type Result struct {
-	Text     string
 	Action   string
-	Keyboard *InlineKeyboardMarkup
+	Text     string
+	keyboard *tgclient.InlineKeyboardMarkup
+}
+
+func (res *Result) AddKeyboardButton(row int, text string, data string) {
+	if res.keyboard == nil {
+		res.keyboard = &tgclient.InlineKeyboardMarkup{}
+		res.keyboard.InlineKeyboard = [][]tgclient.InlineKeyboardButton{}
+	}
+
+	for i := len(res.keyboard.InlineKeyboard); i < row+1; i++ {
+		res.keyboard.InlineKeyboard = append(res.keyboard.InlineKeyboard, []tgclient.InlineKeyboardButton{})
+	}
+
+	res.keyboard.InlineKeyboard[row] = append(res.keyboard.InlineKeyboard[row], tgclient.InlineKeyboardButton{Text: text, CallbackData: data})
 }
 
 type Handler interface {
@@ -165,7 +174,7 @@ func (m *Manager) processMessage(msg *tgclient.Message) {
 	_, err = m.client.SendMessage(context.Background(), tgclient.SendMessageConfig{
 		ChatId:      msg.Chat.ID,
 		Text:        res.Text,
-		ReplyMarkup: res.Keyboard,
+		ReplyMarkup: res.keyboard,
 	})
 	if err != nil {
 		log.Println("[ERROR] Sending a response:", err)
