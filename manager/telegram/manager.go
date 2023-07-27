@@ -96,12 +96,16 @@ func (m *Manager) Start() {
 	}
 }
 
-func parseCommand(text string) Command {
+func parseCommand(text string) (Command, bool) {
 	safeGet := func(arr []string, i int) string {
 		if len(arr)-1 >= i {
 			return arr[i]
 		}
 		return ""
+	}
+
+	if !strings.HasPrefix(text, "/") {
+		return Command{}, false
 	}
 
 	s := strings.SplitN(text, " ", 2)
@@ -110,24 +114,25 @@ func parseCommand(text string) Command {
 	s = strings.Split(cmd, ":")
 	prefix, action := safeGet(s, 0), safeGet(s, 1)
 
-	return Command{Prefix: prefix, Action: action, Text: text}
+	return Command{Prefix: prefix, Action: action, Text: text}, true
 }
 
 func (m *Manager) getCommandHandler(userID int64, text string) (Command, Handler) {
-	command := parseCommand(text)             // Split message by /prefix:action text
-	handler, ok := m.handlers[command.Prefix] // Get the command handler (if exists)
-	if ok {
+	command, isCommand := parseCommand(text)         // Split message by /prefix:action text
+	handler, isHandler := m.handlers[command.Prefix] // Get the command handler
+	if isCommand && isHandler {                      // Execute a new command
 		return command, handler
 	}
 
-	state, ok := m.states[userID] // Check if user has an active state
-	if ok {
-		state.Text = text
-		handler = m.handlers[state.Prefix] // Get the command handler for that state
-		return state, handler
+	state, isState := m.states[userID]
+	if !isState {
+		return Command{}, nil
 	}
 
-	return Command{}, nil
+	// User answered to the bot's question in the current state
+	handler = m.handlers[state.Prefix]
+	state.Text = text
+	return state, handler
 }
 
 func (m *Manager) processMessage(msg *tgclient.Message) {
