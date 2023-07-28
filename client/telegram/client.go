@@ -18,7 +18,6 @@ type Client struct {
 	client *http.Client
 	token  string
 	debug  bool
-	Me     User
 }
 
 func New(token string, debug bool) (*Client, error) {
@@ -36,32 +35,6 @@ func New(token string, debug bool) (*Client, error) {
 	}
 
 	return c, err
-}
-
-// A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
-func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
-	res, err := c.makeRequest(ctx, cfg)
-	if err != nil {
-		return User{}, err
-	}
-
-	user := User{}
-	err = json.Unmarshal(res.Result, &user)
-	c.Me = user
-
-	return user, err
-}
-
-// Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
-func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
-	res, err := c.makeRequest(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	updates := []Update{}
-	err = json.Unmarshal(res.Result, &updates)
-	return updates, err
 }
 
 // Use this method to receive incoming updates using long polling. Starts a background goroutine, and returns a Channel with Update objects.
@@ -103,38 +76,37 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
+// A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
+func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
+	return executeMethod[GetMeConfig, User](ctx, c, cfg, User{})
+}
+
+// Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
+func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
+	return executeMethod[GetUpdatesConfig, []Update](ctx, c, cfg, []Update{})
+}
+
 // Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
-	res, err := c.makeRequest(ctx, cfg)
-	if err != nil {
-		return Message{}, err
-	}
-
-	message := Message{}
-	err = json.Unmarshal(res.Result, &message)
-	return message, err
+	return executeMethod[SendMessageConfig, Message](ctx, c, cfg, Message{})
 }
 
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
-	res, err := c.makeRequest(ctx, cfg)
-	if err != nil {
-		return Message{}, err
-	}
-
-	message := Message{}
-	err = json.Unmarshal(res.Result, &message)
-	return message, err
+	return executeMethod[EditMessageTextConfig, Message](ctx, c, cfg, Message{})
 }
 
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
-	res, err := c.makeRequest(ctx, cfg)
+	return executeMethod[SetMyCommandsConfig, bool](ctx, c, cfg, false)
+}
+
+func executeMethod[T APICaller, V interface{}](ctx context.Context, client *Client, cfg T, value V) (V, error) {
+	res, err := client.makeRequest(ctx, cfg)
 	if err != nil {
-		return false, err
+		return value, err
 	}
 
-	value := false
 	err = json.Unmarshal(res.Result, &value)
 	return value, err
 }
@@ -169,7 +141,7 @@ func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, 
 	apiRes := new(APIResponse)
 	err = json.NewDecoder(res.Body).Decode(apiRes)
 	if err != nil {
-		return nil, fmt.Errorf("makeRequest Decode: %w", err)
+		return nil, fmt.Errorf("[ERROR] makeRequest Decode: %w", err)
 	}
 
 	if !apiRes.Ok {
