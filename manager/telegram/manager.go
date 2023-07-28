@@ -13,8 +13,9 @@ type Payload struct {
 }
 
 type Result struct {
-	Text  string
-	State HandlerFunc
+	Text     string
+	State    HandlerFunc
+	Keyboard *tgclient.InlineKeyboardMarkup
 }
 
 type Handler interface {
@@ -77,36 +78,40 @@ func (m *Manager) Start() {
 	updates := m.client.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
 		if update.Message != nil && update.Message.From != nil {
-			userID := update.Message.From.ID
+			user := update.Message.From
 			text := update.Message.Text
 
-			fn, ok := m.getHandlerFunc(userID, text)
+			fn, ok := m.getHandlerFunc(user.ID, text)
 			if !ok {
-				log.Println("handler not found")
+				log.Printf("[WARN] %s handler not found \n", text)
 				continue
 			}
 
-			res, err := fn(Payload{})
+			res, err := fn(Payload{User: *user, Command: text})
 			if err != nil {
-				log.Println("execution error")
+				log.Printf("[ERROR] %s %s \n", text, err)
 				continue
 			}
 
 			if res.State != nil {
-				m.states[userID] = res.State
+				m.states[user.ID] = res.State
 			} else {
-				delete(m.states, userID)
+				delete(m.states, user.ID)
+			}
+
+			if res.Text == "" {
+				log.Printf("[WARN] %s empty response text \n", text)
+				continue
 			}
 
 			_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
-				ChatId: update.Message.Chat.ID,
-				Text:   res.Text,
-				// ReplyMarkup: res.Keyboard,
+				ChatId:      update.Message.Chat.ID,
+				Text:        res.Text,
+				ReplyMarkup: res.Keyboard,
 			})
 			if err != nil {
-				log.Println("[ERROR] Sending a text response:", err)
+				log.Println("[ERROR] Send message error:", err)
 			}
-
 		} else if update.CallbackQuery != nil {
 			// res, err := m.execute(*update.CallbackQuery.From, update.CallbackQuery.Data)
 			// if err != nil {
@@ -141,7 +146,8 @@ func (m *Manager) Start() {
 
 func (m *Manager) getHandlerFunc(userID int64, text string) (HandlerFunc, bool) {
 	if strings.HasPrefix(text, "/") { // New command
-		handler, ok := m.handlers[text]
+		prefix := strings.SplitN(text, " ", 2)[0]
+		handler, ok := m.handlers[prefix]
 		if ok {
 			return handler.Execute, true
 		}
