@@ -78,37 +78,39 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
 func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
-	return executeMethod[GetMeConfig, User](ctx, c, cfg, User{})
+	return executeMethod[User](ctx, c, cfg)
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
 func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
-	return executeMethod[GetUpdatesConfig, []Update](ctx, c, cfg, []Update{})
+	return executeMethod[[]Update](ctx, c, cfg)
 }
 
 // Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
-	return executeMethod[SendMessageConfig, Message](ctx, c, cfg, Message{})
+	return executeMethod[Message](ctx, c, cfg)
 }
 
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
-	return executeMethod[EditMessageTextConfig, Message](ctx, c, cfg, Message{})
+	return executeMethod[Message](ctx, c, cfg)
 }
 
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
-	return executeMethod[SetMyCommandsConfig, bool](ctx, c, cfg, false)
+	return executeMethod[bool](ctx, c, cfg)
 }
 
-func executeMethod[T APICaller, V interface{}](ctx context.Context, client *Client, cfg T, value V) (V, error) {
+func executeMethod[T any](ctx context.Context, client *Client, cfg APICaller) (T, error) {
+	value := new(T)
+
 	res, err := client.makeRequest(ctx, cfg)
 	if err != nil {
-		return value, err
+		return *value, err
 	}
 
-	err = json.Unmarshal(res.Result, &value)
-	return value, err
+	err = json.Unmarshal(res.Result, value)
+	return *value, err
 }
 
 func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
