@@ -12,12 +12,12 @@ func (PingCommand) Description() string {
 	return "answer with pong"
 }
 
-func (PingCommand) ExecuteTelegram(pl tg.Payload) (tg.Result, error) {
-	if pl.Command.Text == "me" {
-		return tg.Result{Text: "What is your name?", Action: "name"}, nil
-	}
-	if pl.Command.Action == "name" {
-		return tg.Result{Text: "Pong to " + pl.Command.Text + "!"}, nil
-	}
+func (PingCommand) Execute(pl tg.Payload) (tg.Result, error) {
+	// if pl.Command == "me" {
+	// 	return tg.Result{Text: "What is your name?", Action: "name"}, nil
+	// }
+	// if pl.Command.Action == "name" {
+	// 	return tg.Result{Text: "Pong to " + pl.Command.Text + "!"}, nil
+	// }
 	return tg.Result{Text: "pong!"}, nil
 }

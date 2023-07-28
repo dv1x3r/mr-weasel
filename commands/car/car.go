@@ -1,7 +1,6 @@
 package car
 
 import (
-	"fmt"
 	tg "mr-weasel/manager/telegram"
 )
 
@@ -15,23 +14,23 @@ func (CarCommand) Description() string {
 	return "manage car costs"
 }
 
-func (CarCommand) ExecuteTelegram(pl tg.Payload) (tg.Result, error) {
-	res := tg.Result{}
-	switch pl.Command.Action {
-	case "new":
-		res.Text = "Please choose a name for your new car."
-		res.Action = "new"
-		newCar()
-	default:
-		res.Text = "Choose your car from the list below:"
-		for _, car := range listCars() {
-			text := car.Name
-			data := fmt.Sprintf("%s %d", "/car:select", car.ID)
-			res.AddKeyboardButton(0, text, data)
-		}
-		res.AddKeyboardButton(1, "New Car", "/car:new")
-	}
-	return res, nil
+func (CarCommand) Execute(pl tg.Payload) (tg.Result, error) {
+	// res := tg.Result{}
+	// switch pl.Command.Action {
+	// case "new":
+	// 	res.Text = "Please choose a name for your new car."
+	// 	res.Action = "new"
+	// 	newCar()
+	// default:
+	// 	res.Text = "Choose your car from the list below:"
+	// 	for _, car := range listCars() {
+	// 		text := car.Name
+	// 		data := fmt.Sprintf("%s %d", "/car:select", car.ID)
+	// 		res.AddKeyboardButton(0, text, data)
+	// 	}
+	// 	res.AddKeyboardButton(1, "New Car", "/car:new")
+	// }
+	return tg.Result{Text: "WIP"}, nil
 }
 
 type Car struct {
