@@ -37,6 +37,31 @@ func New(token string, debug bool) (*Client, error) {
 	return c, err
 }
 
+// A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
+func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
+	return executeMethod[User](ctx, c, cfg)
+}
+
+// Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
+func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
+	return executeMethod[[]Update](ctx, c, cfg)
+}
+
+// Use this method to send text messages. On success, the sent Message is returned.
+func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
+	return executeMethod[Message](ctx, c, cfg)
+}
+
+// Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
+func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
+	return executeMethod[Message](ctx, c, cfg)
+}
+
+// Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
+func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
+	return executeMethod[bool](ctx, c, cfg)
+}
+
 // Use this method to receive incoming updates using long polling. Starts a background goroutine, and returns a Channel with Update objects.
 func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
 	ch := make(chan Update, chanSize)
@@ -74,31 +99,6 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	}()
 
 	return ch
-}
-
-// A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
-func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
-	return executeMethod[User](ctx, c, cfg)
-}
-
-// Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
-func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
-	return executeMethod[[]Update](ctx, c, cfg)
-}
-
-// Use this method to send text messages. On success, the sent Message is returned.
-func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
-	return executeMethod[Message](ctx, c, cfg)
-}
-
-// Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
-func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
-	return executeMethod[Message](ctx, c, cfg)
-}
-
-// Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
-func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
-	return executeMethod[bool](ctx, c, cfg)
 }
 
 func executeMethod[T any](ctx context.Context, client *Client, cfg APICaller) (T, error) {
