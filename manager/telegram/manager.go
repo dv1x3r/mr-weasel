@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+var (
+	ErrCommandNotFound = errors.New("command not found")
+	ErrCommandFailed   = errors.New("command failed")
+	ErrCommandEmpty    = errors.New("command returned empty text")
+)
+
 type Payload struct {
 	User    tgclient.User
 	Command string
@@ -18,6 +24,21 @@ type Result struct {
 	Text     string
 	State    HandlerFunc
 	Keyboard *tgclient.InlineKeyboardMarkup
+}
+
+func (res *Result) AddKeyboardButton(text string, data string) {
+	if res.Keyboard == nil {
+		res.Keyboard = &tgclient.InlineKeyboardMarkup{
+			InlineKeyboard: make([][]tgclient.InlineKeyboardButton, 1),
+		}
+	}
+	row := &res.Keyboard.InlineKeyboard[len(res.Keyboard.InlineKeyboard)-1]
+	*row = append(*row, tgclient.InlineKeyboardButton{Text: text, CallbackData: data})
+}
+
+func (res *Result) AddKeyboardRow() {
+	res.Keyboard.InlineKeyboard = append(res.Keyboard.InlineKeyboard,
+		[]tgclient.InlineKeyboardButton{})
 }
 
 type Handler interface {
@@ -142,12 +163,6 @@ func (m *Manager) Start() {
 		}
 	}
 }
-
-var (
-	ErrCommandNotFound = errors.New("command not found")
-	ErrCommandFailed   = errors.New("command failed")
-	ErrCommandEmpty    = errors.New("command returned empty text")
-)
 
 func (m *Manager) executeCommand(user *tgclient.User, command string) (Result, error) {
 	fn, ok := m.getHandlerFunc(user.ID, command)
