@@ -1,13 +1,15 @@
 -- +goose Up
 -- +goose StatementBegin
-create table user (
+create table car (
     id integer primary key,
-    telegram_id integer unique,
-    name text
+    user_id integer not null,
+    year int not null,
+    name text not null,
+    plate text
 ) strict;
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-drop table user;
+drop table car;
 -- +goose StatementEnd

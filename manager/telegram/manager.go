@@ -143,7 +143,7 @@ func (m *Manager) Start() {
 
 			if res.Keyboard == nil {
 				_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
-					ChatId: update.Message.Chat.ID,
+					ChatId: update.CallbackQuery.Message.Chat.ID,
 					Text:   res.Text,
 				})
 				if err != nil {

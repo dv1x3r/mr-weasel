@@ -16,41 +16,42 @@ func (CarCommand) Description() string {
 }
 
 func (CarCommand) Execute(pl tg.Payload) (tg.Result, error) {
-	res := tg.Result{}
 	switch pl.Command {
 	case "/car new":
-		res.Text = "Please choose a name for your new car."
-		res.State = newCarName
-	case "/car select":
-		res.Text = "WIP"
-	default:
-		res.Text = "Choose your car from the list below:"
-		for _, car := range listCars() {
-			res.AddKeyboardButton(
-				car.Name,
-				fmt.Sprintf("%s %d", "/car select", car.ID),
-			)
-		}
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Add Car", "/car new")
+		return newCar(pl)
+	case "/car get":
+		return getCar(pl)
+	}
+	return listCars(pl)
+}
+
+func newCar(pl tg.Payload) (tg.Result, error) {
+	res := tg.Result{
+		Text:  "Please choose a name for your new car.",
+		State: newCarName,
 	}
 	return res, nil
 }
 
-type Car struct {
-	ID   int64
-	Name string
-}
-
-var cars = []Car{{ID: 1, Name: "Lexus IS250"}, {ID: 2, Name: "BMW 520i"}}
-
-func listCars() []Car {
-	return cars
-}
-
 func newCarName(pl tg.Payload) (tg.Result, error) {
-	s := fmt.Sprintf("New car %s has been created!", pl.Command)
-	return tg.Result{Text: s}, nil
+	cars = append(cars, Car{ID: 3, Name: pl.Command})
+	res := tg.Result{Text: fmt.Sprintf("New car %s has been created!", pl.Command)}
+	res.AddKeyboardButton("Back", "/car")
+	return res, nil
+}
+
+func getCar(pl tg.Payload) (tg.Result, error) {
+	return tg.Result{Text: "wip"}, nil
+}
+
+func listCars(pl tg.Payload) (tg.Result, error) {
+	res := tg.Result{Text: "Choose your car from the list below:"}
+	for _, car := range cars {
+		res.AddKeyboardButton(car.Name, fmt.Sprintf("%s %d", "/car get", car.ID))
+	}
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("New", "/car new")
+	return res, nil
 }
 
 /*
