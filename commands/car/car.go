@@ -21,15 +21,18 @@ func (CarCommand) Execute(pl tg.Payload) (tg.Result, error) {
 	case "/car new":
 		res.Text = "Please choose a name for your new car."
 		res.State = newCarName
+	case "/car select":
+		res.Text = "WIP"
 	default:
 		res.Text = "Choose your car from the list below:"
 		for _, car := range listCars() {
-			text := car.Name
-			data := fmt.Sprintf("%s %d", "/car select", car.ID)
-			res.AddKeyboardButton(text, data)
+			res.AddKeyboardButton(
+				car.Name,
+				fmt.Sprintf("%s %d", "/car select", car.ID),
+			)
 		}
 		res.AddKeyboardRow()
-		res.AddKeyboardButton("New Car", "/car new")
+		res.AddKeyboardButton("Add Car", "/car new")
 	}
 	return res, nil
 }
@@ -46,7 +49,8 @@ func listCars() []Car {
 }
 
 func newCarName(pl tg.Payload) (tg.Result, error) {
-	return tg.Result{Text: "new car"}, nil
+	s := fmt.Sprintf("New car %s has been created!", pl.Command)
+	return tg.Result{Text: s}, nil
 }
 
 /*
