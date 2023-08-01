@@ -3,16 +3,16 @@ package car
 import (
 	"context"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	tg "mr-weasel/manager/telegram"
 	"strconv"
+	// "strings"
+	"github.com/jmoiron/sqlx"
 )
 
 type DraftCar struct {
-	ID    int64  `db:"id"`
-	Name  string `db:"name"`
-	Year  int64  `db:"year"`
-	Plate string `db:"plate"`
+	Name  string
+	Year  int64
+	Plate string
 }
 
 type CarCommand struct {
@@ -36,13 +36,14 @@ func (c *CarCommand) Description() string {
 }
 
 func (c *CarCommand) Execute(ctx context.Context, pl tg.Payload) (tg.Result, error) {
+	// split := strings.SplitN(pl.Command, 3)
 	switch pl.Command {
 	case "/car new":
 		return c.newCar(ctx, pl)
 	case "/car get":
-		return getCar(ctx, pl)
+		return c.getCar(ctx, pl)
 	}
-	return listCars(ctx, pl)
+	return c.listCars(ctx, pl)
 }
 
 func (c *CarCommand) newCar(ctx context.Context, pl tg.Payload) (tg.Result, error) {
@@ -69,53 +70,53 @@ func (c *CarCommand) newCarPlate(ctx context.Context, pl tg.Payload) (tg.Result,
 	}
 	car := c.draftCars[pl.User.ID]
 	q := "insert into car (user_id, name, year, plate) values (?,?,?,?);"
-	_, err := c.db.ExecContext(ctx, q, pl.User.ID, car.Name, car.Year, car.Plate)
+	res, err := c.db.ExecContext(ctx, q, pl.User.ID, car.Name, car.Year, car.Plate)
 	if err != nil {
-		return tg.Result{Text: "There is something wrong with your car, please try again."}, err
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
 	}
-	res := tg.Result{Text: fmt.Sprintf("New car %s has been created!", car.Name)}
-	res.AddKeyboardButton("Back", "/car")
-	return res, nil
+	id, err := res.LastInsertId()
+	if err != nil {
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
+	}
+	pl.Command = fmt.Sprintf("/car get %d", id)
+	return c.getCar(ctx, pl)
 }
 
-func getCar(ctx context.Context, pl tg.Payload) (tg.Result, error) {
-	return tg.Result{Text: "wip"}, nil
-}
-
-func listCars(ctx context.Context, pl tg.Payload) (tg.Result, error) {
+func (c *CarCommand) listCars(ctx context.Context, pl tg.Payload) (tg.Result, error) {
 	res := tg.Result{Text: "Choose your car from the list below:"}
-	// for _, car := range cars {
-	// 	res.AddKeyboardButton(car.Name, fmt.Sprintf("%s %d", "/car get", car.ID))
-	// }
-	// res.AddKeyboardRow()
+	rows, err := c.db.Query(`
+		select id, name || ' (' || year || ')' as desc
+		from car
+		where user_id = ?
+		order by year desc, name`,
+		pl.User.ID,
+	)
+	if err != nil {
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
+	}
+	i := 0
+	for rows.Next() {
+		var id int64
+		var name string
+		rows.Scan(&id, &name)
+		res.AddKeyboardButton(name, fmt.Sprintf("%s %d", "/car get", id))
+		if i++; i%2 == 0 {
+			res.AddKeyboardRow()
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
+	}
+	res.AddKeyboardRow()
 	res.AddKeyboardButton("New", "/car new")
 	return res, nil
 }
 
-/*
-
-/car
-
-Traveled in the past year: 10,000 KM (+2%)
-Fuel consumption: 10.0L/100Km
-Fuel expenses: 1000 EUR (+10%)
-Other expenses: 500 EUR (-10%)
-
-Choose your car from the list below:
-
-| Lexus IS250 (2011) | BMW 520i (2021) |
-| Previous | Next | NEW |
-
-
-/car:newcar
-
-Please choose a name for your new car.
-
-/car 1
-
-BMW 520i (2021)
-
-| Add Gas | Add Service |
-| Edit Gas | Edit Service |
-
-*/
+func (c *CarCommand) getCar(ctx context.Context, pl tg.Payload) (tg.Result, error) {
+	res := tg.Result{Text: fmt.Sprintf(`
+			Car ID: 
+			Car Name: %s
+		`, pl.Command)}
+	res.AddKeyboardButton("Back", "/car")
+	return res, nil
+}
