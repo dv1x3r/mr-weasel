@@ -20,7 +20,7 @@ type Client struct {
 	debug  bool
 }
 
-func New(token string, debug bool) (*Client, error) {
+func Connect(token string, debug bool) (*Client, error) {
 	c := &Client{
 		client: &http.Client{Timeout: 100 * time.Second},
 		token:  token,
@@ -35,6 +35,14 @@ func New(token string, debug bool) (*Client, error) {
 	}
 
 	return c, err
+}
+
+func MustConnect(token string, debug bool) *Client {
+	c, err := Connect(token, debug)
+	if err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
