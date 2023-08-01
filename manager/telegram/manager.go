@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jmoiron/sqlx"
 	"log"
 	"mr-weasel/client/telegram"
 	"strings"
@@ -38,29 +37,29 @@ func (res *Result) AddKeyboardButton(text string, data string) {
 }
 
 func (res *Result) AddKeyboardRow() {
-	res.Keyboard.InlineKeyboard = append(res.Keyboard.InlineKeyboard,
-		[]tgclient.InlineKeyboardButton{})
+	if res.Keyboard.InlineKeyboard != nil {
+		res.Keyboard.InlineKeyboard = append(res.Keyboard.InlineKeyboard,
+			[]tgclient.InlineKeyboardButton{})
+	}
 }
 
 type Handler interface {
 	Prefix() string
 	Description() string
-	Execute(context.Context, *sqlx.DB, Payload) (Result, error)
+	Execute(context.Context, Payload) (Result, error)
 }
 
-type HandlerFunc = func(context.Context, *sqlx.DB, Payload) (Result, error)
+type HandlerFunc = func(context.Context, Payload) (Result, error)
 
 type Manager struct {
 	client   *tgclient.Client      // Telegram API Client
-	db       *sqlx.DB              // Database storage
 	handlers map[string]Handler    // Map of registered command handlers.
 	states   map[int64]HandlerFunc // Map of active user states.
 }
 
-func New(client *tgclient.Client, db *sqlx.DB, debug bool) *Manager {
+func New(client *tgclient.Client, debug bool) *Manager {
 	return &Manager{
 		client:   client,
-		db:       db,
 		handlers: make(map[string]Handler),
 		states:   make(map[int64]HandlerFunc),
 	}
@@ -173,7 +172,7 @@ func (m *Manager) executeCommand(ctx context.Context, user *tgclient.User, comma
 		return Result{}, fmt.Errorf("executeCommand %s %w", command, ErrCommandNotFound)
 	}
 
-	res, err := fn(ctx, m.db, Payload{User: *user, Command: command})
+	res, err := fn(ctx, Payload{User: *user, Command: command})
 	if err != nil {
 		return res, fmt.Errorf("executeCommand %s %w %w", command, err, ErrCommandFailed)
 	}

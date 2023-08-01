@@ -3,8 +3,8 @@
 create table car (
     id integer primary key,
     user_id integer not null,
-    year int not null,
     name text not null,
+    year int not null,
     plate text
 ) strict;
 -- +goose StatementEnd
