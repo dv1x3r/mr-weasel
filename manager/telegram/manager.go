@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	"log"
 	"mr-weasel/client/telegram"
 	"strings"
@@ -44,20 +45,22 @@ func (res *Result) AddKeyboardRow() {
 type Handler interface {
 	Prefix() string
 	Description() string
-	Execute(Payload) (Result, error)
+	Execute(context.Context, *sqlx.DB, Payload) (Result, error)
 }
 
-type HandlerFunc = func(Payload) (Result, error)
+type HandlerFunc = func(context.Context, *sqlx.DB, Payload) (Result, error)
 
 type Manager struct {
 	client   *tgclient.Client      // Telegram API Client
+	db       *sqlx.DB              // Database storage
 	handlers map[string]Handler    // Map of registered command handlers.
 	states   map[int64]HandlerFunc // Map of active user states.
 }
 
-func New(client *tgclient.Client, debug bool) *Manager {
+func New(client *tgclient.Client, db *sqlx.DB, debug bool) *Manager {
 	return &Manager{
 		client:   client,
+		db:       db,
 		handlers: make(map[string]Handler),
 		states:   make(map[int64]HandlerFunc),
 	}
@@ -104,7 +107,7 @@ func (m *Manager) Start() {
 			user := update.Message.From
 			command := update.Message.Text
 
-			res, err := m.executeCommand(user, command)
+			res, err := m.executeCommand(ctx, user, command)
 			if err != nil {
 				log.Println("[ERROR]", err)
 				continue
@@ -129,7 +132,7 @@ func (m *Manager) Start() {
 			user := update.CallbackQuery.From
 			command := update.CallbackQuery.Data
 
-			res, err := m.executeCommand(user, command)
+			res, err := m.executeCommand(ctx, user, command)
 			if err != nil {
 				log.Println("[ERROR]", err)
 				continue
@@ -164,13 +167,13 @@ func (m *Manager) Start() {
 	}
 }
 
-func (m *Manager) executeCommand(user *tgclient.User, command string) (Result, error) {
+func (m *Manager) executeCommand(ctx context.Context, user *tgclient.User, command string) (Result, error) {
 	fn, ok := m.getHandlerFunc(user.ID, command)
 	if !ok {
 		return Result{}, fmt.Errorf("executeCommand %s %w", command, ErrCommandNotFound)
 	}
 
-	res, err := fn(Payload{User: *user, Command: command})
+	res, err := fn(ctx, m.db, Payload{User: *user, Command: command})
 	if err != nil {
 		return res, fmt.Errorf("executeCommand %s %w %w", command, err, ErrCommandFailed)
 	}

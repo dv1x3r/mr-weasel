@@ -12,11 +12,9 @@ import (
 )
 
 func main() {
-	_ = sqlx.MustConnect("sqlite3", "bin/mr-weasel.db")
-	// db.MustExec("INSERT INTO car (user_id, name, year, plate) values (?, ?, ?, ?)", 1, "BMW", 2021, "FZ-28")
-	token := os.Getenv("TG_TOKEN")
-	tgClient := tgclient.MustConnect(token, false)
-	tgManager := tgmanager.New(tgClient, true)
+	db := sqlx.MustConnect(os.Getenv("GOOSE_DRIVER"), os.Getenv("GOOSE_DBSTRING"))
+	tgClient := tgclient.MustConnect(os.Getenv("TG_TOKEN"), false)
+	tgManager := tgmanager.New(tgClient, db, true)
 	tgManager.AddCommands(ping.PingCommand{}, car.CarCommand{})
 	tgManager.PublishCommands()
 	tgManager.Start()

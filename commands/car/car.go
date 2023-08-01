@@ -1,7 +1,9 @@
 package car
 
 import (
+	"context"
 	"fmt"
+	"github.com/jmoiron/sqlx"
 	tg "mr-weasel/manager/telegram"
 )
 
@@ -15,17 +17,17 @@ func (CarCommand) Description() string {
 	return "manage car costs"
 }
 
-func (CarCommand) Execute(pl tg.Payload) (tg.Result, error) {
+func (CarCommand) Execute(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.Result, error) {
 	switch pl.Command {
 	case "/car new":
-		return newCar(pl)
+		return newCar(ctx, db, pl)
 	case "/car get":
-		return getCar(pl)
+		return getCar(ctx, db, pl)
 	}
-	return listCars(pl)
+	return listCars(ctx, db, pl)
 }
 
-func newCar(pl tg.Payload) (tg.Result, error) {
+func newCar(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.Result, error) {
 	res := tg.Result{
 		Text:  "Please choose a name for your new car.",
 		State: newCarName,
@@ -33,18 +35,18 @@ func newCar(pl tg.Payload) (tg.Result, error) {
 	return res, nil
 }
 
-func newCarName(pl tg.Payload) (tg.Result, error) {
+func newCarName(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.Result, error) {
 	cars = append(cars, Car{ID: 3, Name: pl.Command})
 	res := tg.Result{Text: fmt.Sprintf("New car %s has been created!", pl.Command)}
 	res.AddKeyboardButton("Back", "/car")
 	return res, nil
 }
 
-func getCar(pl tg.Payload) (tg.Result, error) {
+func getCar(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.Result, error) {
 	return tg.Result{Text: "wip"}, nil
 }
 
-func listCars(pl tg.Payload) (tg.Result, error) {
+func listCars(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.Result, error) {
 	res := tg.Result{Text: "Choose your car from the list below:"}
 	for _, car := range cars {
 		res.AddKeyboardButton(car.Name, fmt.Sprintf("%s %d", "/car get", car.ID))
