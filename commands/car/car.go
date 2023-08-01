@@ -7,7 +7,9 @@ import (
 	tg "mr-weasel/manager/telegram"
 )
 
-type CarCommand struct{}
+type CarCommand struct {
+	draftCar map[int64]Car
+}
 
 func (CarCommand) Prefix() string {
 	return "car"
@@ -26,6 +28,13 @@ func (CarCommand) Execute(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.R
 	}
 	return listCars(ctx, db, pl)
 }
+
+type Car struct {
+	ID   int64
+	Name string
+}
+
+var cars = []Car{{ID: 1, Name: "Lexus IS250"}, {ID: 2, Name: "BMW 520i"}}
 
 func newCar(ctx context.Context, db *sqlx.DB, pl tg.Payload) (tg.Result, error) {
 	res := tg.Result{
