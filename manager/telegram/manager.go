@@ -37,7 +37,7 @@ func (res *Result) AddKeyboardButton(text string, data string) {
 }
 
 func (res *Result) AddKeyboardRow() {
-	if res.Keyboard.InlineKeyboard != nil {
+	if res.Keyboard != nil && res.Keyboard.InlineKeyboard != nil {
 		res.Keyboard.InlineKeyboard = append(res.Keyboard.InlineKeyboard,
 			[]tgclient.InlineKeyboardButton{})
 	}
