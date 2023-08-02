@@ -14,11 +14,11 @@ func NewCarStorage(db *sqlx.DB) *CarStorage {
 }
 
 type Car struct {
-	ID     int64  `db:"id"`
-	UserID int64  `db:"user_id"`
-	Name   string `db:"name"`
-	Year   int64  `db:"year"`
-	Plate  string `db:"plate"`
+	ID     int64   `db:"id"`
+	UserID int64   `db:"user_id"`
+	Name   string  `db:"name"`
+	Year   int64   `db:"year"`
+	Plate  *string `db:"plate"`
 }
 
 func (s *CarStorage) SelectCars(ctx context.Context, userID int64) ([]Car, error) {

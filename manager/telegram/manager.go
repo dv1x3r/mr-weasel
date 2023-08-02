@@ -52,7 +52,7 @@ type Manager struct {
 	states   map[int64]HandlerFunc // Map of active user states.
 }
 
-func New(client *tgclient.Client, debug bool) *Manager {
+func New(client *tgclient.Client) *Manager {
 	return &Manager{
 		client:   client,
 		handlers: make(map[string]Handler),

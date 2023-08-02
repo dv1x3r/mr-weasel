@@ -95,7 +95,7 @@ func (c *CarCommand) newCarYear(ctx context.Context, pl tg.Payload) (tg.Result, 
 
 func (c *CarCommand) newCarPlate(ctx context.Context, pl tg.Payload) (tg.Result, error) {
 	if pl.Command != "/skip" {
-		c.draftCars[pl.User.ID].Plate = pl.Command
+		*c.draftCars[pl.User.ID].Plate = pl.Command
 	}
 
 	id, err := c.storage.InsertCar(ctx, *c.draftCars[pl.User.ID])
