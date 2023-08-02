@@ -2,22 +2,17 @@ package tgmanager
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"mr-weasel/client/telegram"
 	"strings"
 )
 
-var (
-	ErrCommandNotFound = errors.New("command not found")
-	ErrCommandFailed   = errors.New("command failed")
-	ErrCommandEmpty    = errors.New("command returned empty text")
-)
-
 type Payload struct {
-	User    tgclient.User
-	Command string
+	User            *tgclient.User
+	Chat            *tgclient.Chat
+	CallbackMessage *tgclient.Message
+	Command         string
+	ClearState      bool
 }
 
 type Result struct {
@@ -83,12 +78,10 @@ func (m *Manager) PublishCommands() {
 	}
 
 	cfg := tgclient.SetMyCommandsConfig{Commands: botCommands}
-	res, err := m.client.SetMyCommands(context.Background(), cfg)
+	_, err := m.client.SetMyCommands(context.Background(), cfg)
 	if err != nil {
-		log.Println("[ERROR] Publishing commands:", err)
+		log.Println("[ERROR]", err)
 	}
-
-	log.Println("[INFO] Publishing commands:", res)
 }
 
 func (m *Manager) Start() {
@@ -103,85 +96,68 @@ func (m *Manager) Start() {
 	updates := m.client.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
 		if update.Message != nil && update.Message.From != nil {
-			user := update.Message.From
-			command := update.Message.Text
-
-			res, err := m.executeCommand(ctx, user, command)
-			if err != nil {
-				log.Println("[ERROR]", err)
-				continue
+			pl := Payload{
+				User:            update.Message.From,
+				Chat:            update.Message.Chat,
+				CallbackMessage: nil,
+				Command:         update.Message.Text,
+				ClearState:      true,
 			}
-
-			// If it is normal message, user can change and escape states
-			if res.State != nil {
-				m.states[user.ID] = res.State
-			} else {
-				delete(m.states, user.ID)
-			}
-
-			_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
-				ChatId:      update.Message.Chat.ID,
-				Text:        res.Text,
-				ReplyMarkup: res.Keyboard,
-			})
-			if err != nil {
-				log.Println("[ERROR] Send message error:", err)
-			}
+			m.processUpdate(ctx, pl)
 		} else if update.CallbackQuery != nil {
-			user := update.CallbackQuery.From
-			command := update.CallbackQuery.Data
-
-			res, err := m.executeCommand(ctx, user, command)
-			if err != nil {
-				log.Println("[ERROR]", err)
-				continue
+			pl := Payload{
+				User:            update.CallbackQuery.From,
+				Chat:            update.CallbackQuery.Message.Chat,
+				CallbackMessage: update.CallbackQuery.Message,
+				Command:         update.CallbackQuery.Data,
+				ClearState:      false,
 			}
-
-			// If it is callback event, user can change state only
-			// User should not remove the current state
-			if res.State != nil {
-				m.states[user.ID] = res.State
-			}
-
-			if res.Keyboard == nil {
-				_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
-					ChatId: update.CallbackQuery.Message.Chat.ID,
-					Text:   res.Text,
-				})
-				if err != nil {
-					log.Println("[ERROR] Callback send message:", err)
-				}
-			} else {
-				_, err = m.client.EditMessageText(ctx, tgclient.EditMessageTextConfig{
-					ChatId:      update.CallbackQuery.Message.Chat.ID,
-					MessageID:   update.CallbackQuery.Message.MessageID,
-					Text:        res.Text,
-					ReplyMarkup: res.Keyboard,
-				})
-				if err != nil {
-					log.Println("[ERROR] Callback edit message:", err)
-				}
-			}
+			m.processUpdate(ctx, pl)
 		}
 	}
 }
 
-func (m *Manager) executeCommand(ctx context.Context, user *tgclient.User, command string) (Result, error) {
-	fn, ok := m.getHandlerFunc(user.ID, command)
+func (m *Manager) processUpdate(ctx context.Context, pl Payload) {
+	fn, ok := m.getHandlerFunc(pl.User.ID, pl.Command)
 	if !ok {
-		return Result{}, fmt.Errorf("executeCommand %s %w", command, ErrCommandNotFound)
+		return
 	}
 
-	res, err := fn(ctx, Payload{User: *user, Command: command})
+	res, err := fn(ctx, pl)
 	if err != nil {
-		return res, fmt.Errorf("executeCommand %s %w %w", command, err, ErrCommandFailed)
+		log.Println("[ERROR]", err)
 	}
 
-	if res.Text == "" {
-		return Result{}, fmt.Errorf("executeCommand %s %w", command, ErrCommandEmpty)
+	// If it is normal message, user can change and escape states
+	// If it is callback event, user can change state only
+	// If it is callback event, user can't clear his current state
+	if res.State != nil {
+		m.states[pl.User.ID] = res.State
+	} else if pl.ClearState {
+		delete(m.states, pl.User.ID)
 	}
 
-	return res, nil
+	// Update existing message with buttons
+	if pl.CallbackMessage != nil && res.Keyboard != nil && res.Text != "" {
+		_, err = m.client.EditMessageText(ctx, tgclient.EditMessageTextConfig{
+			ChatId:      pl.Chat.ID,
+			MessageID:   pl.CallbackMessage.MessageID,
+			Text:        res.Text,
+			ReplyMarkup: res.Keyboard,
+		})
+		if err != nil {
+			log.Println("[ERROR]", err)
+		}
+	} else if res.Text != "" {
+		_, err = m.client.SendMessage(ctx, tgclient.SendMessageConfig{
+			ChatId:      pl.Chat.ID,
+			Text:        res.Text,
+			ReplyMarkup: res.Keyboard,
+		})
+		if err != nil {
+			log.Println("[ERROR]", err)
+		}
+	}
 }
 
 func (m *Manager) getHandlerFunc(userID int64, text string) (HandlerFunc, bool) {

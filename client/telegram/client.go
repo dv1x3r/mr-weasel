@@ -21,6 +21,8 @@ type Client struct {
 }
 
 func Connect(token string, debug bool) (*Client, error) {
+	const op = "telegram.Connect"
+
 	c := &Client{
 		client: &http.Client{Timeout: 100 * time.Second},
 		token:  token,
@@ -30,11 +32,12 @@ func Connect(token string, debug bool) (*Client, error) {
 	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
 		log.Println("[ERROR] Failed to start the bot")
+		return c, fmt.Errorf("%s: %w", op, err)
 	} else {
-		log.Printf("[INFO] Logged in as [%s]", me.Username)
+		log.Printf("[INFO] Logged in as [%s]\n", me.Username)
 	}
 
-	return c, err
+	return c, nil
 }
 
 func MustConnect(token string, debug bool) *Client {
@@ -47,33 +50,58 @@ func MustConnect(token string, debug bool) *Client {
 
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
 func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
-	return executeMethod[User](ctx, c, cfg)
+	const op = "telegram.Client.GetMe"
+	value, err := executeMethod[User](ctx, c, cfg)
+	if err != nil {
+		return value, fmt.Errorf("%s: %w", op, err)
+	}
+	return value, nil
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
 func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
-	return executeMethod[[]Update](ctx, c, cfg)
+	const op = "telegram.Client.GetUpdates"
+	value, err := executeMethod[[]Update](ctx, c, cfg)
+	if err != nil {
+		return value, fmt.Errorf("%s: %w", op, err)
+	}
+	return value, nil
 }
 
 // Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
-	return executeMethod[Message](ctx, c, cfg)
+	const op = "telegram.Client.SendMessage"
+	value, err := executeMethod[Message](ctx, c, cfg)
+	if err != nil {
+		return value, fmt.Errorf("%s: %w", op, err)
+	}
+	return value, nil
 }
 
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
-	return executeMethod[Message](ctx, c, cfg)
+	const op = "telegram.Client.EditMessageText"
+	value, err := executeMethod[Message](ctx, c, cfg)
+	if err != nil {
+		return value, fmt.Errorf("%s: %w", op, err)
+	}
+	return value, nil
 }
 
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
-	return executeMethod[bool](ctx, c, cfg)
+	const op = "telegram.Client.SetMyCommands"
+	value, err := executeMethod[bool](ctx, c, cfg)
+	if err != nil {
+		return value, fmt.Errorf("%s: %w", op, err)
+	}
+	return value, nil
 }
 
 // Use this method to receive incoming updates using long polling. Starts a background goroutine, and returns a Channel with Update objects.
 func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanSize int) <-chan Update {
 	ch := make(chan Update, chanSize)
-	log.Println("[INFO]", "Goroutine GetUpdatesChan started")
+	log.Println("[INFO] Goroutine GetUpdatesChan started")
 
 	go func() {
 		for {
@@ -87,11 +115,11 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 			updates, err := c.GetUpdates(ctx, cfg)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
-					log.Println("[INFO]", "Goroutine GetUpdatesChan closed")
+					log.Println("[INFO] Goroutine GetUpdatesChan closed")
 					close(ch)
 					return
 				} else {
-					log.Println("[WARN]", "Failed to get updates, retrying in 3 seconds...")
+					log.Println("[WARN] Failed to get updates, retrying in 3 seconds...")
 					time.Sleep(time.Second * 3)
 					continue
 				}
@@ -151,7 +179,7 @@ func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, 
 	apiRes := new(APIResponse)
 	err = json.NewDecoder(res.Body).Decode(apiRes)
 	if err != nil {
-		return nil, fmt.Errorf("[ERROR] makeRequest Decode: %w", err)
+		return nil, err
 	}
 
 	if !apiRes.Ok {
