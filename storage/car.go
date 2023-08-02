@@ -44,6 +44,15 @@ func (s *CarStorage) GetCar(ctx context.Context, userID int64, carID int64) (Car
 	return car, err
 }
 
+func (s *CarStorage) DeleteCar(ctx context.Context, userID int64, carID int64) (int64, error) {
+	stmt := `delete from car where user_id = ? and id = ?;`
+	res, err := s.db.ExecContext(ctx, stmt, userID, carID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 func (s *CarStorage) InsertCar(ctx context.Context, car Car) (int64, error) {
 	stmt := "insert into car (user_id, name, year, plate) values (?,?,?,?);"
 	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate)

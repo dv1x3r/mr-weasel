@@ -4,22 +4,20 @@ import (
 	"context"
 	"fmt"
 	tg "mr-weasel/manager/telegram"
-	"mr-weasel/storage"
+	st "mr-weasel/storage"
 	"strconv"
 	"strings"
 )
 
-type DraftCar = storage.Car
-
 type CarCommand struct {
-	storage   *storage.CarStorage
-	draftCars map[int64]*DraftCar
+	storage   *st.CarStorage
+	draftCars map[int64]*st.Car
 }
 
-func New(storage *storage.CarStorage) *CarCommand {
+func New(storage *st.CarStorage) *CarCommand {
 	return &CarCommand{
 		storage:   storage,
-		draftCars: make(map[int64]*DraftCar),
+		draftCars: make(map[int64]*st.Car),
 	}
 }
 
@@ -38,6 +36,12 @@ func (c *CarCommand) Execute(ctx context.Context, pl tg.Payload) (tg.Result, err
 	if strings.HasPrefix(pl.Command, "/car get") {
 		return c.getCar(ctx, pl)
 	}
+	// if strings.HasPrefix(pl.Command, "/car upd") {
+	// 	return c.updCar(ctx, pl)
+	// }
+	if strings.HasPrefix(pl.Command, "/car del") {
+		return c.delCar(ctx, pl)
+	}
 	return c.selectCars(ctx, pl)
 }
 
@@ -48,7 +52,7 @@ func (c *CarCommand) selectCars(ctx context.Context, pl tg.Payload) (tg.Result, 
 		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
 	}
 	for i, v := range cars {
-		res.AddKeyboardButton(v.Name, fmt.Sprintf("%s %d", "/car get", v.ID))
+		res.AddKeyboardButton(v.Name, fmt.Sprintf("/car get %d", v.ID))
 		if (i+1)%2 == 0 {
 			res.AddKeyboardRow()
 		}
@@ -69,12 +73,44 @@ func (c *CarCommand) getCar(ctx context.Context, pl tg.Payload) (tg.Result, erro
 	res := tg.Result{
 		Text: fmt.Sprintf("*Car ID*: %d \n %s\n",
 			car.ID, car.Name)}
+
+	res.AddKeyboardButton("Delete", fmt.Sprintf("/car del %d", id))
 	res.AddKeyboardButton("Back", "/car")
 	return res, nil
 }
 
+func (c *CarCommand) delCar(ctx context.Context, pl tg.Payload) (tg.Result, error) {
+	args, _ := strings.CutPrefix(pl.Command, "/car del ")
+	id, err := strconv.Atoi(args)
+	if err != nil {
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
+	}
+	car, err := c.storage.GetCar(ctx, pl.User.ID, int64(id))
+	if err != nil {
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
+	}
+	c.draftCars[pl.User.ID] = &car
+	return tg.Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)? /confirm", car.Name, car.Year), State: c.delCarConfirm}, nil
+}
+
+func (c *CarCommand) delCarConfirm(ctx context.Context, pl tg.Payload) (tg.Result, error) {
+	if pl.Command != "/confirm" {
+		return tg.Result{Text: "Operation has been cancelled."}, nil
+	}
+	affected, err := c.storage.DeleteCar(ctx, pl.User.ID, c.draftCars[pl.User.ID].ID)
+	if err != nil {
+		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
+	}
+	if affected == 1 {
+		res := tg.Result{Text: "Car has been successfully deleted!"}
+		res.AddKeyboardButton("Back", "/car")
+		return res, nil
+	}
+	return tg.Result{Text: "Car not found."}, nil
+}
+
 func (c *CarCommand) newCar(ctx context.Context, pl tg.Payload) (tg.Result, error) {
-	c.draftCars[pl.User.ID] = &DraftCar{UserID: pl.User.ID}
+	c.draftCars[pl.User.ID] = &st.Car{UserID: pl.User.ID}
 	return tg.Result{Text: "Please choose a name for your new car.", State: c.newCarName}, nil
 }
 
@@ -88,21 +124,19 @@ func (c *CarCommand) newCarYear(ctx context.Context, pl tg.Payload) (tg.Result, 
 	if err != nil {
 		return tg.Result{Text: "Please enter a valid number.", State: c.newCarYear}, nil
 	}
-
 	c.draftCars[pl.User.ID].Year = int64(year)
 	return tg.Result{Text: "What is your plate number? /skip", State: c.newCarPlate}, nil
 }
 
 func (c *CarCommand) newCarPlate(ctx context.Context, pl tg.Payload) (tg.Result, error) {
 	if pl.Command != "/skip" {
-		*c.draftCars[pl.User.ID].Plate = pl.Command
+		plate := pl.Command
+		c.draftCars[pl.User.ID].Plate = &plate
 	}
-
 	id, err := c.storage.InsertCar(ctx, *c.draftCars[pl.User.ID])
 	if err != nil {
 		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
 	}
-
 	pl.Command = fmt.Sprintf("/car get %d", id)
 	return c.getCar(ctx, pl)
 }
