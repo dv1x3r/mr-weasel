@@ -25,7 +25,7 @@ func (GetUpdatesConfig) Method() string {
 
 type SendMessageConfig struct {
 	// Unique identifier for the target chat or username.
-	ChatId int64 `json:"chat_id"`
+	ChatID int64 `json:"chat_id"`
 	// Optional. Unique identifier for the target message thread (topic) of the forum; for forum supergroups only.
 	MessageThreadId int `json:"message_thread_id,omitempty"`
 	// Text of the message to be sent, 1-4096 characters after entities parsing.
@@ -54,7 +54,7 @@ func (SendMessageConfig) Method() string {
 
 type EditMessageTextConfig struct {
 	// Optional. Required if inline_message_id is not specified. Unique identifier for the target chat or username of the target channel.
-	ChatId int64 `json:"chat_id,omitempty"`
+	ChatID int64 `json:"chat_id,omitempty"`
 	// Optional. Required if inline_message_id is not specified. Identifier of the message to edit.
 	MessageID int `json:"message_id,omitempty"`
 	// Optional. Required if chat_id and message_id are not specified. Identifier of the inline message.
@@ -73,6 +73,23 @@ type EditMessageTextConfig struct {
 
 func (EditMessageTextConfig) Method() string {
 	return "editMessageText"
+}
+
+type AnswerCallbackQueryConfig struct {
+	// Unique identifier for the query to be answered.
+	CallbackQueryID string `json:"callback_query_id"`
+	// Optional. Text of the notification. If not specified, nothing will be shown to the user, 0-200 characters.
+	Text string `json:"text"`
+	// Optional. If True, an alert will be shown by the client instead of a notification at the top of the chat screen. Defaults to false.
+	ShowAlert bool `json:"show_alert"`
+	// Optional. URL that will be opened by the user's client.
+	URL string `json:"url"`
+	// Optional. The maximum amount of time in seconds that the result of the callback query may be cached client-side.
+	CacheTime int `json:"cache_time"`
+}
+
+func (AnswerCallbackQueryConfig) Method() string {
+	return "answerCallbackQuery"
 }
 
 type SetMyCommandsConfig struct {

@@ -88,6 +88,16 @@ func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig)
 	return value, nil
 }
 
+// Use this method to send answers to callback queries sent from inline keyboards. The answer will be displayed to the user as a notification at the top of the chat screen or as an alert. On success, True is returned.
+func (c *Client) AnswerCallbackQuery(ctx context.Context, cfg AnswerCallbackQueryConfig) (bool, error) {
+	const op = "telegram.Client.AnswerCallbackQuery"
+	value, err := executeMethod[bool](ctx, c, cfg)
+	if err != nil {
+		return value, fmt.Errorf("%s: %w", op, err)
+	}
+	return value, nil
+}
+
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
 	const op = "telegram.Client.SetMyCommands"

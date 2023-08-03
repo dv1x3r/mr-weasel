@@ -111,7 +111,7 @@ type MessageEntity struct {
 	// Length of the entity in UTF-16 code units.
 	Length int `json:"length"`
 	// Optional. For “text_link” only, URL that will be opened after user taps on the text.
-	Url string `json:"url,omitempty"`
+	URL string `json:"url,omitempty"`
 	// Optional. For “text_mention” only, the mentioned user.
 	User *User `json:"user,omitempty"`
 	// Optional. For “pre” only, the programming language of the entity text.
