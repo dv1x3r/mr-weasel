@@ -7,17 +7,12 @@ import (
 func TestResultKeyboard(t *testing.T) {
 	res := Result{}
 	if res.Keyboard != nil {
-		t.Fatal("Keyboard is not nil on Result init")
+		t.Fatal("Keyboard is not nil on init")
 	}
-	t.Run("NewRows", func(t *testing.T) {
-		res := Result{}
+	for i := 0; i < 5; i++ {
 		res.AddKeyboardRow()
-		if len(res.Keyboard.InlineKeyboard) != 1 {
-			t.Errorf("actual rows: [%d], expected rows [%d]\n", len(res.Keyboard.InlineKeyboard), 1)
+		if len(res.Keyboard.InlineKeyboard) != i {
+			t.Errorf("actual rows: [%d], expected rows [%d]\n", len(res.Keyboard.InlineKeyboard), i)
 		}
-		res.AddKeyboardRow()
-		if len(res.Keyboard.InlineKeyboard) != 2 {
-			t.Errorf("actual rows: [%d], expected rows [%d]\n", len(res.Keyboard.InlineKeyboard), 2)
-		}
-	})
+	}
 }
