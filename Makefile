@@ -15,6 +15,9 @@ compile:
 run:
 	go build -o ./bin/$(APP_NAME) && ./bin/$(APP_NAME)
 
+test:
+	go test -v ./...
+
 db-up:
 	$(GOOSE) up
 
@@ -42,7 +45,7 @@ db-create:
 	@read -p "Migration name: " VALUE; \
 	$(GOOSE) create "$$VALUE" sql
 
-.PHONY: build compile run
+.PHONY: build compile run test
 .PHONY: db-up db-up-by-one db-up-to db-down db-down-to
 .PHONY: db-reset db-status db-create
  
