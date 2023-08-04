@@ -3,6 +3,7 @@ package car
 import (
 	"context"
 	"fmt"
+	tgclient "mr-weasel/client/telegram"
 	tg "mr-weasel/manager/telegram"
 	st "mr-weasel/storage"
 	"strconv"
@@ -46,19 +47,19 @@ func (c *CarCommand) Execute(ctx context.Context, pl tg.Payload) (tg.Result, err
 }
 
 func (c *CarCommand) selectCars(ctx context.Context, pl tg.Payload) (tg.Result, error) {
-	res := tg.Result{Text: "Choose your car from the list below:"}
+	res := tg.Result{Text: "Choose your car from the list below:", Keyboard: &tgclient.InlineKeyboardMarkup{}}
 	cars, err := c.storage.SelectCars(ctx, pl.User.ID)
 	if err != nil {
 		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
 	}
 	for i, v := range cars {
-		res.AddKeyboardButton(v.Name, fmt.Sprintf("/car get %d", v.ID))
+		res.Keyboard.AddButton(v.Name, fmt.Sprintf("/car get %d", v.ID))
 		if (i+1)%2 == 0 {
-			res.AddKeyboardRow()
+			res.Keyboard.AddRow()
 		}
 	}
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("New", "/car new")
+	res.Keyboard.AddRow()
+	res.Keyboard.AddButton("New", "/car new")
 	return res, nil
 }
 
@@ -72,10 +73,12 @@ func (c *CarCommand) getCar(ctx context.Context, pl tg.Payload) (tg.Result, erro
 	car, err := c.storage.GetCar(ctx, pl.User.ID, int64(id))
 	res := tg.Result{
 		Text: fmt.Sprintf("*Car ID*: %d \n %s\n",
-			car.ID, car.Name)}
+			car.ID, car.Name),
+		Keyboard: &tgclient.InlineKeyboardMarkup{},
+	}
 
-	res.AddKeyboardButton("Delete", fmt.Sprintf("/car del %d", id))
-	res.AddKeyboardButton("Back", "/car")
+	res.Keyboard.AddButton("Delete", fmt.Sprintf("/car del %d", id))
+	res.Keyboard.AddButton("Back", "/car")
 	return res, nil
 }
 
@@ -102,8 +105,8 @@ func (c *CarCommand) delCarConfirm(ctx context.Context, pl tg.Payload) (tg.Resul
 		return tg.Result{Text: "There is something wrong with our database, please try again."}, err
 	}
 	if affected == 1 {
-		res := tg.Result{Text: "Car has been successfully deleted!"}
-		res.AddKeyboardButton("Back", "/car")
+		res := tg.Result{Text: "Car has been successfully deleted!", Keyboard: &tgclient.InlineKeyboardMarkup{}}
+		res.Keyboard.AddButton("Back", "/car")
 		return res, nil
 	}
 	return tg.Result{Text: "Car not found."}, nil

@@ -18,23 +18,6 @@ type Result struct {
 	Keyboard *tgclient.InlineKeyboardMarkup
 }
 
-func (res *Result) AddKeyboardButton(text string, data string) {
-	if res.Keyboard == nil {
-		res.Keyboard = &tgclient.InlineKeyboardMarkup{
-			InlineKeyboard: make([][]tgclient.InlineKeyboardButton, 1),
-		}
-	}
-	row := &res.Keyboard.InlineKeyboard[len(res.Keyboard.InlineKeyboard)-1]
-	*row = append(*row, tgclient.InlineKeyboardButton{Text: text, CallbackData: data})
-}
-
-func (res *Result) AddKeyboardRow() {
-	if res.Keyboard != nil && res.Keyboard.InlineKeyboard != nil {
-		res.Keyboard.InlineKeyboard = append(res.Keyboard.InlineKeyboard,
-			[]tgclient.InlineKeyboardButton{})
-	}
-}
-
 type Handler interface {
 	Prefix() string
 	Description() string

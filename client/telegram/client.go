@@ -14,6 +14,13 @@ import (
 
 const apiEndpoint = "https://api.telegram.org/bot%s/%s"
 
+func wrapIfErr(err error, op string) error {
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return nil
+}
+
 type Client struct {
 	client *http.Client
 	token  string
@@ -32,12 +39,11 @@ func Connect(token string, debug bool) (*Client, error) {
 	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
 		log.Println("[ERROR] Failed to start the bot")
-		return c, fmt.Errorf("%s: %w", op, err)
 	} else {
 		log.Printf("[INFO] Logged in as [%s]\n", me.Username)
 	}
 
-	return c, nil
+	return c, wrapIfErr(err, op)
 }
 
 func MustConnect(token string, debug bool) *Client {
@@ -52,60 +58,42 @@ func MustConnect(token string, debug bool) *Client {
 func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 	const op = "telegram.Client.GetMe"
 	value, err := executeMethod[User](ctx, c, cfg)
-	if err != nil {
-		return value, fmt.Errorf("%s: %w", op, err)
-	}
-	return value, nil
+	return value, wrapIfErr(err, op)
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
 func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
 	const op = "telegram.Client.GetUpdates"
 	value, err := executeMethod[[]Update](ctx, c, cfg)
-	if err != nil {
-		return value, fmt.Errorf("%s: %w", op, err)
-	}
-	return value, nil
+	return value, wrapIfErr(err, op)
 }
 
 // Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
 	const op = "telegram.Client.SendMessage"
 	value, err := executeMethod[Message](ctx, c, cfg)
-	if err != nil {
-		return value, fmt.Errorf("%s: %w", op, err)
-	}
-	return value, nil
+	return value, wrapIfErr(err, op)
 }
 
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
 	const op = "telegram.Client.EditMessageText"
 	value, err := executeMethod[Message](ctx, c, cfg)
-	if err != nil {
-		return value, fmt.Errorf("%s: %w", op, err)
-	}
-	return value, nil
+	return value, wrapIfErr(err, op)
 }
 
 // Use this method to send answers to callback queries sent from inline keyboards. The answer will be displayed to the user as a notification at the top of the chat screen or as an alert. On success, True is returned.
 func (c *Client) AnswerCallbackQuery(ctx context.Context, cfg AnswerCallbackQueryConfig) (bool, error) {
 	const op = "telegram.Client.AnswerCallbackQuery"
 	value, err := executeMethod[bool](ctx, c, cfg)
-	if err != nil {
-		return value, fmt.Errorf("%s: %w", op, err)
-	}
-	return value, nil
+	return value, wrapIfErr(err, op)
 }
 
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
 	const op = "telegram.Client.SetMyCommands"
 	value, err := executeMethod[bool](ctx, c, cfg)
-	if err != nil {
-		return value, fmt.Errorf("%s: %w", op, err)
-	}
-	return value, nil
+	return value, wrapIfErr(err, op)
 }
 
 // Use this method to receive incoming updates using long polling. Starts a background goroutine, and returns a Channel with Update objects.
@@ -147,19 +135,19 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
-func executeMethod[T any](ctx context.Context, client *Client, cfg APICaller) (T, error) {
-	value := new(T)
+func executeMethod[T any](ctx context.Context, client *Client, cfg Config) (T, error) {
+	var value T
 
 	res, err := client.makeRequest(ctx, cfg)
 	if err != nil {
-		return *value, err
+		return value, err
 	}
 
-	err = json.Unmarshal(res.Result, value)
-	return *value, err
+	err = json.Unmarshal(res.Result, &value)
+	return value, err
 }
 
-func (c *Client) makeRequest(ctx context.Context, cfg APICaller) (*APIResponse, error) {
+func (c *Client) makeRequest(ctx context.Context, cfg Config) (*APIResponse, error) {
 	url := fmt.Sprintf(apiEndpoint, c.token, cfg.Method())
 
 	params := new(bytes.Buffer)

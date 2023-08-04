@@ -1,5 +1,9 @@
 package tgclient
 
+type Config interface {
+	Method() string
+}
+
 type GetMeConfig struct {
 }
 

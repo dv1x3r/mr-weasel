@@ -30,11 +30,7 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	return fmt.Sprintf("Telegram Error: %d %s", e.Code, e.Message)
-}
-
-type APICaller interface {
-	Method() string
+	return fmt.Sprintf("telegram.APIError: %d %s", e.Code, e.Message)
 }
 
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
@@ -124,6 +120,18 @@ type MessageEntity struct {
 type InlineKeyboardMarkup struct {
 	// Array of button rows, each represented by an Array of InlineKeyboardButton objects.
 	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
+}
+
+func (m *InlineKeyboardMarkup) AddRow() {
+	m.InlineKeyboard = append(m.InlineKeyboard, []InlineKeyboardButton{})
+}
+
+func (m *InlineKeyboardMarkup) AddButton(text string, callbackData string) {
+	if len(m.InlineKeyboard) == 0 {
+		m.AddRow()
+	}
+	row := &m.InlineKeyboard[len(m.InlineKeyboard)-1]
+	*row = append(*row, InlineKeyboardButton{Text: text, CallbackData: callbackData})
 }
 
 // This object represents one button of an inline keyboard. You must use exactly one of the optional fields.
