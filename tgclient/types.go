@@ -122,18 +122,6 @@ type InlineKeyboardMarkup struct {
 	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
 }
 
-func (m *InlineKeyboardMarkup) AddRow() {
-	m.InlineKeyboard = append(m.InlineKeyboard, []InlineKeyboardButton{})
-}
-
-func (m *InlineKeyboardMarkup) AddButton(text string, callbackData string) {
-	if len(m.InlineKeyboard) == 0 {
-		m.AddRow()
-	}
-	row := &m.InlineKeyboard[len(m.InlineKeyboard)-1]
-	*row = append(*row, InlineKeyboardButton{Text: text, CallbackData: callbackData})
-}
-
 // This object represents one button of an inline keyboard. You must use exactly one of the optional fields.
 type InlineKeyboardButton struct {
 	// Label text on the button
