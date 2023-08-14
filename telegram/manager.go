@@ -83,6 +83,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	_, err = m.client.SendMessage(ctx, SendMessageConfig{
 		ChatID:      message.Chat.ID,
 		Text:        res.Text,
+		ParseMode:   "HTML",
 		ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
 	})
 	if err != nil {
@@ -112,6 +113,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 			ChatID:      callbackQuery.Message.Chat.ID,
 			MessageID:   callbackQuery.Message.MessageID,
 			Text:        res.Text,
+			ParseMode:   "HTML",
 			ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
 		})
 		if err != nil {
@@ -121,6 +123,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		_, err = m.client.SendMessage(ctx, SendMessageConfig{
 			ChatID:      callbackQuery.Message.Chat.ID,
 			Text:        res.Text,
+			ParseMode:   "HTML",
 			ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
 		})
 		if err != nil {
