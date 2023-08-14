@@ -12,7 +12,7 @@ import (
 
 func main() {
 	db := sqlx.MustConnect(os.Getenv("GOOSE_DRIVER"), os.Getenv("GOOSE_DBSTRING"))
-	tgClient := telegram.MustConnect(os.Getenv("TG_TOKEN"), false)
+	tgClient := telegram.NewClient(os.Getenv("TG_TOKEN"), false).MustConnect()
 	tgManager := telegram.NewManager(tgClient)
 	tgManager.AddCommands(
 		commands.NewPingCommand(),

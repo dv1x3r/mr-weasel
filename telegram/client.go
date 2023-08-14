@@ -27,28 +27,27 @@ type Client struct {
 	debug  bool
 }
 
-func Connect(token string, debug bool) (*Client, error) {
-	const op = "telegram.Connect"
-
-	c := &Client{
+func NewClient(token string, debug bool) *Client {
+	return &Client{
 		client: &http.Client{Timeout: 100 * time.Second},
 		token:  token,
 		debug:  debug,
 	}
+}
 
+func (c *Client) Connect() (*Client, error) {
+	const op = "telegram.Connect"
 	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
 		log.Println("[ERROR] Failed to start the bot")
 	} else {
 		log.Printf("[INFO] Logged in as [%s]\n", me.Username)
 	}
-
 	return c, wrapIfErr(op, err)
 }
 
-func MustConnect(token string, debug bool) *Client {
-	c, err := Connect(token, debug)
-	if err != nil {
+func (c *Client) MustConnect() *Client {
+	if _, err := c.Connect(); err != nil {
 		panic(err)
 	}
 	return c

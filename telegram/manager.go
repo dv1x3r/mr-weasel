@@ -83,7 +83,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	_, err = m.client.SendMessage(ctx, SendMessageConfig{
 		ChatID:      message.Chat.ID,
 		Text:        res.Text,
-		ReplyMarkup: m.keyboardToInlineMarkup(res.Keyboard),
+		ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
 	})
 	if err != nil {
 		log.Println("[ERROR]", err)
@@ -112,7 +112,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 			ChatID:      callbackQuery.Message.Chat.ID,
 			MessageID:   callbackQuery.Message.MessageID,
 			Text:        res.Text,
-			ReplyMarkup: m.keyboardToInlineMarkup(res.Keyboard),
+			ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
 		})
 		if err != nil {
 			log.Println("[ERROR]", err)
@@ -121,7 +121,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		_, err = m.client.SendMessage(ctx, SendMessageConfig{
 			ChatID:      callbackQuery.Message.Chat.ID,
 			Text:        res.Text,
-			ReplyMarkup: m.keyboardToInlineMarkup(res.Keyboard),
+			ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
 		})
 		if err != nil {
 			log.Println("[ERROR]", err)
@@ -156,13 +156,12 @@ func (m *Manager) setState(userID int64, state commands.HandlerFunc, clear bool)
 	}
 }
 
-func (m *Manager) keyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
-	markup := &InlineKeyboardMarkup{InlineKeyboard: make([][]InlineKeyboardButton, 0, len(keyboard))}
-	for i, row := range keyboard {
-		markup.InlineKeyboard = append(markup.InlineKeyboard, make([]InlineKeyboardButton, len(row)))
-		for _, button := range row {
-			markup.InlineKeyboard[i] = append(markup.InlineKeyboard[i],
-				InlineKeyboardButton{Text: button.Label, CallbackData: button.Data})
+func (m *Manager) commandKeyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
+	markup := &InlineKeyboardMarkup{InlineKeyboard: make([][]InlineKeyboardButton, len(keyboard))}
+	for r, row := range keyboard {
+		markup.InlineKeyboard[r] = make([]InlineKeyboardButton, len(row))
+		for b, btn := range row {
+			markup.InlineKeyboard[r][b] = InlineKeyboardButton{Text: btn.Label, CallbackData: btn.Data}
 		}
 	}
 	return markup

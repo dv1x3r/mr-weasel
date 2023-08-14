@@ -2,6 +2,14 @@ package commands
 
 import "context"
 
+type Handler interface {
+	Prefix() string
+	Description() string
+	Execute(context.Context, Payload) (Result, error)
+}
+
+type HandlerFunc = func(context.Context, Payload) (Result, error)
+
 type Payload struct {
 	UserID  int64
 	Command string
@@ -32,12 +40,4 @@ func (r *Result) AddKeyboardButton(label string, data string) {
 	}
 	i := len(r.Keyboard) - 1
 	r.Keyboard[i] = append(r.Keyboard[i], Button{Label: label, Data: data})
-}
-
-type HandlerFunc = func(context.Context, Payload) (Result, error)
-
-type Handler interface {
-	Prefix() string
-	Description() string
-	Execute(context.Context, Payload) (Result, error)
 }
