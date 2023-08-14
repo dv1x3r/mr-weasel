@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"mr-weasel/storage"
 	st "mr-weasel/storage"
 	"strconv"
 	"strings"
@@ -41,16 +42,20 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 	if strings.HasPrefix(pl.Command, "/car del") {
 		return c.delCar(ctx, pl)
 	}
-	return c.selectCars(ctx, pl)
+	return c.selectCarsFromDB(ctx, pl)
 }
 
-func (c *CarCommand) selectCars(ctx context.Context, pl Payload) (Result, error) {
-	res := Result{Text: "Choose your car from the list below:"}
-
+func (c *CarCommand) selectCarsFromDB(ctx context.Context, pl Payload) (Result, error) {
 	cars, err := c.storage.SelectCars(ctx, pl.UserID)
 	if err != nil {
 		return Result{Text: "There is something wrong with our database, please try again."}, err
 	}
+	res := c.addCarsToResult(cars)
+	return res, nil
+}
+
+func (c *CarCommand) addCarsToResult(cars []storage.Car) Result {
+	res := Result{Text: "Choose your car from the list below:"}
 	for i, v := range cars {
 		res.AddKeyboardButton(v.Name, fmt.Sprintf("/car get %d", v.ID))
 		if (i+1)%2 == 0 {
@@ -59,19 +64,22 @@ func (c *CarCommand) selectCars(ctx context.Context, pl Payload) (Result, error)
 	}
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("New", "/car new")
-	return res, nil
+	return res
 }
 
 func (c *CarCommand) getCar(ctx context.Context, pl Payload) (Result, error) {
 	args, _ := strings.CutPrefix(pl.Command, "/car get ")
 	id, err := strconv.Atoi(args)
 	if err != nil {
-		return Result{Text: "There is something wrong with our database, please try again."}, err
+		return Result{Text: "Invalid Car ID."}, err
 	}
 
 	car, err := c.storage.GetCar(ctx, pl.UserID, int64(id))
-	res := Result{Text: fmt.Sprintf("*Car ID*: %d \n %s\n", car.ID, car.Name)}
+	if err != nil {
+		return Result{Text: "Car not found."}, err
+	}
 
+	res := Result{Text: fmt.Sprintf("*Car ID*: %d \n %s\n", car.ID, car.Name)}
 	res.AddKeyboardButton("Delete", fmt.Sprintf("/car del %d", id))
 	res.AddKeyboardButton("Back", "/car")
 	return res, nil

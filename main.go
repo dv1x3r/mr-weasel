@@ -13,7 +13,7 @@ import (
 
 func main() {
 	db := sqlx.MustConnect(os.Getenv("GOOSE_DRIVER"), os.Getenv("GOOSE_DBSTRING"))
-	tgClient := tgclient.MustConnect(os.Getenv("TG_TOKEN"), true)
+	tgClient := tgclient.MustConnect(os.Getenv("TG_TOKEN"), false)
 	tgManager := tgmanager.New(tgClient)
 	tgManager.AddCommands(
 		commands.NewPingCommand(),
