@@ -30,19 +30,32 @@ func (CarCommand) Description() string {
 }
 
 func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
-	// if pl.Command == "/car add" {
-	// 	return c.addCarStart(ctx, pl)
-	// } else if strings.HasPrefix(pl.Command, "/car get ") {
-	// 	// return c.getCar(ctx, pl.UserID, pl.)
-	// } else if strings.HasPrefix(pl.Command, "/car upd ") {
-	// 	// return c.updCar(ctx, pl)
-	// } else if strings.HasPrefix(pl.Command, "/car del ") {
-	// 	// return c.delCar(ctx, pl)
-	// } else if strings.HasPrefix(pl.Command, "/car rmf ") {
-	// 	// return c.delCarConfirmed(ctx, pl)
-	// }
+	args := splitCommand(pl.Command, c.Prefix())
+	if safeGet(args, 0) == "add" {
+		return c.addCarStart(ctx, pl)
+	}
+	if safeGet(args, 0) == "get" {
+		if carID, err := strconv.Atoi(args[1]); err == nil {
+			return c.showCarInfo(ctx, pl.UserID, int64(carID))
+		}
+	}
+	if safeGet(args, 0) == "upd" {
+		// return c.updCar(ctx, pl)
+	}
+	if safeGet(args, 0) == "del" {
+		if carID, err := strconv.Atoi(safeGet(args, 1)); err == nil {
+			return c.delCar(ctx, pl.UserID, int64(carID))
+		}
+	}
+	if safeGet(args, 0) == "rmf" {
+		if carID, err := strconv.Atoi(safeGet(args, 1)); err == nil {
+			return c.delCarConfirmed(ctx, pl.UserID, int64(carID))
+		}
+	}
 	return c.showCarList(ctx, pl.UserID)
 }
+
+// Draft
 
 func (c *CarCommand) setDraftCarNew(userID int64) {
 	c.draftCars[userID] = &st.Car{UserID: userID}
@@ -100,6 +113,7 @@ func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, err
 	if err != nil {
 		return Result{Text: "There is something wrong with our database, please try again."}, err
 	}
+
 	res := Result{Text: "Choose your car from the list below:"}
 	for i, v := range cars {
 		res.AddKeyboardButton(v.Name, fmt.Sprintf("/car get %d", v.ID))
@@ -145,8 +159,9 @@ func (c *CarCommand) delCar(ctx context.Context, userID int64, carID int64) (Res
 	if err != nil {
 		return Result{Text: "Car not found."}, err
 	}
+
 	res := Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)?", car.Name, car.Year)}
-	res.AddKeyboardButton("Yes, delete the car", fmt.Sprintf("/car rm %d", carID))
+	res.AddKeyboardButton("Yes, delete the car", fmt.Sprintf("/car rmf %d", carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("No", fmt.Sprintf("/car get %d", carID))
 	res.AddKeyboardRow()
@@ -159,6 +174,7 @@ func (c *CarCommand) delCarConfirmed(ctx context.Context, userID int64, carID in
 	if err != nil {
 		return Result{Text: "Car not found, or you do not have access."}, err
 	}
+
 	if affected == 1 {
 		res := Result{Text: "Car has been successfully deleted!"}
 		res.AddKeyboardButton("« Back to Cars list", "/car")

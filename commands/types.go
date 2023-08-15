@@ -45,11 +45,18 @@ func (r *Result) AddKeyboardButton(label string, data string) {
 	r.Keyboard[i] = append(r.Keyboard[i], Button{Label: label, Data: data})
 }
 
-func splitCommandArgs(input string, prefix string) []string {
+func splitCommand(input string, prefix string) []string {
 	input, _ = strings.CutPrefix(input, prefix)
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return []string{}
 	}
 	return strings.Split(input, " ")
+}
+
+func safeGet(args []string, n int) string {
+	if n <= len(args)-1 {
+		return args[n]
+	}
+	return ""
 }

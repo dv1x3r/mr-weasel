@@ -29,7 +29,7 @@ func TestKeyboard(t *testing.T) {
 	})
 }
 
-func TestSplitCommandArgs(t *testing.T) {
+func TestSplitCommand(t *testing.T) {
 	tests := []struct {
 		Input    string
 		Prefix   string
@@ -42,7 +42,7 @@ func TestSplitCommandArgs(t *testing.T) {
 		{Input: "/cmd sub 123 456", Prefix: "/cmd sub", Expected: []string{"123", "456"}},
 	}
 	for _, test := range tests {
-		actual := splitCommandArgs(test.Input, test.Prefix)
+		actual := splitCommand(test.Input, test.Prefix)
 		if len(actual) != len(test.Expected) {
 			t.Fatalf("len does not match, actual [%+v], expected [%+v]\n", actual, test)
 		}
