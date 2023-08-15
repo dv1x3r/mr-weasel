@@ -73,13 +73,15 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	res, err := m.executeCommand(ctx, pl)
 	if err != nil {
 		log.Println("[ERROR]", err)
-	} else {
-		// If it is normal message, user can change and escape states
-		m.setState(pl.UserID, res.State, true)
 	}
+
+	// If it is normal message, user can change and escape states
+	m.setState(pl.UserID, res.State, true)
+
 	if res.Text == "" {
 		return
 	}
+
 	_, err = m.client.SendMessage(ctx, SendMessageConfig{
 		ChatID:      message.Chat.ID,
 		Text:        res.Text,
@@ -96,11 +98,12 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 	res, err := m.executeCommand(ctx, pl)
 	if err != nil {
 		log.Println("[ERROR]", err)
-	} else {
-		// If it is callback event, user can change state only
-		// If it is callback event, user can't clear his current state
-		m.setState(pl.UserID, res.State, false)
 	}
+
+	// If it is callback event, user can change state only
+	// If it is callback event, user can't clear his current state
+	m.setState(pl.UserID, res.State, false)
+
 	_, err = m.client.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
 	if err != nil {
 		log.Println("[ERROR]", err)
