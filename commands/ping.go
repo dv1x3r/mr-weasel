@@ -9,7 +9,7 @@ func NewPingCommand() *PingCommand {
 }
 
 func (PingCommand) Prefix() string {
-	return "ping"
+	return "/ping"
 }
 
 func (PingCommand) Description() string {

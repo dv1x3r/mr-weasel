@@ -23,7 +23,7 @@ func NewManager(client *Client) *Manager {
 
 func (m *Manager) AddCommands(handlers ...commands.Handler) {
 	for _, handler := range handlers {
-		prefix := "/" + handler.Prefix()
+		prefix := handler.Prefix()
 		m.handlers[prefix] = handler
 		log.Printf("[INFO] %s registered \n", prefix)
 	}

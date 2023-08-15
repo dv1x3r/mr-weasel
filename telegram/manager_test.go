@@ -10,7 +10,7 @@ type TestCommand struct {
 }
 
 func (TestCommand) Prefix() string {
-	return "test"
+	return "/test"
 }
 
 func (TestCommand) Description() string {

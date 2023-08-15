@@ -7,7 +7,6 @@ import (
 	"fmt"
 	st "mr-weasel/storage"
 	"strconv"
-	"strings"
 )
 
 type CarCommand struct {
@@ -23,7 +22,7 @@ func NewCarCommand(storage *st.CarStorage) *CarCommand {
 }
 
 func (CarCommand) Prefix() string {
-	return "car"
+	return "/car"
 }
 
 func (CarCommand) Description() string {
@@ -31,25 +30,21 @@ func (CarCommand) Description() string {
 }
 
 func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
-	if pl.Command == "/car add" {
-		return c.addCarStart(ctx, pl)
-	}
-	if strings.HasPrefix(pl.Command, "/car get ") {
-		// return c.getCar(ctx, pl.UserID, pl.)
-	}
-	if strings.HasPrefix(pl.Command, "/car upd ") {
-		// return c.updCar(ctx, pl)
-	}
-	if strings.HasPrefix(pl.Command, "/car del ") {
-		return c.delCar(ctx, pl)
-	}
-	if strings.HasPrefix(pl.Command, "/car rmrf ") {
-		return c.delCarConfirmed(ctx, pl)
-	}
-	return c.selectCars(ctx, pl.UserID)
+	// if pl.Command == "/car add" {
+	// 	return c.addCarStart(ctx, pl)
+	// } else if strings.HasPrefix(pl.Command, "/car get ") {
+	// 	// return c.getCar(ctx, pl.UserID, pl.)
+	// } else if strings.HasPrefix(pl.Command, "/car upd ") {
+	// 	// return c.updCar(ctx, pl)
+	// } else if strings.HasPrefix(pl.Command, "/car del ") {
+	// 	// return c.delCar(ctx, pl)
+	// } else if strings.HasPrefix(pl.Command, "/car rmf ") {
+	// 	// return c.delCarConfirmed(ctx, pl)
+	// }
+	return c.showCarList(ctx, pl.UserID)
 }
 
-func (c *CarCommand) newDraftCar(userID int64) {
+func (c *CarCommand) setDraftCarNew(userID int64) {
 	c.draftCars[userID] = &st.Car{UserID: userID}
 }
 
@@ -72,7 +67,7 @@ func (c *CarCommand) setDraftCarPlate(userID int64, input string) {
 // Add
 
 func (c *CarCommand) addCarStart(ctx context.Context, pl Payload) (Result, error) {
-	c.newDraftCar(pl.UserID)
+	c.setDraftCarNew(pl.UserID)
 	return Result{Text: "Please choose a name for your car.", State: c.addCarName}, nil
 }
 
@@ -95,12 +90,12 @@ func (c *CarCommand) addCarPlate(ctx context.Context, pl Payload) (Result, error
 	if err != nil {
 		return Result{Text: "There is something wrong with our database, please try again."}, err
 	}
-	return c.getCar(ctx, pl.UserID, id)
+	return c.showCarInfo(ctx, pl.UserID, id)
 }
 
 // Select
 
-func (c *CarCommand) selectCars(ctx context.Context, userID int64) (Result, error) {
+func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, error) {
 	cars, err := c.storage.SelectCarsFromDB(ctx, userID)
 	if err != nil {
 		return Result{Text: "There is something wrong with our database, please try again."}, err
@@ -117,7 +112,7 @@ func (c *CarCommand) selectCars(ctx context.Context, userID int64) (Result, erro
 	return res, nil
 }
 
-func (c *CarCommand) getCar(ctx context.Context, userID int64, carID int64) (Result, error) {
+func (c *CarCommand) showCarInfo(ctx context.Context, userID int64, carID int64) (Result, error) {
 	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Result{Text: "Car not found."}, nil

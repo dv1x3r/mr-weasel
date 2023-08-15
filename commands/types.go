@@ -1,6 +1,9 @@
 package commands
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 type Handler interface {
 	Prefix() string
@@ -40,4 +43,13 @@ func (r *Result) AddKeyboardButton(label string, data string) {
 	}
 	i := len(r.Keyboard) - 1
 	r.Keyboard[i] = append(r.Keyboard[i], Button{Label: label, Data: data})
+}
+
+func splitCommandArgs(input string, prefix string) []string {
+	input, _ = strings.CutPrefix(input, prefix)
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return []string{}
+	}
+	return strings.Split(input, " ")
 }
