@@ -176,11 +176,11 @@ func (c *CarCommand) carUpdateMenu(ctx context.Context, userID int64, carID int6
 	if err != nil {
 		return res, err
 	}
-	res.AddKeyboardButton("Change Name", fmt.Sprintf("/car upd %d name", carID))
+	res.AddKeyboardButton("Edit Name", fmt.Sprintf("/car upd %d name", carID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("Change Year", fmt.Sprintf("/car upd %d year", carID))
+	res.AddKeyboardButton("Edit Year", fmt.Sprintf("/car upd %d year", carID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("Change Plate", fmt.Sprintf("/car upd %d plate", carID))
+	res.AddKeyboardButton("Edit Plate", fmt.Sprintf("/car upd %d plate", carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("« Back to Car menu", fmt.Sprintf("/car %d", carID))
 	return res, nil
