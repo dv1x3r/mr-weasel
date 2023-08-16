@@ -15,8 +15,8 @@ func TestNewDraftCar(t *testing.T) {
 		}
 		c := NewCarCommand(nil)
 		for _, test := range tests {
-			c.setDraftCarNew(test.UserID)
-			c.setDraftCarName(test.UserID, test.Input)
+			c.draftCarInit(test.UserID)
+			c.draftCarSetName(test.UserID, test.Input)
 			actual := c.draftCars[test.UserID].Name
 			if actual != test.Expected {
 				t.Errorf("actual [%s], [%+v]\n", actual, test)
@@ -36,8 +36,8 @@ func TestNewDraftCar(t *testing.T) {
 		}
 		c := NewCarCommand(nil)
 		for _, test := range tests {
-			c.setDraftCarNew(test.UserID)
-			err := c.setDraftCarYear(test.UserID, test.Input)
+			c.draftCarInit(test.UserID)
+			err := c.draftCarSetYear(test.UserID, test.Input)
 			if test.Error && err == nil {
 				t.Errorf("missing err [%+v]\n", test)
 			}
@@ -61,8 +61,8 @@ func TestNewDraftCar(t *testing.T) {
 		}
 		c := NewCarCommand(nil)
 		for _, test := range tests {
-			c.setDraftCarNew(test.UserID)
-			c.setDraftCarPlate(test.UserID, test.Input)
+			c.draftCarInit(test.UserID)
+			c.draftCarSetPlate(test.UserID, test.Input)
 			actual := c.draftCars[test.UserID].Plate
 			if test.IsNil && actual != nil {
 				t.Errorf("actual [%s], [%+v]\n", *actual, test)
