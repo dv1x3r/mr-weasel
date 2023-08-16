@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"strconv"
 	"strings"
 )
 
@@ -59,4 +60,9 @@ func safeGet(args []string, n int) string {
 		return args[n]
 	}
 	return ""
+}
+
+func safeGetInt(args []string, n int) int64 {
+	i, _ := strconv.Atoi(safeGet(args, n))
+	return int64(i)
 }

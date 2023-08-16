@@ -61,3 +61,12 @@ func (s *CarStorage) InsertCarIntoDB(ctx context.Context, car Car) (int64, error
 	}
 	return res.LastInsertId()
 }
+
+func (s *CarStorage) UpdateCarInDB(ctx context.Context, car Car) (int64, error) {
+	stmt := "update car set user_id = ?, name = ?, year = ?, plate = ? where id = ?;"
+	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate, car.ID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}

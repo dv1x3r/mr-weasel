@@ -31,84 +31,92 @@ func (CarCommand) Description() string {
 
 func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 	args := splitCommand(pl.Command, c.Prefix())
-	if safeGet(args, 0) == "add" {
+	subcommand, carID := safeGet(args, 0), safeGetInt(args, 1)
+	switch subcommand {
+	case "add":
 		return c.addCarStart(ctx, pl)
-	}
-	if safeGet(args, 0) == "get" {
-		if carID, err := strconv.Atoi(args[1]); err == nil {
-			return c.showCarInfo(ctx, pl.UserID, int64(carID))
+	case "get":
+		return c.carMainMenu(ctx, pl.UserID, carID)
+	case "upd":
+		if field := safeGet(args, 2); field != "" {
+			return c.updCarField(ctx, pl.UserID, carID, field)
+		} else {
+			return c.carUpdateMenu(ctx, pl.UserID, carID)
 		}
+	case "del":
+		return c.delCarCheck(ctx, pl.UserID, carID)
+	case "rmf":
+		return c.delCarConfirmed(ctx, pl.UserID, carID)
+	default:
+		return c.carsList(ctx, pl.UserID)
 	}
-	if safeGet(args, 0) == "upd" {
-		// return c.updCar(ctx, pl)
-	}
-	if safeGet(args, 0) == "del" {
-		if carID, err := strconv.Atoi(safeGet(args, 1)); err == nil {
-			return c.delCar(ctx, pl.UserID, int64(carID))
-		}
-	}
-	if safeGet(args, 0) == "rmf" {
-		if carID, err := strconv.Atoi(safeGet(args, 1)); err == nil {
-			return c.delCarConfirmed(ctx, pl.UserID, int64(carID))
-		}
-	}
-	return c.showCarList(ctx, pl.UserID)
 }
 
-// Draft
+func (c *CarCommand) draftCarFetchFromDB(ctx context.Context, userID int64, carID int64) error {
+	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
+	if err != nil {
+		return err
+	}
+	c.draftCars[userID] = &car
+	return nil
+}
 
-func (c *CarCommand) setDraftCarNew(userID int64) {
+func (c *CarCommand) draftCarInsertIntoDB(ctx context.Context, userID int64) (int64, error) {
+	return c.storage.InsertCarIntoDB(ctx, *c.draftCars[userID])
+}
+
+func (c *CarCommand) draftCarUpdateInDB(ctx context.Context, userID int64) (int64, error) {
+	return c.storage.UpdateCarInDB(ctx, *c.draftCars[userID])
+}
+
+func (c *CarCommand) draftCarInit(userID int64) {
 	c.draftCars[userID] = &st.Car{UserID: userID}
 }
 
-func (c *CarCommand) setDraftCarName(userID int64, input string) {
+func (c *CarCommand) draftCarSetName(userID int64, input string) {
 	c.draftCars[userID].Name = input
 }
 
-func (c *CarCommand) setDraftCarYear(userID int64, input string) error {
+func (c *CarCommand) draftCarSetYear(userID int64, input string) error {
 	year, err := strconv.Atoi(input)
 	c.draftCars[userID].Year = int64(year)
 	return err
 }
 
-func (c *CarCommand) setDraftCarPlate(userID int64, input string) {
+func (c *CarCommand) draftCarSetPlate(userID int64, input string) {
 	if input != "/skip" {
 		c.draftCars[userID].Plate = &input
 	}
 }
 
-// Add
-
 func (c *CarCommand) addCarStart(ctx context.Context, pl Payload) (Result, error) {
-	c.setDraftCarNew(pl.UserID)
+	c.draftCarInit(pl.UserID)
 	return Result{Text: "Please choose a name for your car.", State: c.addCarName}, nil
 }
 
 func (c *CarCommand) addCarName(ctx context.Context, pl Payload) (Result, error) {
-	c.setDraftCarName(pl.UserID, pl.Command)
+	c.draftCarSetName(pl.UserID, pl.Command)
 	return Result{Text: "What is the model year?", State: c.addCarYear}, nil
 }
 
 func (c *CarCommand) addCarYear(ctx context.Context, pl Payload) (Result, error) {
-	err := c.setDraftCarYear(pl.UserID, pl.Command)
+	err := c.draftCarSetYear(pl.UserID, pl.Command)
 	if err != nil {
 		return Result{Text: "Please enter a valid number.", State: c.addCarYear}, nil
 	}
-	return Result{Text: "What is your plate number? /skip", State: c.addCarPlate}, nil
+	return Result{Text: "What is your plate number? /skip", State: c.addCarPlateAndSave}, nil
 }
 
-func (c *CarCommand) addCarPlate(ctx context.Context, pl Payload) (Result, error) {
-	c.setDraftCarPlate(pl.UserID, pl.Command)
-	id, err := c.storage.InsertCarIntoDB(ctx, *c.draftCars[pl.UserID])
+func (c *CarCommand) addCarPlateAndSave(ctx context.Context, pl Payload) (Result, error) {
+	c.draftCarSetPlate(pl.UserID, pl.Command)
+	carID, err := c.draftCarInsertIntoDB(ctx, pl.UserID)
 	if err != nil {
 		return Result{Text: "There is something wrong with our database, please try again."}, err
 	}
-	return c.showCarInfo(ctx, pl.UserID, id)
+	return c.carMainMenu(ctx, pl.UserID, carID)
 }
 
-// Select
-
-func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, error) {
+func (c *CarCommand) carsList(ctx context.Context, userID int64) (Result, error) {
 	cars, err := c.storage.SelectCarsFromDB(ctx, userID)
 	if err != nil {
 		return Result{Text: "There is something wrong with our database, please try again."}, err
@@ -126,7 +134,7 @@ func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, err
 	return res, nil
 }
 
-func (c *CarCommand) showCarInfo(ctx context.Context, userID int64, carID int64) (Result, error) {
+func (c *CarCommand) carInfo(ctx context.Context, userID int64, carID int64) (Result, error) {
 	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Result{Text: "Car not found."}, nil
@@ -138,9 +146,18 @@ func (c *CarCommand) showCarInfo(ctx context.Context, userID int64, carID int64)
 	res.Text += fmt.Sprintf("<b>Name:</b> %s\n", car.Name)
 	res.Text += fmt.Sprintf("<b>Year:</b> %d\n", car.Year)
 	if car.Plate != nil {
-		res.Text += fmt.Sprintf("<b>Plates:</b> %s\n", *car.Plate)
+		res.Text += fmt.Sprintf("<b>Plate:</b> %s\n", *car.Plate)
 	} else {
-		res.Text += fmt.Sprintf("<b>Plates:</b> 🚫\n")
+		res.Text += fmt.Sprintf("<b>Plate:</b> 🚫\n")
+	}
+
+	return res, nil
+}
+
+func (c *CarCommand) carMainMenu(ctx context.Context, userID int64, carID int64) (Result, error) {
+	res, err := c.carInfo(ctx, userID, carID)
+	if err != nil {
+		return res, err
 	}
 	res.AddKeyboardButton("Fuel", fmt.Sprintf("/car fuel %d", carID))
 	res.AddKeyboardButton("Edit Car", fmt.Sprintf("/car upd %d", carID))
@@ -152,9 +169,47 @@ func (c *CarCommand) showCarInfo(ctx context.Context, userID int64, carID int64)
 	return res, nil
 }
 
-// Delete
+func (c *CarCommand) carUpdateMenu(ctx context.Context, userID int64, carID int64) (Result, error) {
+	res, err := c.carInfo(ctx, userID, carID)
+	if err != nil {
+		return res, err
+	}
+	res.AddKeyboardButton("Change Name", fmt.Sprintf("/car upd %d name", carID))
+	res.AddKeyboardButton("Change Year", fmt.Sprintf("/car upd %d year", carID))
+	res.AddKeyboardButton("Change Plate", fmt.Sprintf("/car upd %d plate", carID))
+	res.AddKeyboardButton("« Back to Car menu", fmt.Sprintf("/car %d", carID))
+	return res, nil
+}
 
-func (c *CarCommand) delCar(ctx context.Context, userID int64, carID int64) (Result, error) {
+func (c *CarCommand) updCarField(ctx context.Context, userID int64, carID int64, field string) (Result, error) {
+	err := c.draftCarFetchFromDB(ctx, userID, carID)
+	if err != nil {
+		return Result{Text: "Car not found."}, err
+	}
+	switch field {
+	case "name":
+		return Result{Text: "What is the new car name?", State: c.updCarNameAndSave}, nil
+	// case "year":
+	// 	return Result{Text: "What is the new car year?", State: c.updCarNameAndSave}, nil
+	// case "plate":
+	// 	return Result{Text: "What is the new car plate? /skip", State: c.updCarNameAndSave}, nil
+	default:
+		return Result{Text: "Unknown field."}, nil
+	}
+}
+
+func (c *CarCommand) updCarNameAndSave(ctx context.Context, pl Payload) (Result, error) {
+	c.draftCarSetName(pl.UserID, pl.Command)
+	_, err := c.draftCarUpdateInDB(ctx, pl.UserID)
+	if err != nil {
+		return Result{Text: "Update failed, try again."}, err
+	}
+	res := Result{Text: "Car Name has been successfully updated!"}
+	res.AddKeyboardButton("« Back to Car menu", fmt.Sprintf("/car %d", c.draftCars[pl.UserID].ID))
+	return res, nil
+}
+
+func (c *CarCommand) delCarCheck(ctx context.Context, userID int64, carID int64) (Result, error) {
 	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
 	if err != nil {
 		return Result{Text: "Car not found."}, err
