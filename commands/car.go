@@ -14,11 +14,21 @@ type CarCommand struct {
 	draftCars map[int64]*st.Car
 }
 
+const (
+	carCommandAdd     = "add"
+	carCommandGet     = "get"
+	carCommandUpd     = "upd"
+	carCommandDelAsk  = "del"
+	carCommandDelRMF  = "rmf"
+	carCommandFuelAdd = "fuel_add"
+)
+
 func NewCarCommand(storage *st.CarStorage) *CarCommand {
-	return &CarCommand{
+	c := &CarCommand{
 		storage:   storage,
 		draftCars: make(map[int64]*st.Car),
 	}
+	return c
 }
 
 func (CarCommand) Prefix() string {
@@ -33,20 +43,20 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 	args := splitCommand(pl.Command, c.Prefix())
 	subcommand, carID := safeGet(args, 0), safeGetInt(args, 1)
 	switch subcommand {
-	case "add":
+	case carCommandAdd:
 		return c.addCarStart(ctx, pl)
-	case "get":
+	case carCommandGet:
 		return c.carMainMenu(ctx, pl.UserID, carID)
-	case "upd":
+	case carCommandUpd:
 		if field := safeGet(args, 2); field != "" {
 			return c.updCarFieldSelect(ctx, pl.UserID, carID, field)
 		} else {
 			return c.carUpdateMenu(ctx, pl.UserID, carID)
 		}
-	case "del":
-		return c.delCarCheck(ctx, pl.UserID, carID)
-	case "rmf":
-		return c.delCarConfirmed(ctx, pl.UserID, carID)
+	case carCommandDelAsk:
+		return c.delCarAsk(ctx, pl.UserID, carID)
+	case carCommandDelRMF:
+		return c.delCarRmf(ctx, pl.UserID, carID)
 	default:
 		return c.carsList(ctx, pl.UserID)
 	}
@@ -232,7 +242,7 @@ func (c *CarCommand) updCarPlateAndSave(ctx context.Context, pl Payload) (Result
 	return res, nil
 }
 
-func (c *CarCommand) delCarCheck(ctx context.Context, userID int64, carID int64) (Result, error) {
+func (c *CarCommand) delCarAsk(ctx context.Context, userID int64, carID int64) (Result, error) {
 	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
 	if err != nil {
 		return Result{Text: "Car not found."}, err
@@ -247,7 +257,7 @@ func (c *CarCommand) delCarCheck(ctx context.Context, userID int64, carID int64)
 	return res, nil
 }
 
-func (c *CarCommand) delCarConfirmed(ctx context.Context, userID int64, carID int64) (Result, error) {
+func (c *CarCommand) delCarRmf(ctx context.Context, userID int64, carID int64) (Result, error) {
 	affected, err := c.storage.DeleteCarFromDB(ctx, userID, carID)
 	if err != nil || affected != 1 {
 		return Result{Text: "Car not found."}, err
