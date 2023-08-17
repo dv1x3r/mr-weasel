@@ -49,6 +49,8 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.carDelAsk(ctx, pl.UserID, safeGetInt(args, 1))
 	case cmdCarDelYes:
 		return c.carDelYes(ctx, pl.UserID, safeGetInt(args, 1))
+	case cmdCarFuel:
+		return c.carShowFuelRecord(ctx, pl.UserID, safeGetInt(args, 1), 0)
 	default:
 		return c.carShowList(ctx, pl.UserID)
 	}
@@ -68,12 +70,12 @@ const (
 )
 
 func (c *CarCommand) formatCarDetails(car st.Car) string {
-	html := fmt.Sprintf("<b>Name:</b> %s\n", car.Name)
-	html += fmt.Sprintf("<b>Year:</b> %d\n", car.Year)
+	html := fmt.Sprintf("🚘 <b>Name:</b> %s\n", car.Name)
+	html += fmt.Sprintf("🏭 <b>Year:</b> %d\n", car.Year)
 	if car.Plate != nil {
-		html += fmt.Sprintf("<b>Plate:</b> %s\n", *car.Plate)
+		html += fmt.Sprintf("🧾 <b>Plate:</b> %s\n", *car.Plate)
 	} else {
-		html += fmt.Sprintf("<b>Plate:</b> 🚫\n")
+		html += fmt.Sprintf("🧾 <b>Plate:</b> 🚫\n")
 	}
 	return html
 }
@@ -93,7 +95,7 @@ func (c *CarCommand) carShowDetailsMenu(ctx context.Context, userID int64, carID
 	res.AddKeyboardButton("Service", commandf(c, cmdCarService, carID))
 	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDel, carID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("« Back to Cars list", c.Prefix())
+	res.AddKeyboardButton("« Back to my cars", c.Prefix())
 	return res, nil
 }
 
@@ -105,8 +107,7 @@ func (c *CarCommand) carShowList(ctx context.Context, userID int64) (Result, err
 
 	res := Result{Text: "Choose your car from the list below:"}
 	for i, v := range cars {
-		res.AddKeyboardButton(fmt.Sprintf("%s (%d)", v.Name, v.Year),
-			commandf(c, cmdCarGet, v.ID))
+		res.AddKeyboardButton(fmt.Sprintf("%s (%d)", v.Name, v.Year), commandf(c, cmdCarGet, v.ID))
 		if (i+1)%2 == 0 {
 			res.AddKeyboardRow()
 		}
@@ -158,7 +159,7 @@ func (c *CarCommand) carShowUpdateMenu(ctx context.Context, userID int64, carID 
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Edit Plate", commandf(c, cmdCarUpdPlate, carID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("« Back to Car menu", commandf(c, cmdCarGet, carID))
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	return res, nil
 }
 
@@ -189,17 +190,22 @@ func (c *CarCommand) carUpdateSaveName(ctx context.Context, pl Payload) (Result,
 		return Result{Text: "Update failed, try again."}, err
 	}
 	res := Result{Text: "Car name has been successfully updated!"}
-	res.AddKeyboardButton("« Back to Car menu", commandf(c, cmdCarGet, c.draftCars[pl.UserID].ID))
+	car := c.draftCars[pl.UserID]
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	return res, nil
 }
 
 func (c *CarCommand) carUpdateSaveYear(ctx context.Context, pl Payload) (Result, error) {
-	c.draftCarSetYear(pl.UserID, pl.Command)
+	err := c.draftCarSetYear(pl.UserID, pl.Command)
+	if err != nil {
+		return Result{Text: "Please enter a valid number.", State: c.carAddYear}, nil
+	}
 	if _, err := c.draftCarUpdateInDB(ctx, pl.UserID); err != nil {
 		return Result{Text: "Update failed, try again."}, err
 	}
 	res := Result{Text: "Car year has been successfully updated!"}
-	res.AddKeyboardButton("« Back to Car menu", commandf(c, cmdCarGet, c.draftCars[pl.UserID].ID))
+	car := c.draftCars[pl.UserID]
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	return res, nil
 }
 
@@ -209,7 +215,8 @@ func (c *CarCommand) carUpdateSavePlate(ctx context.Context, pl Payload) (Result
 		return Result{Text: "Update failed, try again."}, err
 	}
 	res := Result{Text: "Car plate has been successfully updated!"}
-	res.AddKeyboardButton("« Back to Car menu", commandf(c, cmdCarGet, c.draftCars[pl.UserID].ID))
+	car := c.draftCars[pl.UserID]
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	return res, nil
 }
 
@@ -235,7 +242,7 @@ func (c *CarCommand) carDelYes(ctx context.Context, userID int64, carID int64) (
 	}
 
 	res := Result{Text: "Car has been successfully deleted!"}
-	res.AddKeyboardButton("« Back to Cars list", c.Prefix())
+	res.AddKeyboardButton("« Back to my cars", c.Prefix())
 	return res, nil
 
 }
@@ -279,10 +286,32 @@ func (c *CarCommand) draftCarSetPlate(userID int64, input string) {
 	}
 }
 
-// fuel
+func (c *CarCommand) formatFuelDetails() string {
+	html := fmt.Sprintf("⛽ <b>Amount:</b> %s\n", "20L (Type 98)")
+	html += fmt.Sprintf("💲 <b>Paid:</b> %s\n", "100 Eur (1Eur/L)")
+	html += fmt.Sprintf("📍 <b>Traveled:</b> %s\n", "1,222 Km (1.1 L/Km)")
+	html += fmt.Sprintf("📅 2023/01/01 11:11:11\n")
+	return html
+}
 
-// Date: 2023/01/01 11:11:11
-// Amount: 20L (Type 98)
-// Paid: 100 Eur (1Eur/L)
-// Traveled: 1,222 Km (64,000 Km Total)
-// <-5 <-1 del 1-> 5->
+func (c *CarCommand) carShowFuelRecord(ctx context.Context, userID int64, carID int64, offset int) (Result, error) {
+	// car, err := c.storage.GetCarFromDB(ctx, userID, carID)
+	// if errors.Is(err, sql.ErrNoRows) {
+	// 	return Result{Text: "Car not found."}, nil
+	// } else if err != nil {
+	// 	return Result{Text: "There is something wrong, please try again."}, err
+	// }
+
+	res := Result{Text: c.formatFuelDetails()}
+	res.AddKeyboardButton("«5", commandf(c, cmdCarFuel, carID, offset-5))
+	res.AddKeyboardButton("«1", commandf(c, cmdCarFuel, carID, offset-1))
+	res.AddKeyboardButton("1/42", commandf(c, cmdCarFuel, carID, offset))
+	res.AddKeyboardButton("1»", commandf(c, cmdCarFuel, carID, offset+1))
+	res.AddKeyboardButton("5»", commandf(c, cmdCarFuel, carID, offset+5))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("« Delete »", commandf(c))
+	res.AddKeyboardButton("« Add »", commandf(c))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("« Back to BMW (2022)", commandf(c, cmdCarGet, carID))
+	return res, nil
+}

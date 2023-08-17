@@ -56,12 +56,12 @@ func splitCommand(input string, prefix string) []string {
 	return strings.Split(input, " ")
 }
 
-func commandf(h Handler, subcommand string, arg any) string {
-	if arg != nil {
-		return fmt.Sprintf("%s %s %v", h.Prefix(), subcommand, arg)
-	} else {
-		return fmt.Sprintf("%s %s", h.Prefix(), subcommand)
+func commandf(h Handler, args ...any) string {
+	cmd := h.Prefix()
+	for _, arg := range args {
+		cmd = fmt.Sprintf("%s %v", cmd, arg)
 	}
+	return cmd
 }
 
 func safeGet(args []string, n int) string {
