@@ -278,3 +278,11 @@ func (c *CarCommand) draftCarSetPlate(userID int64, input string) {
 		c.draftCars[userID].Plate = &input
 	}
 }
+
+// fuel
+
+// Date: 2023/01/01 11:11:11
+// Amount: 20L (Type 98)
+// Paid: 100 Eur (1Eur/L)
+// Traveled: 1,222 Km (64,000 Km Total)
+// <-5 <-1 del 1-> 5->
