@@ -105,7 +105,8 @@ func (c *CarCommand) carShowList(ctx context.Context, userID int64) (Result, err
 
 	res := Result{Text: "Choose your car from the list below:"}
 	for i, v := range cars {
-		res.AddKeyboardButton(v.Name, commandf(c, cmdCarGet, v.ID))
+		res.AddKeyboardButton(fmt.Sprintf("%s (%d)", v.Name, v.Year),
+			commandf(c, cmdCarGet, v.ID))
 		if (i+1)%2 == 0 {
 			res.AddKeyboardRow()
 		}
