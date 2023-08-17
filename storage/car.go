@@ -21,6 +21,16 @@ type Car struct {
 	Plate  *string `db:"plate"`
 }
 
+type Fuel struct {
+	ID         int64  `db:"id"`
+	CarID      int64  `db:"car_id"`
+	Timestamp  int64  `db:"timestamp"`
+	TypeFuel   string `db:"type_fuel"`
+	AmountML   int64  `db:"amount_ml"`
+	AmountPaid int64  `db:"amount_paid"`
+	Odometer   int64  `db:"odometer"`
+}
+
 func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]Car, error) {
 	var cars []Car
 	stmt := `
@@ -69,4 +79,27 @@ func (s *CarStorage) UpdateCarInDB(ctx context.Context, car Car) (int64, error) 
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int) (Fuel, error) {
+	var fuel Fuel
+	stmt := `
+		select f.id, f.car_id, f.timestamp, f.type_fuel, f.amount_ml, f.amount_paid, f.odometer
+		from fuel f
+		join car c on c.id = f.car_id 
+		where c.user_id = ? and f.car_id = ?
+		order by f.timestamp desc
+		limit 1 offset ?;
+	`
+	err := s.db.GetContext(ctx, &fuel, stmt, userID, carID, offset)
+	return fuel, err
+}
+
+func (s *CarStorage) InsertFuelIntoDB(ctx context.Context, fuel Fuel) (int64, error) {
+	stmt := "insert into fuel (car_id, timestamp, type_fuel, amount_ml, amount_paid, odometer) values (?,?,?,?,?,?);"
+	res, err := s.db.ExecContext(ctx, stmt, fuel.CarID, fuel.Timestamp, fuel.TypeFuel, fuel.AmountML, fuel.AmountPaid, fuel.Odometer)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
 }

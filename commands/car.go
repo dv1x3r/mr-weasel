@@ -286,7 +286,7 @@ func (c *CarCommand) draftCarSetPlate(userID int64, input string) {
 	}
 }
 
-func (c *CarCommand) formatFuelDetails() string {
+func (c *CarCommand) formatFuelDetails(fuel st.Fuel) string {
 	html := fmt.Sprintf("⛽ <b>Amount:</b> %s\n", "20L (Type 98)")
 	html += fmt.Sprintf("💲 <b>Paid:</b> %s\n", "100 Eur (1Eur/L)")
 	html += fmt.Sprintf("📍 <b>Traveled:</b> %s\n", "1,222 Km (1.1 L/Km)")
@@ -295,14 +295,14 @@ func (c *CarCommand) formatFuelDetails() string {
 }
 
 func (c *CarCommand) carShowFuelRecord(ctx context.Context, userID int64, carID int64, offset int) (Result, error) {
-	// car, err := c.storage.GetCarFromDB(ctx, userID, carID)
-	// if errors.Is(err, sql.ErrNoRows) {
-	// 	return Result{Text: "Car not found."}, nil
-	// } else if err != nil {
-	// 	return Result{Text: "There is something wrong, please try again."}, err
-	// }
+	fuel, err := c.storage.GetFuelFromDB(ctx, userID, carID, offset)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Result{Text: "No fuel records."}, nil
+	} else if err != nil {
+		return Result{Text: "There is something wrong, please try again."}, err
+	}
 
-	res := Result{Text: c.formatFuelDetails()}
+	res := Result{Text: c.formatFuelDetails(fuel)}
 	res.AddKeyboardButton("«5", commandf(c, cmdCarFuel, carID, offset-5))
 	res.AddKeyboardButton("«1", commandf(c, cmdCarFuel, carID, offset-1))
 	res.AddKeyboardButton("1/42", commandf(c, cmdCarFuel, carID, offset))
