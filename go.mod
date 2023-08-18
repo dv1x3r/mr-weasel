@@ -1,6 +1,6 @@
 module mr-weasel
 
-go 1.20
+go 1.21
 
 require (
 	github.com/jmoiron/sqlx v1.3.5

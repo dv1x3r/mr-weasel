@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Handler interface {
@@ -45,6 +46,41 @@ func (r *Result) AddKeyboardButton(label string, data string) {
 	}
 	i := len(r.Keyboard) - 1
 	r.Keyboard[i] = append(r.Keyboard[i], Button{Label: label, Data: data})
+}
+
+func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
+	r.AddKeyboardButton(fmt.Sprintf("%s %d", month.String(), year), "-")
+	r.AddKeyboardRow()
+	for _, v := range []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"} {
+		r.AddKeyboardButton(v, "-")
+	}
+	r.AddKeyboardRow()
+
+	dt := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	daysInMonth := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	ISOWeekday := func(t time.Time) int {
+		if t.Weekday() == time.Sunday {
+			return 6
+		} else {
+			return int(t.Weekday()) - 1
+		}
+	}
+
+	for i := 0; i < ISOWeekday(dt); i++ {
+		r.AddKeyboardButton(" ", "-")
+	}
+
+	for day := 1; day <= daysInMonth; day++ {
+		dt = time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+		r.AddKeyboardButton(fmt.Sprint(day), fmt.Sprint(dt.Unix()))
+		if ISOWeekday(dt) == 6 {
+			r.AddKeyboardRow()
+		}
+	}
+
+	for n := ISOWeekday(dt); n < 6; n++ {
+		r.AddKeyboardButton(" ", "-")
+	}
 }
 
 func splitCommand(input string, prefix string) []string {

@@ -7,17 +7,20 @@ import (
 	"fmt"
 	st "mr-weasel/storage"
 	"strconv"
+	"time"
 )
 
 type CarCommand struct {
 	storage   *st.CarStorage
 	draftCars map[int64]*st.Car
+	draftFuel map[int64]*st.Fuel
 }
 
 func NewCarCommand(storage *st.CarStorage) *CarCommand {
 	c := &CarCommand{
 		storage:   storage,
 		draftCars: make(map[int64]*st.Car),
+		draftFuel: make(map[int64]*st.Fuel),
 	}
 	return c
 }
@@ -29,6 +32,22 @@ func (CarCommand) Prefix() string {
 func (CarCommand) Description() string {
 	return "manage car costs"
 }
+
+const (
+	cmdCarAdd        = "add"
+	cmdCarGet        = "get"
+	cmdCarUpd        = "upd"
+	cmdCarUpdName    = "upd_name"
+	cmdCarUpdYear    = "upd_year"
+	cmdCarUpdPlate   = "upd_plate"
+	cmdCarDel        = "del"
+	cmdCarDelYes     = "del_yes"
+	cmdCarFuelAdd    = "fuel_add"
+	cmdCarFuelGet    = "fuel_get"
+	cmdCarFuelDel    = "fuel_del"
+	cmdCarFuelDelYes = "fuel_del_yes"
+	cmdCarService    = "service"
+)
 
 func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 	args := splitCommand(pl.Command, c.Prefix())
@@ -49,27 +68,16 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.carDelAsk(ctx, pl.UserID, safeGetInt(args, 1))
 	case cmdCarDelYes:
 		return c.carDelYes(ctx, pl.UserID, safeGetInt(args, 1))
-	case cmdCarFuel:
-		return c.carShowFuelRecord(ctx, pl.UserID, safeGetInt(args, 1), 0)
+	case cmdCarFuelAdd:
+		return c.fuelAddStart(ctx, pl.UserID, safeGetInt(args, 1))
+	case cmdCarFuelGet:
+		return c.fuelShowDetailsMenu(ctx, pl.UserID, safeGetInt(args, 1), 0)
 	default:
 		return c.carShowList(ctx, pl.UserID)
 	}
 }
 
-const (
-	cmdCarAdd      = "add"
-	cmdCarGet      = "get"
-	cmdCarUpd      = "upd"
-	cmdCarUpdName  = "upd_name"
-	cmdCarUpdYear  = "upd_year"
-	cmdCarUpdPlate = "upd_plate"
-	cmdCarDel      = "del"
-	cmdCarDelYes   = "del_yes"
-	cmdCarFuel     = "fuel"
-	cmdCarService  = "service"
-)
-
-func (c *CarCommand) formatCarDetails(car st.Car) string {
+func (c *CarCommand) carFormatDetails(car st.Car) string {
 	html := fmt.Sprintf("🚘 <b>Name:</b> %s\n", car.Name)
 	html += fmt.Sprintf("🏭 <b>Year:</b> %d\n", car.Year)
 	if car.Plate != nil {
@@ -88,8 +96,8 @@ func (c *CarCommand) carShowDetailsMenu(ctx context.Context, userID int64, carID
 		return Result{Text: "There is something wrong, please try again."}, err
 	}
 
-	res := Result{Text: c.formatCarDetails(car)}
-	res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuel, carID))
+	res := Result{Text: c.carFormatDetails(car)}
+	res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
 	res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Service", commandf(c, cmdCarService, carID))
@@ -152,7 +160,7 @@ func (c *CarCommand) carShowUpdateMenu(ctx context.Context, userID int64, carID 
 		return Result{Text: "There is something wrong, please try again."}, err
 	}
 
-	res := Result{Text: c.formatCarDetails(car)}
+	res := Result{Text: c.carFormatDetails(car)}
 	res.AddKeyboardButton("Edit Name", commandf(c, cmdCarUpdName, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Edit Year", commandf(c, cmdCarUpdYear, carID))
@@ -286,7 +294,7 @@ func (c *CarCommand) draftCarSetPlate(userID int64, input string) {
 	}
 }
 
-func (c *CarCommand) formatFuelDetails(fuel st.Fuel) string {
+func (c *CarCommand) fuelFormatDetails(fuel st.Fuel) string {
 	html := fmt.Sprintf("⛽ <b>Amount:</b> %s\n", "20L (Type 98)")
 	html += fmt.Sprintf("💲 <b>Paid:</b> %s\n", "100 Eur (1Eur/L)")
 	html += fmt.Sprintf("📍 <b>Traveled:</b> %s\n", "1,222 Km (1.1 L/Km)")
@@ -294,24 +302,52 @@ func (c *CarCommand) formatFuelDetails(fuel st.Fuel) string {
 	return html
 }
 
-func (c *CarCommand) carShowFuelRecord(ctx context.Context, userID int64, carID int64, offset int) (Result, error) {
+func (c *CarCommand) fuelShowDetailsMenu(ctx context.Context, userID int64, carID int64, offset int) (Result, error) {
+	res := Result{}
 	fuel, err := c.storage.GetFuelFromDB(ctx, userID, carID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Result{Text: "No fuel records."}, nil
+		res.Text = "No fuel records."
 	} else if err != nil {
 		return Result{Text: "There is something wrong, please try again."}, err
+	} else {
+		res.Text = c.fuelFormatDetails(fuel)
 	}
 
-	res := Result{Text: c.formatFuelDetails(fuel)}
-	res.AddKeyboardButton("«5", commandf(c, cmdCarFuel, carID, offset-5))
-	res.AddKeyboardButton("«1", commandf(c, cmdCarFuel, carID, offset-1))
-	res.AddKeyboardButton("1/42", commandf(c, cmdCarFuel, carID, offset))
-	res.AddKeyboardButton("1»", commandf(c, cmdCarFuel, carID, offset+1))
-	res.AddKeyboardButton("5»", commandf(c, cmdCarFuel, carID, offset+5))
+	res.AddKeyboardButton("«5", commandf(c, cmdCarFuelGet, carID, offset-5))
+	res.AddKeyboardButton("«1", commandf(c, cmdCarFuelGet, carID, offset-1))
+	res.AddKeyboardButton("1/42", commandf(c, cmdCarFuelGet, carID, offset))
+	res.AddKeyboardButton("1»", commandf(c, cmdCarFuelGet, carID, offset+1))
+	res.AddKeyboardButton("5»", commandf(c, cmdCarFuelGet, carID, offset+5))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("« Delete »", commandf(c))
-	res.AddKeyboardButton("« Add »", commandf(c))
+	res.AddKeyboardButton("Delete", commandf(c))
+	res.AddKeyboardButton("Add", commandf(c, cmdCarFuelAdd, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("« Back to BMW (2022)", commandf(c, cmdCarGet, carID))
 	return res, nil
+}
+
+func (c *CarCommand) fuelAddStart(ctx context.Context, userID int64, carID int64) (Result, error) {
+	c.draftFuelInit(userID, carID)
+	res := Result{Text: "Please pick a receipt date.", State: c.fuelAddTimestamp}
+	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	return res, nil
+}
+
+func (c *CarCommand) fuelAddTimestamp(ctx context.Context, pl Payload) (Result, error) {
+	res := Result{}
+	return res, nil
+}
+
+// type Fuel struct {
+// 	ID         int64  `db:"id"`
+// 	CarID      int64  `db:"car_id"`
+// 	Timestamp  int64  `db:"timestamp"`
+// 	TypeFuel   string `db:"type_fuel"`
+// 	AmountML   int64  `db:"amount_ml"`
+// 	AmountPaid int64  `db:"amount_paid"`
+// 	Odometer   int64  `db:"odometer"`
+// }
+
+func (c *CarCommand) draftFuelInit(userID int64, carID int64) {
+	c.draftFuel[userID] = &st.Fuel{CarID: carID}
 }
