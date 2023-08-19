@@ -22,13 +22,13 @@ type Car struct {
 }
 
 type Fuel struct {
-	ID         int64  `db:"id"`
-	CarID      int64  `db:"car_id"`
-	Timestamp  int64  `db:"timestamp"`
-	TypeFuel   string `db:"type_fuel"`
-	AmountML   int64  `db:"amount_ml"`
-	AmountPaid int64  `db:"amount_paid"`
-	Odometer   int64  `db:"odometer"`
+	ID        int64  `db:"id"`
+	CarID     int64  `db:"car_id"`
+	Timestamp int64  `db:"timestamp"`
+	Type      string `db:"type"`
+	Volume    int64  `db:"volume"`
+	Mileage   int64  `db:"mileage"`
+	Paid      int64  `db:"paid"`
 }
 
 func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]Car, error) {
@@ -84,7 +84,7 @@ func (s *CarStorage) UpdateCarInDB(ctx context.Context, car Car) (int64, error) 
 func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int) (Fuel, error) {
 	var fuel Fuel
 	stmt := `
-		select f.id, f.car_id, f.timestamp, f.type_fuel, f.amount_ml, f.amount_paid, f.odometer
+		select f.id, f.car_id, f.timestamp, f.type, f.volume, f.mileage, f.paid
 		from fuel f
 		join car c on c.id = f.car_id 
 		where c.user_id = ? and f.car_id = ?
@@ -96,8 +96,8 @@ func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int6
 }
 
 func (s *CarStorage) InsertFuelIntoDB(ctx context.Context, fuel Fuel) (int64, error) {
-	stmt := "insert into fuel (car_id, timestamp, type_fuel, amount_ml, amount_paid, odometer) values (?,?,?,?,?,?);"
-	res, err := s.db.ExecContext(ctx, stmt, fuel.CarID, fuel.Timestamp, fuel.TypeFuel, fuel.AmountML, fuel.AmountPaid, fuel.Odometer)
+	stmt := "insert into fuel (car_id, timestamp, type, volume, mileage, paid) values (?,?,?,?,?,?);"
+	res, err := s.db.ExecContext(ctx, stmt, fuel.CarID, fuel.Timestamp, fuel.Type, fuel.Volume, fuel.Mileage, fuel.Paid)
 	if err != nil {
 		return 0, err
 	}

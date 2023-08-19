@@ -1,13 +1,13 @@
 -- +goose Up
 -- +goose StatementBegin
 create table fuel (
-    id int primary key,
-    car_id int not null,
-    timestamp int not null,
-    type_fuel text not null,
-    amount_ml int not null,
-    amount_paid int not null,
-    odometer int not null
+    id integer primary key,
+    car_id integer not null,
+    timestamp integer not null,
+    type text not null,
+    volume integer not null,
+    mileage integer not null,
+    paid integer not null
 ) strict;
 -- +goose StatementEnd
 

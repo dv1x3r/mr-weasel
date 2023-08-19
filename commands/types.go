@@ -49,15 +49,6 @@ func (r *Result) AddKeyboardButton(label string, data string) {
 }
 
 func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
-	r.AddKeyboardButton(fmt.Sprintf("%s %d", month.String(), year), "-")
-	r.AddKeyboardRow()
-	for _, v := range []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"} {
-		r.AddKeyboardButton(v, "-")
-	}
-	r.AddKeyboardRow()
-
-	dt := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
-	daysInMonth := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
 	ISOWeekday := func(t time.Time) int {
 		if t.Weekday() == time.Sunday {
 			return 6
@@ -66,6 +57,18 @@ func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
 		}
 	}
 
+	dt := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	daysInMonth := time.Date(year, month+1, 0, 0, 0, 0, 0, time.UTC).Day()
+	yearMonthStr := fmt.Sprintf("%s %d", month.String(), year)
+
+	r.AddKeyboardButton(yearMonthStr, "-")
+	r.AddKeyboardRow()
+	for _, v := range []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"} {
+		r.AddKeyboardButton(v, "-")
+	}
+
+	// in case month starts not on Monday, add empty buttons
+	r.AddKeyboardRow()
 	for i := 0; i < ISOWeekday(dt); i++ {
 		r.AddKeyboardButton(" ", "-")
 	}
@@ -78,9 +81,18 @@ func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
 		}
 	}
 
+	// in case month ends not on Sunday, add empty buttons
 	for n := ISOWeekday(dt); n < 6; n++ {
 		r.AddKeyboardButton(" ", "-")
 	}
+
+	dtPrev := time.Date(dt.Year(), dt.Month()-1, 1, 0, 0, 0, 0, time.UTC)
+	dtNext := time.Date(dt.Year(), dt.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+
+	r.AddKeyboardRow()
+	r.AddKeyboardButton("«", fmt.Sprintf("%d %d", dtPrev.Year(), dtPrev.Month()))
+	r.AddKeyboardButton("Pick Today", fmt.Sprint(time.Now().Unix()))
+	r.AddKeyboardButton("»", fmt.Sprintf("%d %d", dtNext.Year(), dtNext.Month()))
 }
 
 func splitCommand(input string, prefix string) []string {
@@ -107,7 +119,11 @@ func safeGet(args []string, n int) string {
 	return ""
 }
 
-func safeGetInt(args []string, n int) int64 {
+func safeGetInt(args []string, n int) int {
 	i, _ := strconv.Atoi(safeGet(args, n))
-	return int64(i)
+	return i
+}
+
+func safeGetInt64(args []string, n int) int64 {
+	return int64(safeGetInt(args, n))
 }
