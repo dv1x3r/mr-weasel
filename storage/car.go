@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"github.com/jmoiron/sqlx"
+	"time"
 )
 
 type CarStorage struct {
@@ -22,13 +23,38 @@ type Car struct {
 }
 
 type Fuel struct {
-	ID        int64  `db:"id"`
-	CarID     int64  `db:"car_id"`
-	Timestamp int64  `db:"timestamp"`
-	Type      string `db:"type"`
-	Volume    int64  `db:"volume"`
-	Mileage   int64  `db:"mileage"`
-	Paid      int64  `db:"paid"`
+	ID          int64  `db:"id"`
+	CarID       int64  `db:"car_id"`
+	Timestamp   int64  `db:"timestamp"`
+	Type        string `db:"type"`
+	Cents       int64  `db:"cents"`
+	Milliliters int64  `db:"milliliters"`
+	Kilometers  int64  `db:"kilometers"`
+	KilometersR int64  `db:"kilometersr"`
+}
+
+func (f *Fuel) GetLiters() float64 {
+	return float64(f.Milliliters) / 1000
+}
+
+func (f *Fuel) GetEuro() float64 {
+	return float64(f.Cents) / 100
+}
+
+func (f *Fuel) GetEurPerLiter() float64 {
+	return f.GetEuro() / f.GetLiters()
+}
+
+func (f *Fuel) GetEurPerKilometer() float64 {
+	return f.GetEuro() / float64(f.Kilometers)
+}
+
+func (f *Fuel) GetLitersPerKilometer() float64 {
+	return float64(f.KilometersR) / f.GetLiters()
+}
+
+func (f *Fuel) GetTimestamp() time.Time {
+	return time.Unix(f.Timestamp, 0)
 }
 
 func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]Car, error) {
@@ -84,11 +110,19 @@ func (s *CarStorage) UpdateCarInDB(ctx context.Context, car Car) (int64, error) 
 func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int) (Fuel, error) {
 	var fuel Fuel
 	stmt := `
-		select f.id, f.car_id, f.timestamp, f.type, f.volume, f.mileage, f.paid
+		select
+			f.id,
+			f.car_id,
+			f.timestamp,
+			f.type,
+			f.milliliters,
+			f.kilometers,
+			f.cents,
+			coalesce(f.kilometers - lag(f.kilometers) over (order by f.id), f.kilometers) as kilometersr
 		from fuel f
 		join car c on c.id = f.car_id 
 		where c.user_id = ? and f.car_id = ?
-		order by f.timestamp desc
+		order by f.timestamp desc, f.id desc
 		limit 1 offset ?;
 	`
 	err := s.db.GetContext(ctx, &fuel, stmt, userID, carID, offset)
@@ -96,8 +130,8 @@ func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int6
 }
 
 func (s *CarStorage) InsertFuelIntoDB(ctx context.Context, fuel Fuel) (int64, error) {
-	stmt := "insert into fuel (car_id, timestamp, type, volume, mileage, paid) values (?,?,?,?,?,?);"
-	res, err := s.db.ExecContext(ctx, stmt, fuel.CarID, fuel.Timestamp, fuel.Type, fuel.Volume, fuel.Mileage, fuel.Paid)
+	stmt := "insert into fuel (car_id, timestamp, type, milliliters, kilometers, cents) values (?,?,?,?,?,?);"
+	res, err := s.db.ExecContext(ctx, stmt, fuel.CarID, fuel.Timestamp, fuel.Type, fuel.Milliliters, fuel.Kilometers, fuel.Cents)
 	if err != nil {
 		return 0, err
 	}

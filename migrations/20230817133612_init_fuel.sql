@@ -5,9 +5,9 @@ create table fuel (
     car_id integer not null,
     timestamp integer not null,
     type text not null,
-    volume integer not null,
-    mileage integer not null,
-    paid integer not null
+    cents integer not null
+    milliliters integer not null,
+    kilometers integer not null,
 ) strict;
 -- +goose StatementEnd
 

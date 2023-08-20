@@ -291,10 +291,10 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, userID int64, carID i
 }
 
 func (c *CarCommand) formatFuelDetails(fuel st.Fuel) string {
-	html := fmt.Sprintf("⛽ <b>Amount:</b> %s\n", "20L (Type 98)")
-	html += fmt.Sprintf("💲 <b>Paid:</b> %s\n", "100 Eur (1Eur/L)")
-	html += fmt.Sprintf("📍 <b>Traveled:</b> %s\n", "1,222 Km (1.1 L/Km)")
-	html += fmt.Sprintf("📅 2023/01/01 11:11:11\n")
+	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fLi (%s)\n", fuel.GetLiters(), fuel.Type)
+	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€/Li)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
+	html += fmt.Sprintf("📍 <b>Traveled:</b> %d (%.2fL/Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
+	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp().UTC().Format("Monday, 02 January 2006"))
 	return html
 }
 
@@ -340,21 +340,21 @@ func (c *CarCommand) setDraftFuelType(userID int64, input string) {
 	c.draftFuel[userID].Type = input
 }
 
-func (c *CarCommand) setDraftFuelVolume(userID int64, input string) error {
-	amountL, err := strconv.ParseFloat(input, 64)
-	c.draftFuel[userID].Volume = int64(amountL * 1000)
+func (c *CarCommand) setDraftFuelLiters(userID int64, input string) error {
+	liters, err := strconv.ParseFloat(input, 64)
+	c.draftFuel[userID].Milliliters = int64(liters * 1000)
 	return err
 }
 
-func (c *CarCommand) setDraftFuelPaid(userID int64, input string) error {
-	amountPaid, err := strconv.ParseFloat(input, 64)
-	c.draftFuel[userID].Paid = int64(amountPaid * 100)
+func (c *CarCommand) setDraftFuelKilometers(userID int64, input string) error {
+	kilometers, err := strconv.Atoi(input)
+	c.draftFuel[userID].Kilometers = int64(kilometers)
 	return err
 }
 
-func (c *CarCommand) setDraftFuelMileage(userID int64, input string) error {
-	mileage, err := strconv.Atoi(input)
-	c.draftFuel[userID].Mileage = int64(mileage)
+func (c *CarCommand) setDraftFuelEuros(userID int64, input string) error {
+	euro, err := strconv.ParseFloat(input, 64)
+	c.draftFuel[userID].Cents = int64(euro * 100)
 	return err
 }
 
@@ -372,7 +372,7 @@ func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) (Result, 
 		return res, nil
 	}
 	if err := c.setDraftFuelTimestamp(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please select a valid date (keyboard or unix date).", State: c.addFuelTimestamp}, nil
+		return Result{State: c.addFuelTimestamp}, nil
 	}
 	res := Result{Text: "What is the fuel type?", State: c.addFuelType}
 	res.AddKeyboardRow() // remove calendar keyboard
@@ -381,29 +381,28 @@ func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) (Result, 
 
 func (c *CarCommand) addFuelType(ctx context.Context, pl Payload) (Result, error) {
 	c.setDraftFuelType(pl.UserID, pl.Command)
-	return Result{Text: "What is the fuel amount in Liters?", State: c.addFuelVolume}, nil
+	return Result{Text: "What is the fuel amount in Liters?", State: c.addFuelLiters}, nil
 }
 
-func (c *CarCommand) addFuelVolume(ctx context.Context, pl Payload) (Result, error) {
-	if err := c.setDraftFuelVolume(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid number (volume liters).", State: c.addFuelVolume}, nil
+func (c *CarCommand) addFuelLiters(ctx context.Context, pl Payload) (Result, error) {
+	if err := c.setDraftFuelLiters(pl.UserID, pl.Command); err != nil {
+		return Result{Text: "Please enter a valid decimal number.", State: c.addFuelLiters}, nil
 	}
-	return Result{Text: "What is your total mileage now?", State: c.addFuelMileage}, nil
+	return Result{Text: "What is your total mileage now in Kilometers?", State: c.addFuelKilometers}, nil
 }
 
-func (c *CarCommand) addFuelMileage(ctx context.Context, pl Payload) (Result, error) {
-	if err := c.setDraftFuelMileage(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid number (mileage km).", State: c.addFuelMileage}, nil
+func (c *CarCommand) addFuelKilometers(ctx context.Context, pl Payload) (Result, error) {
+	if err := c.setDraftFuelKilometers(pl.UserID, pl.Command); err != nil {
+		return Result{Text: "Please enter a valid whole number.", State: c.addFuelKilometers}, nil
 	}
-	return Result{Text: "How much money did you spend?", State: c.addFuelPaidAndSave}, nil
+	return Result{Text: "How much money did you spend in Euros?", State: c.addFuelEurosAndSave}, nil
 }
 
-func (c *CarCommand) addFuelPaidAndSave(ctx context.Context, pl Payload) (Result, error) {
-	if err := c.setDraftFuelPaid(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid number (paid amount).", State: c.addFuelPaidAndSave}, nil
+func (c *CarCommand) addFuelEurosAndSave(ctx context.Context, pl Payload) (Result, error) {
+	if err := c.setDraftFuelEuros(pl.UserID, pl.Command); err != nil {
+		return Result{Text: "Please enter a valid decimal number.", State: c.addFuelEurosAndSave}, nil
 	}
-	_, err := c.insertDraftFuelIntoDB(ctx, pl.UserID)
-	if err != nil {
+	if _, err := c.insertDraftFuelIntoDB(ctx, pl.UserID); err != nil {
 		return Result{Text: "There is something wrong, please try again."}, err
 	}
 	return c.showFuelDetails(ctx, pl.UserID, c.draftFuel[pl.UserID].CarID, 0)
