@@ -11,7 +11,11 @@ import (
 )
 
 func main() {
-	db := sqlx.MustConnect(os.Getenv("GOOSE_DRIVER"), os.Getenv("GOOSE_DBSTRING"))
+	dbDriver, dbString := os.Getenv("GOOSE_DRIVER"), os.Getenv("GOOSE_DBSTRING")
+	if dbDriver == "sqlite3" {
+		dbString += "?_journal=WAL&_fk=1"
+	}
+	db := sqlx.MustConnect(dbDriver, dbString)
 	tgClient := telegram.NewClient(os.Getenv("TG_TOKEN"), false).MustConnect()
 	tgManager := telegram.NewManager(tgClient)
 	tgManager.AddCommands(

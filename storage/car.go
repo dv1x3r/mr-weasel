@@ -25,6 +25,7 @@ type CarBase struct {
 
 type CarDetails struct {
 	CarBase
+	Kilometers int64 `db:"kilometers"`
 }
 
 type FuelBase struct {
@@ -82,9 +83,22 @@ func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]CarD
 func (s *CarStorage) GetCarFromDB(ctx context.Context, userID int64, carID int64) (CarDetails, error) {
 	var car CarDetails
 	stmt := `
-		select id, user_id, name, year, plate
-		from car
-		where user_id = ? and id = ?;
+		select 
+			c.id
+			,c.user_id
+			,c.name
+			,c.year
+			,c.plate
+			,coalesce(f.kilometers, 0) as kilometers
+		from car c
+		left join (
+			select
+				car_id
+				,max(kilometers) as kilometers
+			from fuel
+			group by car_id
+		) f on f.car_id = c.id
+		where c.user_id = ? and c.id = ?;
 	`
 	err := s.db.GetContext(ctx, &car, stmt, userID, carID)
 	return car, err
@@ -117,19 +131,19 @@ func (s *CarStorage) UpdateCarInDB(ctx context.Context, car CarBase) (int64, err
 	return res.RowsAffected()
 }
 
-func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int) (FuelDetails, error) {
+func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int64) (FuelDetails, error) {
 	var fuel FuelDetails
 	stmt := `
 		select
-			f.id,
-			f.car_id,
-			f.timestamp,
-			f.type,
-			f.milliliters,
-			f.kilometers,
-			f.cents,
-			coalesce(f.kilometers - lag(f.kilometers) over (order by f.id), f.kilometers) as kilometersr,
-			count(*) over (partition by car_id) as countrows
+			f.id
+			,f.car_id
+			,f.timestamp
+			,f.type
+			,f.milliliters
+			,f.kilometers
+			,f.cents
+			,coalesce(f.kilometers - lag(f.kilometers) over (order by f.timestamp, f.id), f.kilometers) as kilometersr
+			,count(*) over (partition by car_id) as countrows
 		from fuel f
 		join car c on c.id = f.car_id 
 		where c.user_id = ? and f.car_id = ?
@@ -152,11 +166,7 @@ func (s *CarStorage) InsertFuelIntoDB(ctx context.Context, fuel FuelBase) (int64
 func (s *CarStorage) DeleteFuelFromDB(ctx context.Context, userID int64, fuelID int64) (int64, error) {
 	stmt := `
 		delete from fuel where id = ?
-			and car_id in (
-				select id
-				from car
-				where user_id = ?
-			);
+			and car_id in (select id from car where user_id = ?);
 	`
 	res, err := s.db.ExecContext(ctx, stmt, fuelID, userID)
 	if err != nil {

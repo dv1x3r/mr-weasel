@@ -72,7 +72,7 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 	case cmdCarFuelAdd:
 		return c.addFuelStart(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarFuelGet:
-		return c.showFuelDetails(ctx, pl.UserID, safeGetInt64(args, 1), 0)
+		return c.showFuelDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarFuelDelAsk:
 		return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarFuelDelYes:
@@ -83,13 +83,13 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 }
 
 func (c *CarCommand) formatCarDetails(car st.CarDetails) string {
-	html := fmt.Sprintf("🚘 <b>Name:</b> %s\n", car.Name)
-	html += fmt.Sprintf("🏭 <b>Year:</b> %d\n", car.Year)
+	html := fmt.Sprintf("🚘 <b>Car:</b> %s (%d)\n", car.Name, car.Year)
 	if car.Plate.Valid {
-		html += fmt.Sprintf("🧾 <b>Plate:</b> %s\n", car.Plate.String)
+		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> %s\n", car.Plate.String)
 	} else {
-		html += fmt.Sprintf("🧾 <b>Plate:</b> 🚫\n")
+		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> 🚫\n")
 	}
+	html += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
 	return html
 }
 
@@ -296,12 +296,12 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, userID int64, carID i
 func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
 	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
 	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
-	html += fmt.Sprintf("📍 <b>Traveled:</b> %d (%.2fL/Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
+	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm %.2fL/Km (%dKm)\n", fuel.KilometersR, fuel.GetLitersPerKilometer(), fuel.Kilometers)
 	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp().UTC().Format("Monday, 02 January 2006"))
 	return html
 }
 
-func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID int64, offset int) (Result, error) {
+func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID int64, offset int64) (Result, error) {
 	res := Result{}
 	fuel, err := c.storage.GetFuelFromDB(ctx, userID, carID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -310,11 +310,27 @@ func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID in
 		return Result{Text: "There is something wrong, please try again."}, err
 	} else {
 		res.Text = c.formatFuelDetails(fuel)
-		res.AddKeyboardButton("«5", commandf(c, cmdCarFuelGet, carID, offset-5))
-		res.AddKeyboardButton("«1", commandf(c, cmdCarFuelGet, carID, offset-1))
+		if offset >= 5 {
+			res.AddKeyboardButton("«5", commandf(c, cmdCarFuelGet, carID, offset-5))
+		} else {
+			res.AddKeyboardButton(" ", "-")
+		}
+		if offset >= 1 {
+			res.AddKeyboardButton("«1", commandf(c, cmdCarFuelGet, carID, offset-1))
+		} else {
+			res.AddKeyboardButton(" ", "-")
+		}
 		res.AddKeyboardButton(fmt.Sprintf("%d/%d", offset+1, fuel.CountRows), "-")
-		res.AddKeyboardButton("1»", commandf(c, cmdCarFuelGet, carID, offset+1))
-		res.AddKeyboardButton("5»", commandf(c, cmdCarFuelGet, carID, offset+5))
+		if offset+1 < fuel.CountRows {
+			res.AddKeyboardButton("1»", commandf(c, cmdCarFuelGet, carID, offset+1))
+		} else {
+			res.AddKeyboardButton(" ", "-")
+		}
+		if offset+1 < fuel.CountRows-4 {
+			res.AddKeyboardButton("5»", commandf(c, cmdCarFuelGet, carID, offset+5))
+		} else {
+			res.AddKeyboardButton(" ", "-")
+		}
 		res.AddKeyboardRow()
 		res.AddKeyboardButton("Delete", commandf(c, cmdCarFuelDelAsk, carID, fuel.ID))
 	}
