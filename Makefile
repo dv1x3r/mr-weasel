@@ -45,7 +45,13 @@ db-create:
 	@read -p "Migration name: " VALUE; \
 	$(GOOSE) create "$$VALUE" sql
 
+go-install:
+	go install golang.org/x/tools/gopls@latest
+	go install github.com/pressly/goose/v3/cmd/goose@latest
+	go install github.com/go-delve/delve/cmd/dlv@latest
+
 .PHONY: build compile run test
 .PHONY: db-up db-up-by-one db-up-to db-down db-down-to
 .PHONY: db-reset db-status db-create
+.PHONY: go-install
  
