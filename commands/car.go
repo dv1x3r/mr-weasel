@@ -13,15 +13,15 @@ import (
 
 type CarCommand struct {
 	storage   *st.CarStorage
-	draftCars map[int64]*st.Car
-	draftFuel map[int64]*st.Fuel
+	draftCars map[int64]*st.CarBase
+	draftFuel map[int64]*st.FuelBase
 }
 
 func NewCarCommand(storage *st.CarStorage) *CarCommand {
 	c := &CarCommand{
 		storage:   storage,
-		draftCars: make(map[int64]*st.Car),
-		draftFuel: make(map[int64]*st.Fuel),
+		draftCars: make(map[int64]*st.CarBase),
+		draftFuel: make(map[int64]*st.FuelBase),
 	}
 	return c
 }
@@ -41,11 +41,11 @@ const (
 	cmdCarUpdName    = "upd_name"
 	cmdCarUpdYear    = "upd_year"
 	cmdCarUpdPlate   = "upd_plate"
-	cmdCarDel        = "del"
+	cmdCarDelAsk     = "del"
 	cmdCarDelYes     = "del_yes"
 	cmdCarFuelAdd    = "fuel_add"
 	cmdCarFuelGet    = "fuel_get"
-	cmdCarFuelDel    = "fuel_del"
+	cmdCarFuelDelAsk = "fuel_del"
 	cmdCarFuelDelYes = "fuel_del_yes"
 	cmdCarService    = "service"
 )
@@ -65,7 +65,7 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.updateCarAskYear(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarUpdPlate:
 		return c.updateCarAskPlate(ctx, pl.UserID, safeGetInt64(args, 1))
-	case cmdCarDel:
+	case cmdCarDelAsk:
 		return c.deleteCarAsk(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarDelYes:
 		return c.deleteCarConfirm(ctx, pl.UserID, safeGetInt64(args, 1))
@@ -73,16 +73,20 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.addFuelStart(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarFuelGet:
 		return c.showFuelDetails(ctx, pl.UserID, safeGetInt64(args, 1), 0)
+	case cmdCarFuelDelAsk:
+		return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarFuelDelYes:
+		return c.deleteFuelConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	default:
 		return c.showCarList(ctx, pl.UserID)
 	}
 }
 
-func (c *CarCommand) formatCarDetails(car st.Car) string {
+func (c *CarCommand) formatCarDetails(car st.CarDetails) string {
 	html := fmt.Sprintf("🚘 <b>Name:</b> %s\n", car.Name)
 	html += fmt.Sprintf("🏭 <b>Year:</b> %d\n", car.Year)
-	if car.Plate != nil {
-		html += fmt.Sprintf("🧾 <b>Plate:</b> %s\n", *car.Plate)
+	if car.Plate.Valid {
+		html += fmt.Sprintf("🧾 <b>Plate:</b> %s\n", car.Plate.String)
 	} else {
 		html += fmt.Sprintf("🧾 <b>Plate:</b> 🚫\n")
 	}
@@ -102,7 +106,7 @@ func (c *CarCommand) showCarDetails(ctx context.Context, userID int64, carID int
 	res.AddKeyboardButton("Service", commandf(c, cmdCarService, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
-	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDel, carID))
+	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("« Back to my cars", c.Prefix())
 	return res, nil
@@ -129,7 +133,7 @@ func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, err
 func (c *CarCommand) fetchDraftCarFromDB(ctx context.Context, userID int64, carID int64) error {
 	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
 	if err == nil {
-		c.draftCars[userID] = &car
+		c.draftCars[userID] = &car.CarBase
 	}
 	return err
 }
@@ -143,7 +147,7 @@ func (c *CarCommand) updateDraftCarInDB(ctx context.Context, userID int64) (int6
 }
 
 func (c *CarCommand) newDraftCar(userID int64) {
-	c.draftCars[userID] = &st.Car{UserID: userID}
+	c.draftCars[userID] = &st.CarBase{UserID: userID}
 }
 
 func (c *CarCommand) setDraftCarName(userID int64, input string) {
@@ -158,9 +162,9 @@ func (c *CarCommand) setDraftCarYear(userID int64, input string) error {
 
 func (c *CarCommand) setDraftCarPlate(userID int64, input string) {
 	if input == "/skip" {
-		c.draftCars[userID].Plate = nil
+		c.draftCars[userID].Plate.Valid = false
 	} else {
-		c.draftCars[userID].Plate = &input
+		c.draftCars[userID].Plate.String = input
 	}
 }
 
@@ -287,12 +291,11 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, userID int64, carID i
 	res := Result{Text: "Car has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my cars", c.Prefix())
 	return res, nil
-
 }
 
-func (c *CarCommand) formatFuelDetails(fuel st.Fuel) string {
-	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fLi (%s)\n", fuel.GetLiters(), fuel.Type)
-	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€/Li)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
+func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
+	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
+	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
 	html += fmt.Sprintf("📍 <b>Traveled:</b> %d (%.2fL/Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
 	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp().UTC().Format("Monday, 02 January 2006"))
 	return html
@@ -302,23 +305,23 @@ func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID in
 	res := Result{}
 	fuel, err := c.storage.GetFuelFromDB(ctx, userID, carID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
-		res.Text = "No fuel records."
+		res.Text = "No fuel receipts found."
 	} else if err != nil {
 		return Result{Text: "There is something wrong, please try again."}, err
 	} else {
 		res.Text = c.formatFuelDetails(fuel)
+		res.AddKeyboardButton("«5", commandf(c, cmdCarFuelGet, carID, offset-5))
+		res.AddKeyboardButton("«1", commandf(c, cmdCarFuelGet, carID, offset-1))
+		res.AddKeyboardButton(fmt.Sprintf("%d/%d", offset+1, fuel.CountRows), "-")
+		res.AddKeyboardButton("1»", commandf(c, cmdCarFuelGet, carID, offset+1))
+		res.AddKeyboardButton("5»", commandf(c, cmdCarFuelGet, carID, offset+5))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Delete", commandf(c, cmdCarFuelDelAsk, carID, fuel.ID))
 	}
-
-	res.AddKeyboardButton("«5", commandf(c, cmdCarFuelGet, carID, offset-5))
-	res.AddKeyboardButton("«1", commandf(c, cmdCarFuelGet, carID, offset-1))
-	res.AddKeyboardButton("1/42", commandf(c, cmdCarFuelGet, carID, offset))
-	res.AddKeyboardButton("1»", commandf(c, cmdCarFuelGet, carID, offset+1))
-	res.AddKeyboardButton("5»", commandf(c, cmdCarFuelGet, carID, offset+5))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Delete", commandf(c))
 	res.AddKeyboardButton("Add", commandf(c, cmdCarFuelAdd, carID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("« Back to BMW (2022)", commandf(c, cmdCarGet, carID))
+	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	return res, nil
 }
 
@@ -327,7 +330,7 @@ func (c *CarCommand) insertDraftFuelIntoDB(ctx context.Context, userID int64) (i
 }
 
 func (c *CarCommand) newDraftFuel(userID int64, carID int64) {
-	c.draftFuel[userID] = &st.Fuel{CarID: carID}
+	c.draftFuel[userID] = &st.FuelBase{CarID: carID}
 }
 
 func (c *CarCommand) setDraftFuelTimestamp(userID int64, input string) error {
@@ -406,4 +409,24 @@ func (c *CarCommand) addFuelEurosAndSave(ctx context.Context, pl Payload) (Resul
 		return Result{Text: "There is something wrong, please try again."}, err
 	}
 	return c.showFuelDetails(ctx, pl.UserID, c.draftFuel[pl.UserID].CarID, 0)
+}
+
+func (c *CarCommand) deleteFuelAsk(ctx context.Context, userID int64, carID int64, fuelID int64) (Result, error) {
+	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
+	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarFuelDelYes, carID, fuelID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("No", commandf(c, cmdCarFuelGet, carID, 0))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarFuelGet, carID, 0))
+	return res, nil
+}
+
+func (c *CarCommand) deleteFuelConfirm(ctx context.Context, userID int64, carID int64, fuelID int64) (Result, error) {
+	affected, err := c.storage.DeleteFuelFromDB(ctx, userID, fuelID)
+	if err != nil || affected != 1 {
+		return Result{Text: "Receipt not found."}, err
+	}
+	res := Result{Text: "Receipt has been successfully deleted!"}
+	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID, 0))
+	return res, nil
 }

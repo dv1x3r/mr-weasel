@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"database/sql"
 	"github.com/jmoiron/sqlx"
 	"time"
 )
@@ -14,15 +15,19 @@ func NewCarStorage(db *sqlx.DB) *CarStorage {
 	return &CarStorage{db: db}
 }
 
-type Car struct {
-	ID     int64   `db:"id"`
-	UserID int64   `db:"user_id"`
-	Name   string  `db:"name"`
-	Year   int64   `db:"year"`
-	Plate  *string `db:"plate"`
+type CarBase struct {
+	ID     int64          `db:"id"`
+	UserID int64          `db:"user_id"`
+	Name   string         `db:"name"`
+	Year   int64          `db:"year"`
+	Plate  sql.NullString `db:"plate"`
 }
 
-type Fuel struct {
+type CarDetails struct {
+	CarBase
+}
+
+type FuelBase struct {
 	ID          int64  `db:"id"`
 	CarID       int64  `db:"car_id"`
 	Timestamp   int64  `db:"timestamp"`
@@ -30,35 +35,40 @@ type Fuel struct {
 	Cents       int64  `db:"cents"`
 	Milliliters int64  `db:"milliliters"`
 	Kilometers  int64  `db:"kilometers"`
-	KilometersR int64  `db:"kilometersr"`
 }
 
-func (f *Fuel) GetLiters() float64 {
+type FuelDetails struct {
+	FuelBase
+	KilometersR int64 `db:"kilometersr"`
+	CountRows   int64 `db:"countrows"`
+}
+
+func (f *FuelDetails) GetLiters() float64 {
 	return float64(f.Milliliters) / 1000
 }
 
-func (f *Fuel) GetEuro() float64 {
+func (f *FuelDetails) GetEuro() float64 {
 	return float64(f.Cents) / 100
 }
 
-func (f *Fuel) GetEurPerLiter() float64 {
+func (f *FuelDetails) GetEurPerLiter() float64 {
 	return f.GetEuro() / f.GetLiters()
 }
 
-func (f *Fuel) GetEurPerKilometer() float64 {
+func (f *FuelDetails) GetEurPerKilometer() float64 {
 	return f.GetEuro() / float64(f.Kilometers)
 }
 
-func (f *Fuel) GetLitersPerKilometer() float64 {
+func (f *FuelDetails) GetLitersPerKilometer() float64 {
 	return float64(f.KilometersR) / f.GetLiters()
 }
 
-func (f *Fuel) GetTimestamp() time.Time {
+func (f *FuelDetails) GetTimestamp() time.Time {
 	return time.Unix(f.Timestamp, 0)
 }
 
-func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]Car, error) {
-	var cars []Car
+func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]CarDetails, error) {
+	var cars []CarDetails
 	stmt := `
 		select id, user_id, name, year, plate
 		from car
@@ -69,8 +79,8 @@ func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]Car,
 	return cars, err
 }
 
-func (s *CarStorage) GetCarFromDB(ctx context.Context, userID int64, carID int64) (Car, error) {
-	var car Car
+func (s *CarStorage) GetCarFromDB(ctx context.Context, userID int64, carID int64) (CarDetails, error) {
+	var car CarDetails
 	stmt := `
 		select id, user_id, name, year, plate
 		from car
@@ -89,7 +99,7 @@ func (s *CarStorage) DeleteCarFromDB(ctx context.Context, userID int64, carID in
 	return res.RowsAffected()
 }
 
-func (s *CarStorage) InsertCarIntoDB(ctx context.Context, car Car) (int64, error) {
+func (s *CarStorage) InsertCarIntoDB(ctx context.Context, car CarBase) (int64, error) {
 	stmt := "insert into car (user_id, name, year, plate) values (?,?,?,?);"
 	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate)
 	if err != nil {
@@ -98,7 +108,7 @@ func (s *CarStorage) InsertCarIntoDB(ctx context.Context, car Car) (int64, error
 	return res.LastInsertId()
 }
 
-func (s *CarStorage) UpdateCarInDB(ctx context.Context, car Car) (int64, error) {
+func (s *CarStorage) UpdateCarInDB(ctx context.Context, car CarBase) (int64, error) {
 	stmt := "update car set user_id = ?, name = ?, year = ?, plate = ? where id = ?;"
 	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate, car.ID)
 	if err != nil {
@@ -107,8 +117,8 @@ func (s *CarStorage) UpdateCarInDB(ctx context.Context, car Car) (int64, error) 
 	return res.RowsAffected()
 }
 
-func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int) (Fuel, error) {
-	var fuel Fuel
+func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int) (FuelDetails, error) {
+	var fuel FuelDetails
 	stmt := `
 		select
 			f.id,
@@ -118,7 +128,8 @@ func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int6
 			f.milliliters,
 			f.kilometers,
 			f.cents,
-			coalesce(f.kilometers - lag(f.kilometers) over (order by f.id), f.kilometers) as kilometersr
+			coalesce(f.kilometers - lag(f.kilometers) over (order by f.id), f.kilometers) as kilometersr,
+			count(*) over (partition by car_id) as countrows
 		from fuel f
 		join car c on c.id = f.car_id 
 		where c.user_id = ? and f.car_id = ?
@@ -129,11 +140,27 @@ func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int6
 	return fuel, err
 }
 
-func (s *CarStorage) InsertFuelIntoDB(ctx context.Context, fuel Fuel) (int64, error) {
+func (s *CarStorage) InsertFuelIntoDB(ctx context.Context, fuel FuelBase) (int64, error) {
 	stmt := "insert into fuel (car_id, timestamp, type, milliliters, kilometers, cents) values (?,?,?,?,?,?);"
 	res, err := s.db.ExecContext(ctx, stmt, fuel.CarID, fuel.Timestamp, fuel.Type, fuel.Milliliters, fuel.Kilometers, fuel.Cents)
 	if err != nil {
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+func (s *CarStorage) DeleteFuelFromDB(ctx context.Context, userID int64, fuelID int64) (int64, error) {
+	stmt := `
+		delete from fuel where id = ?
+			and car_id in (
+				select id
+				from car
+				where user_id = ?
+			);
+	`
+	res, err := s.db.ExecContext(ctx, stmt, fuelID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

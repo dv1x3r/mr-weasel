@@ -2,12 +2,12 @@
 -- +goose StatementBegin
 create table fuel (
     id integer primary key,
-    car_id integer not null,
+    car_id integer not null references car(id) on delete cascade,
     timestamp integer not null,
     type text not null,
-    cents integer not null
+    cents integer not null,
     milliliters integer not null,
-    kilometers integer not null,
+    kilometers integer not null
 ) strict;
 -- +goose StatementEnd
 

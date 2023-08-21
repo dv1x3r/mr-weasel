@@ -53,22 +53,22 @@ func TestNewDraftCar(t *testing.T) {
 			UserID   int64
 			Input    string
 			Expected string
-			IsNil    bool
+			IsNull   bool
 		}{
-			{UserID: 0, Input: "/skip", Expected: "", IsNil: true},
-			{UserID: 1, Input: "", Expected: "", IsNil: false},
-			{UserID: 2, Input: "FZ", Expected: "FZ", IsNil: false},
+			{UserID: 0, Input: "/skip", Expected: "", IsNull: true},
+			{UserID: 1, Input: "", Expected: "", IsNull: false},
+			{UserID: 2, Input: "FZ", Expected: "FZ", IsNull: false},
 		}
 		c := NewCarCommand(nil)
 		for _, test := range tests {
 			c.newDraftCar(test.UserID)
 			c.setDraftCarPlate(test.UserID, test.Input)
 			actual := c.draftCars[test.UserID].Plate
-			if test.IsNil && actual != nil {
-				t.Errorf("actual [%s], [%+v]\n", *actual, test)
+			if actual.Valid && test.IsNull {
+				t.Errorf("actual [%+v], [%+v]\n", actual, test)
 			}
-			if actual != nil && *actual != test.Expected {
-				t.Errorf("actual [%s], [%+v]\n", *actual, test)
+			if actual.String != test.Expected {
+				t.Errorf("actual [%+v], [%+v]\n", actual, test)
 			}
 		}
 	})
