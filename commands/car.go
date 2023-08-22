@@ -35,19 +35,22 @@ func (CarCommand) Description() string {
 }
 
 const (
-	cmdCarAdd        = "add"
-	cmdCarGet        = "get"
-	cmdCarUpd        = "upd"
-	cmdCarUpdName    = "upd_name"
-	cmdCarUpdYear    = "upd_year"
-	cmdCarUpdPlate   = "upd_plate"
-	cmdCarDelAsk     = "del"
-	cmdCarDelYes     = "del_yes"
-	cmdCarFuelAdd    = "fuel_add"
-	cmdCarFuelGet    = "fuel_get"
-	cmdCarFuelDelAsk = "fuel_del"
-	cmdCarFuelDelYes = "fuel_del_yes"
-	cmdCarService    = "service"
+	cmdCarAdd           = "add"
+	cmdCarGet           = "get"
+	cmdCarUpd           = "upd"
+	cmdCarUpdName       = "upd_name"
+	cmdCarUpdYear       = "upd_year"
+	cmdCarUpdPlate      = "upd_plate"
+	cmdCarDelAsk        = "del"
+	cmdCarDelYes        = "del_yes"
+	cmdCarFuelAdd       = "fuel_add"
+	cmdCarFuelGet       = "fuel_get"
+	cmdCarFuelDelAsk    = "fuel_del"
+	cmdCarFuelDelYes    = "fuel_del_yes"
+	cmdCarServiceAdd    = "service_add"
+	cmdCarServiceGet    = "service_get"
+	cmdCarServiceDelAsk = "service_del"
+	cmdCarServiceDelYes = "service_del_yes"
 )
 
 func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
@@ -103,7 +106,7 @@ func (c *CarCommand) showCarDetails(ctx context.Context, userID int64, carID int
 
 	res := Result{Text: c.formatCarDetails(car)}
 	res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
-	res.AddKeyboardButton("Service", commandf(c, cmdCarService, carID))
+	res.AddKeyboardButton("Service", commandf(c, cmdCarServiceGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
 	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
@@ -431,9 +434,9 @@ func (c *CarCommand) deleteFuelAsk(ctx context.Context, userID int64, carID int6
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
 	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarFuelDelYes, carID, fuelID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("No", commandf(c, cmdCarFuelGet, carID, 0))
+	res.AddKeyboardButton("No", commandf(c, cmdCarFuelGet, carID))
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarFuelGet, carID, 0))
+	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarFuelGet, carID))
 	return res, nil
 }
 
@@ -443,6 +446,6 @@ func (c *CarCommand) deleteFuelConfirm(ctx context.Context, userID int64, carID 
 		return Result{Text: "Receipt not found."}, err
 	}
 	res := Result{Text: "Receipt has been successfully deleted!"}
-	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID, 0))
+	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID))
 	return res, nil
 }

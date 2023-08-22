@@ -44,27 +44,44 @@ type FuelDetails struct {
 	CountRows   int64 `db:"countrows"`
 }
 
-func (f *FuelDetails) GetLiters() float64 {
+func (f *FuelBase) GetTimestamp() time.Time {
+	return time.Unix(f.Timestamp, 0)
+}
+
+func (f *FuelBase) GetLiters() float64 {
 	return float64(f.Milliliters) / 1000
 }
 
-func (f *FuelDetails) GetEuro() float64 {
+func (f *FuelBase) GetEuro() float64 {
 	return float64(f.Cents) / 100
 }
 
-func (f *FuelDetails) GetEurPerLiter() float64 {
+func (f *FuelBase) GetEurPerLiter() float64 {
 	return f.GetEuro() / f.GetLiters()
 }
 
 func (f *FuelDetails) GetEurPerKilometer() float64 {
-	return f.GetEuro() / float64(f.Kilometers)
+	return f.GetEuro() / float64(f.KilometersR)
 }
 
 func (f *FuelDetails) GetLitersPerKilometer() float64 {
 	return float64(f.KilometersR) / f.GetLiters()
 }
 
-func (f *FuelDetails) GetTimestamp() time.Time {
+type ServiceBase struct {
+	ID          int64  `db:"id"`
+	CarID       int64  `db:"car_id"`
+	Timestamp   int64  `db:"timestamp"`
+	Description string `db:"description"`
+	Cents       int64  `db:"cents"`
+}
+
+type ServiceDetails struct {
+	ServiceBase
+	CountRows int64 `db:"countrows"`
+}
+
+func (f *ServiceBase) GetTimestamp() time.Time {
 	return time.Unix(f.Timestamp, 0)
 }
 
@@ -146,7 +163,7 @@ func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int6
 			,count(*) over (partition by car_id) as countrows
 		from fuel f
 		join car c on c.id = f.car_id 
-		where c.user_id = ? and f.car_id = ?
+		where c.user_id = ? and c.id = ?
 		order by f.timestamp desc, f.id desc
 		limit 1 offset ?;
 	`
@@ -169,6 +186,47 @@ func (s *CarStorage) DeleteFuelFromDB(ctx context.Context, userID int64, fuelID 
 			and car_id in (select id from car where user_id = ?);
 	`
 	res, err := s.db.ExecContext(ctx, stmt, fuelID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (s *CarStorage) GetServiceFromDB(ctx context.Context, userID int64, carID int64, offset int64) (ServiceDetails, error) {
+	var service ServiceDetails
+	stmt := `
+		select
+			s.id
+			,s.car_id
+			,s.timestamp
+			,s.description
+			,s.cents
+			,count(*) over (partition by car_id) as countrows
+		from service s
+		join car c on c.id = s.car_id 
+		where c.user_id = ? and c.id = ?
+		order by s.timestamp desc, s.id desc
+		limit 1 offset ?;
+	`
+	err := s.db.GetContext(ctx, &service, stmt, userID, carID, offset)
+	return service, err
+}
+
+func (s *CarStorage) InsertServiceIntoDB(ctx context.Context, service ServiceBase) (int64, error) {
+	stmt := "insert into service (car_id, timestamp, description, cents) values (?,?,?,?);"
+	res, err := s.db.ExecContext(ctx, stmt, service.CarID, service.Timestamp, service.Description, service.Cents)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (s *CarStorage) DeleteServiceFromDB(ctx context.Context, userID int64, serviceID int64) (int64, error) {
+	stmt := `
+		delete from service where id = ?
+			and car_id in (select id from car where user_id = ?);
+	`
+	res, err := s.db.ExecContext(ctx, stmt, serviceID, userID)
 	if err != nil {
 		return 0, err
 	}
