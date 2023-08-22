@@ -44,8 +44,8 @@ type FuelDetails struct {
 	CountRows   int64 `db:"countrows"`
 }
 
-func (f *FuelBase) GetTimestamp() time.Time {
-	return time.Unix(f.Timestamp, 0)
+func (f *FuelBase) GetTimestamp() string {
+	return time.Unix(f.Timestamp, 0).UTC().Format("Monday, 02 January 2006")
 }
 
 func (f *FuelBase) GetLiters() float64 {
@@ -81,8 +81,12 @@ type ServiceDetails struct {
 	CountRows int64 `db:"countrows"`
 }
 
-func (f *ServiceBase) GetTimestamp() time.Time {
-	return time.Unix(f.Timestamp, 0)
+func (s *ServiceBase) GetEuro() float64 {
+	return float64(s.Cents) / 100
+}
+
+func (s *ServiceBase) GetTimestamp() string {
+	return time.Unix(s.Timestamp, 0).UTC().Format("Monday, 02 January 2006")
 }
 
 func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]CarDetails, error) {

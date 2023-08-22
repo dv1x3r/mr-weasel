@@ -80,6 +80,8 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarFuelDelYes:
 		return c.deleteFuelConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarServiceGet:
+		return c.showServiceDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	default:
 		return c.showCarList(ctx, pl.UserID)
 	}
@@ -300,7 +302,7 @@ func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
 	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
 	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
 	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm %.2fL/Km (%dKm)\n", fuel.KilometersR, fuel.GetLitersPerKilometer(), fuel.Kilometers)
-	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp().UTC().Format("Monday, 02 January 2006"))
+	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
 	return html
 }
 
@@ -313,27 +315,7 @@ func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID in
 		return Result{Text: "There is something wrong, please try again."}, err
 	} else {
 		res.Text = c.formatFuelDetails(fuel)
-		if offset >= 5 {
-			res.AddKeyboardButton("«5", commandf(c, cmdCarFuelGet, carID, offset-5))
-		} else {
-			res.AddKeyboardButton(" ", "-")
-		}
-		if offset >= 1 {
-			res.AddKeyboardButton("«1", commandf(c, cmdCarFuelGet, carID, offset-1))
-		} else {
-			res.AddKeyboardButton(" ", "-")
-		}
-		res.AddKeyboardButton(fmt.Sprintf("%d/%d", offset+1, fuel.CountRows), "-")
-		if offset+1 < fuel.CountRows {
-			res.AddKeyboardButton("1»", commandf(c, cmdCarFuelGet, carID, offset+1))
-		} else {
-			res.AddKeyboardButton(" ", "-")
-		}
-		if offset+1 < fuel.CountRows-4 {
-			res.AddKeyboardButton("5»", commandf(c, cmdCarFuelGet, carID, offset+5))
-		} else {
-			res.AddKeyboardButton(" ", "-")
-		}
+		res.AddKeyboardPagination(offset, fuel.CountRows, commandf(c, cmdCarFuelGet, carID))
 		res.AddKeyboardRow()
 		res.AddKeyboardButton("Delete", commandf(c, cmdCarFuelDelAsk, carID, fuel.ID))
 	}
@@ -447,5 +429,32 @@ func (c *CarCommand) deleteFuelConfirm(ctx context.Context, userID int64, carID 
 	}
 	res := Result{Text: "Receipt has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID))
+	return res, nil
+}
+
+func (c *CarCommand) formatServiceDetails(service st.ServiceDetails) string {
+	html := fmt.Sprintf("🛠️ %s\n", service.Description)
+	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", service.GetEuro())
+	html += fmt.Sprintf("📅 %s\n", service.GetTimestamp())
+	return html
+}
+
+func (c *CarCommand) showServiceDetails(ctx context.Context, userID int64, carID int64, offset int64) (Result, error) {
+	res := Result{}
+	service, err := c.storage.GetServiceFromDB(ctx, userID, carID, offset)
+	if errors.Is(err, sql.ErrNoRows) {
+		res.Text = "No service receipts found."
+	} else if err != nil {
+		return Result{Text: "There is something wrong, please try again."}, err
+	} else {
+		res.Text = c.formatServiceDetails(service)
+		res.AddKeyboardPagination(offset, service.CountRows, commandf(c, cmdCarServiceGet, carID))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Delete", commandf(c, cmdCarServiceDelAsk, carID, service.ID))
+	}
+	res.AddKeyboardButton("Add", commandf(c, cmdCarServiceAdd, carID))
+	res.AddKeyboardRow()
+	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	return res, nil
 }

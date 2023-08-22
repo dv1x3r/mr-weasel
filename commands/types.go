@@ -95,6 +95,30 @@ func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
 	r.AddKeyboardButton("»", fmt.Sprintf("%d %d", dtNext.Year(), dtNext.Month()))
 }
 
+func (r *Result) AddKeyboardPagination(offset int64, countRows int64, command string) {
+	if offset >= 5 {
+		r.AddKeyboardButton("«5", fmt.Sprintf("%s %d", command, offset-5))
+	} else {
+		r.AddKeyboardButton(" ", "-")
+	}
+	if offset >= 1 {
+		r.AddKeyboardButton("«1", fmt.Sprintf("%s %d", command, offset-1))
+	} else {
+		r.AddKeyboardButton(" ", "-")
+	}
+	r.AddKeyboardButton(fmt.Sprintf("%d/%d", offset+1, countRows), "-")
+	if offset+1 < countRows {
+		r.AddKeyboardButton("1»", fmt.Sprintf("%s %d", command, offset+1))
+	} else {
+		r.AddKeyboardButton(" ", "-")
+	}
+	if offset+1 < countRows-4 {
+		r.AddKeyboardButton("5»", fmt.Sprintf("%s %d", command, offset+5))
+	} else {
+		r.AddKeyboardButton(" ", "-")
+	}
+}
+
 func splitCommand(input string, prefix string) []string {
 	input, _ = strings.CutPrefix(input, prefix)
 	input = strings.TrimSpace(input)
