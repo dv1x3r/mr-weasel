@@ -12,16 +12,18 @@ import (
 )
 
 type CarCommand struct {
-	storage   *st.CarStorage
-	draftCars map[int64]*st.CarBase
-	draftFuel map[int64]*st.FuelBase
+	storage      *st.CarStorage
+	draftCars    map[int64]*st.CarBase
+	draftFuel    map[int64]*st.FuelBase
+	draftService map[int64]*st.ServiceBase
 }
 
 func NewCarCommand(storage *st.CarStorage) *CarCommand {
 	c := &CarCommand{
-		storage:   storage,
-		draftCars: make(map[int64]*st.CarBase),
-		draftFuel: make(map[int64]*st.FuelBase),
+		storage:      storage,
+		draftCars:    make(map[int64]*st.CarBase),
+		draftFuel:    make(map[int64]*st.FuelBase),
+		draftService: make(map[int64]*st.ServiceBase),
 	}
 	return c
 }
@@ -80,6 +82,8 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarFuelDelYes:
 		return c.deleteFuelConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarServiceAdd:
+		return c.addServiceStart(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarServiceGet:
 		return c.showServiceDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	default:
@@ -457,4 +461,64 @@ func (c *CarCommand) showServiceDetails(ctx context.Context, userID int64, carID
 	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	return res, nil
+}
+
+func (c *CarCommand) insertDraftServiceIntoDB(ctx context.Context, userID int64) (int64, error) {
+	return c.storage.InsertServiceIntoDB(ctx, *c.draftService[userID])
+}
+
+func (c *CarCommand) newDraftService(userID int64, carID int64) {
+	c.draftService[userID] = &st.ServiceBase{CarID: carID}
+}
+
+func (c *CarCommand) setDraftServiceTimestamp(userID int64, input string) error {
+	timestamp, err := strconv.Atoi(input)
+	c.draftService[userID].Timestamp = int64(timestamp)
+	return err
+}
+
+func (c *CarCommand) setDraftServiceDescription(userID int64, input string) {
+	c.draftService[userID].Description = input
+}
+
+func (c *CarCommand) setDraftServiceEuros(userID int64, input string) error {
+	euro, err := strconv.ParseFloat(input, 64)
+	c.draftService[userID].Cents = int64(euro * 100)
+	return err
+}
+
+func (c *CarCommand) addServiceStart(ctx context.Context, userID int64, carID int64) (Result, error) {
+	c.newDraftService(userID, carID)
+	res := Result{Text: "Please pick a receipt date.", State: c.addServiceTimestamp}
+	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	return res, nil
+}
+
+func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) (Result, error) {
+	if s := strings.Split(pl.Command, " "); len(s) == 2 {
+		res := Result{Text: "Please pick a receipt date.", State: c.addServiceTimestamp}
+		res.AddKeyboardCalendar(safeGetInt(s, 0), time.Month(safeGetInt(s, 1)))
+		return res, nil
+	}
+	if err := c.setDraftServiceTimestamp(pl.UserID, pl.Command); err != nil {
+		return Result{State: c.addServiceTimestamp}, nil
+	}
+	res := Result{Text: "Provide service description.", State: c.addServiceDescription}
+	res.AddKeyboardRow() // remove calendar keyboard
+	return res, nil
+}
+
+func (c *CarCommand) addServiceDescription(ctx context.Context, pl Payload) (Result, error) {
+	c.setDraftServiceDescription(pl.UserID, pl.Command)
+	return Result{Text: "How much money did you spend in Euros?", State: c.addServiceEurosAndSave}, nil
+}
+
+func (c *CarCommand) addServiceEurosAndSave(ctx context.Context, pl Payload) (Result, error) {
+	if err := c.setDraftServiceEuros(pl.UserID, pl.Command); err != nil {
+		return Result{Text: "Please enter a valid decimal number.", State: c.addServiceEurosAndSave}, nil
+	}
+	if _, err := c.insertDraftServiceIntoDB(ctx, pl.UserID); err != nil {
+		return Result{Text: "There is something wrong, please try again."}, err
+	}
+	return c.showServiceDetails(ctx, pl.UserID, c.draftService[pl.UserID].CarID, 0)
 }
