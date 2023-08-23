@@ -3,8 +3,9 @@ package telegram
 import (
 	"context"
 	"log"
-	"mr-weasel/commands"
 	"strings"
+
+	"mr-weasel/commands"
 )
 
 type Manager struct {

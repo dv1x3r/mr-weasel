@@ -2,8 +2,9 @@ package telegram
 
 import (
 	"context"
-	"mr-weasel/commands"
 	"testing"
+
+	"mr-weasel/commands"
 )
 
 type TestCommand struct {

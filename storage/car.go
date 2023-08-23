@@ -3,8 +3,9 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"github.com/jmoiron/sqlx"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 type CarStorage struct {

@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/jmoiron/sqlx"
-	_ "github.com/joho/godotenv/autoload"
-	_ "github.com/mattn/go-sqlite3"
+	"os"
+
 	"mr-weasel/commands"
 	"mr-weasel/storage"
 	"mr-weasel/telegram"
-	"os"
+
+	"github.com/jmoiron/sqlx"
+	_ "github.com/joho/godotenv/autoload"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
@@ -21,6 +23,7 @@ func main() {
 	tgManager.AddCommands(
 		commands.NewPingCommand(),
 		commands.NewCarCommand(storage.NewCarStorage(db)),
+		commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
 	)
 	tgManager.PublishCommands()
 	tgManager.Start()
