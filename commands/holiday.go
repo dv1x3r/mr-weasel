@@ -23,8 +23,27 @@ func (HolidayCommand) Description() string {
 	return "manage day off's"
 }
 
+const (
+	cmdHolidayAdd    = "add"
+	cmdHolidayGet    = "get"
+	cmdHolidayDelAsk = "del"
+	cmdHolidayDelYes = "del_yes"
+)
+
 func (c *HolidayCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
-	return c.showHolodayDaysByYear(ctx, pl.UserID)
+	args := splitCommand(pl.Command, c.Prefix())
+	switch safeGet(args, 0) {
+	// case cmdHolidayAdd:
+	// 	return c.addFuelStart(ctx, pl.UserID, safeGetInt64(args, 1))
+	// case cmdHolidayGet:
+	// 	return c.showFuelDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	// case cmdHolidayDelAsk:
+	// 	return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	// case cmdHolidayDelYes:
+	// 	return c.deleteFuelConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	default:
+		return c.showHolodayDaysByYear(ctx, pl.UserID)
+	}
 }
 
 func (c *HolidayCommand) showHolodayDaysByYear(ctx context.Context, userID int64) (Result, error) {
