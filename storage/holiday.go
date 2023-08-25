@@ -39,10 +39,10 @@ func (h *HolidayBase) GetEndTimestamp() string {
 func (s *HolidayStorage) SelectHolidayDaysByYearFromDB(ctx context.Context, userID int64) ([]HolidayDaysByYear, error) {
 	var holidays []HolidayDaysByYear
 	stmt := `
-		select year(start) as year, sum(days) as days
+		select cast(strftime('%Y', start, 'unixepoch') as integer) as year, sum(days) as days
 		from holiday
 		where user_id = ?
-		order by 1;
+		group by 1 order by 1;
 	`
 	err := s.db.SelectContext(ctx, &holidays, stmt, userID)
 	return holidays, err

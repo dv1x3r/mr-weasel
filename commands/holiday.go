@@ -24,7 +24,7 @@ func (HolidayCommand) Description() string {
 }
 
 func (c *HolidayCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
-	return Result{}, nil
+	return c.showHolodayDaysByYear(ctx, pl.UserID)
 }
 
 func (c *HolidayCommand) showHolodayDaysByYear(ctx context.Context, userID int64) (Result, error) {
@@ -35,11 +35,11 @@ func (c *HolidayCommand) showHolodayDaysByYear(ctx context.Context, userID int64
 
 	res := Result{}
 	if len(holidays) == 0 {
-		res.Text = "Holidays not found."
+		res.Text = "Holidays not found, add one?"
 	} else {
-		res.Text = "Holiday days by year: \n"
+		res.Text = "Holiday days by year:"
 		for _, v := range holidays {
-			res.Text += fmt.Sprintf("%d - %d days\n", v.Year, v.Days)
+			res.Text += fmt.Sprintf("\n<b>%d</b> - %d days", v.Year, v.Days)
 		}
 	}
 
