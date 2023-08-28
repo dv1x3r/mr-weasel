@@ -23,6 +23,11 @@ type HolidayBase struct {
 	Days   int64 `db:"days"`
 }
 
+type HolidayDetails struct {
+	HolidayBase
+	CountRows int64 `db:"countrows"`
+}
+
 type HolidayDaysByYear struct {
 	Year int64 `db:"year"`
 	Days int64 `db:"days"`
@@ -48,10 +53,11 @@ func (s *HolidayStorage) SelectHolidayDaysByYearFromDB(ctx context.Context, user
 	return holidays, err
 }
 
-func (s *HolidayStorage) GetHolidayFromDB(ctx context.Context, userID int64, offset int64) (HolidayBase, error) {
-	var holiday HolidayBase
+func (s *HolidayStorage) GetHolidayFromDB(ctx context.Context, userID int64, offset int64) (HolidayDetails, error) {
+	var holiday HolidayDetails
 	stmt := `
 		select id, user_id, start, end, days
+			,count(*) over (partition by user_id) as countrows
 		from holidays
 		where user_id = ?
 		order by start desc

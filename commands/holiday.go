@@ -2,6 +2,8 @@ package commands
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -52,8 +54,24 @@ func (c *HolidayCommand) Execute(ctx context.Context, pl Payload) (Result, error
 	}
 }
 
-func (c *HolidayCommand) showHolidayDetails(ctx context.Context, userID int64, holidayID int64) (Result, error) {
-	return Result{}, nil
+func (c *HolidayCommand) showHolidayDetails(ctx context.Context, userID int64, offset int64) (Result, error) {
+	res := Result{}
+	holiday, err := c.storage.GetHolidayFromDB(ctx, userID, offset)
+	if errors.Is(err, sql.ErrNoRows) {
+		res.Text = "Holiday not found."
+	} else if err != nil {
+		return Result{Text: "There is something wrong, please try again."}, err
+	} else {
+		// res.Text = c.formatHolidayDetails(holiday)
+		res.Text = fmt.Sprintf("%+v", holiday)
+		res.AddKeyboardPagination(offset, holiday.CountRows, commandf(c, cmdHolidayGet))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Delete", commandf(c, cmdHolidayDelAsk, holiday.ID))
+	}
+	res.AddKeyboardButton("Add", commandf(c, cmdHolidayAdd))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("« Back", commandf(c))
+	return res, nil
 }
 
 func (c *HolidayCommand) showHolodayDaysByYear(ctx context.Context, userID int64) (Result, error) {
@@ -142,10 +160,10 @@ func (c *HolidayCommand) addHolidayDaysAndSave(ctx context.Context, pl Payload) 
 		return Result{Text: "Please enter a valid whole number.", State: c.addHolidayDaysAndSave}, nil
 	}
 
-	holidayID, err := c.insertDraftHolidayIntoDB(ctx, pl.UserID)
+	_, err := c.insertDraftHolidayIntoDB(ctx, pl.UserID)
 	if err != nil {
 		return Result{Text: "There is something wrong, please try again."}, err
 	}
 
-	return c.showHolidayDetails(ctx, pl.UserID, holidayID)
+	return c.showHolidayDetails(ctx, pl.UserID, 0)
 }
