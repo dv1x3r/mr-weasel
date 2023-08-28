@@ -48,7 +48,7 @@ func (s *HolidayStorage) SelectHolidayDaysByYearFromDB(ctx context.Context, user
 	return holidays, err
 }
 
-func (s *CarStorage) GetHolidayFromDB(ctx context.Context, userID int64, offset int64) (HolidayBase, error) {
+func (s *HolidayStorage) GetHolidayFromDB(ctx context.Context, userID int64, offset int64) (HolidayBase, error) {
 	var holiday HolidayBase
 	stmt := `
 		select id, user_id, start, end, days
@@ -59,4 +59,13 @@ func (s *CarStorage) GetHolidayFromDB(ctx context.Context, userID int64, offset 
 	`
 	err := s.db.GetContext(ctx, &holiday, stmt, userID, offset)
 	return holiday, err
+}
+
+func (s *HolidayStorage) InsertHolidayIntoDB(ctx context.Context, holiday HolidayBase) (int64, error) {
+	stmt := "insert into holiday (user_id, start, end, days) values (?,?,?,?);"
+	res, err := s.db.ExecContext(ctx, stmt, holiday.UserID, holiday.Start, holiday.End, holiday.Days)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
 }

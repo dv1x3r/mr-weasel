@@ -79,6 +79,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	// If it is normal message, user can change and escape states
 	m.setState(pl.UserID, res.State, true)
 
+	// Skip if there is no response text
 	if res.Text == "" {
 		return
 	}
@@ -109,9 +110,17 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 	if err != nil {
 		log.Println("[ERROR]", err)
 	}
-	if res.Text == "" {
+
+	// Skip if there is no text and keyboard
+	if res.Text == "" && res.Keyboard == nil {
 		return
 	}
+
+	// If result text is empty, then use the original value
+	if res.Text == "" {
+		res.Text = callbackQuery.Message.Text
+	}
+
 	if res.Keyboard != nil {
 		_, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
 			ChatID:      callbackQuery.Message.Chat.ID,

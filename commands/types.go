@@ -95,6 +95,14 @@ func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
 	r.AddKeyboardButton("»", fmt.Sprintf("%d %d", dtNext.Year(), dtNext.Month()))
 }
 
+func (r *Result) UpdateKeyboardCalendar(input string) bool {
+	if s := strings.Split(input, " "); len(s) == 2 {
+		r.AddKeyboardCalendar(safeGetInt(s, 0), time.Month(safeGetInt(s, 1)))
+		return true
+	}
+	return false
+}
+
 func (r *Result) AddKeyboardPagination(offset int64, countRows int64, command string) {
 	if offset >= 5 {
 		r.AddKeyboardButton("«5", fmt.Sprintf("%s %d", command, offset-5))

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	st "mr-weasel/storage"
@@ -375,15 +374,14 @@ func (c *CarCommand) addFuelStart(ctx context.Context, userID int64, carID int64
 }
 
 func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) (Result, error) {
-	if s := strings.Split(pl.Command, " "); len(s) == 2 {
-		res := Result{Text: "Please pick a receipt date.", State: c.addFuelTimestamp}
-		res.AddKeyboardCalendar(safeGetInt(s, 0), time.Month(safeGetInt(s, 1)))
+	res := Result{}
+	if res.UpdateKeyboardCalendar(pl.Command) {
+		return res, nil
+	} else if c.setDraftFuelTimestamp(pl.UserID, pl.Command) != nil {
 		return res, nil
 	}
-	if err := c.setDraftFuelTimestamp(pl.UserID, pl.Command); err != nil {
-		return Result{State: c.addFuelTimestamp}, nil
-	}
-	res := Result{Text: "What is the fuel type?", State: c.addFuelType}
+
+	res.Text, res.State = "What is the fuel type?", c.addFuelType
 	res.AddKeyboardRow() // remove calendar keyboard
 	return res, nil
 }
@@ -496,15 +494,14 @@ func (c *CarCommand) addServiceStart(ctx context.Context, userID int64, carID in
 }
 
 func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) (Result, error) {
-	if s := strings.Split(pl.Command, " "); len(s) == 2 {
-		res := Result{Text: "Please pick a receipt date.", State: c.addServiceTimestamp}
-		res.AddKeyboardCalendar(safeGetInt(s, 0), time.Month(safeGetInt(s, 1)))
+	res := Result{}
+	if res.UpdateKeyboardCalendar(pl.Command) {
+		return res, nil
+	} else if c.setDraftServiceTimestamp(pl.UserID, pl.Command) != nil {
 		return res, nil
 	}
-	if err := c.setDraftServiceTimestamp(pl.UserID, pl.Command); err != nil {
-		return Result{State: c.addServiceTimestamp}, nil
-	}
-	res := Result{Text: "Provide service description.", State: c.addServiceDescription}
+
+	res.Text, res.State = "Provide service description.", c.addServiceDescription
 	res.AddKeyboardRow() // remove calendar keyboard
 	return res, nil
 }
