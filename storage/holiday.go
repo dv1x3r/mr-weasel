@@ -58,7 +58,7 @@ func (s *HolidayStorage) GetHolidayFromDB(ctx context.Context, userID int64, off
 	stmt := `
 		select id, user_id, start, end, days
 			,count(*) over (partition by user_id) as countrows
-		from holidays
+		from holiday
 		where user_id = ?
 		order by start desc
 		limit 1 offset ?;
@@ -74,4 +74,13 @@ func (s *HolidayStorage) InsertHolidayIntoDB(ctx context.Context, holiday Holida
 		return 0, err
 	}
 	return res.LastInsertId()
+}
+
+func (s *HolidayStorage) DeleteHolidayFromDB(ctx context.Context, userID int64, holidayID int64) (int64, error) {
+	stmt := `delete from holiday where user_id = ? and id = ?;`
+	res, err := s.db.ExecContext(ctx, stmt, userID, holidayID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

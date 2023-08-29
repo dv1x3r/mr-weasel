@@ -43,15 +43,22 @@ func (c *HolidayCommand) Execute(ctx context.Context, pl Payload) (Result, error
 	switch safeGet(args, 0) {
 	case cmdHolidayAdd:
 		return c.addHolidayStart(ctx, pl.UserID)
-	// case cmdHolidayGet:
-	// 	return c.showFuelDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
-	// case cmdHolidayDelAsk:
-	// 	return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
-	// case cmdHolidayDelYes:
-	// 	return c.deleteFuelConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdHolidayGet:
+		return c.showHolidayDetails(ctx, pl.UserID, safeGetInt64(args, 1))
+	case cmdHolidayDelAsk:
+		return c.deleteHolidayAsk(ctx, pl.UserID, safeGetInt64(args, 1))
+	case cmdHolidayDelYes:
+		return c.deleteHolidayConfirm(ctx, pl.UserID, safeGetInt64(args, 1))
 	default:
 		return c.showHolodayDaysByYear(ctx, pl.UserID)
 	}
+}
+
+func (c *HolidayCommand) formatHolidayDetails(holiday st.HolidayDetails) string {
+	html := fmt.Sprintf("📅 <b>Start:</b> %s\n", holiday.GetStartTimestamp())
+	html += fmt.Sprintf("📅 <b>End:</b> %s\n", holiday.GetEndTimestamp())
+	html += fmt.Sprintf("🌴 <b>Working days:</b> %d\n", holiday.Days)
+	return html
 }
 
 func (c *HolidayCommand) showHolidayDetails(ctx context.Context, userID int64, offset int64) (Result, error) {
@@ -62,8 +69,7 @@ func (c *HolidayCommand) showHolidayDetails(ctx context.Context, userID int64, o
 	} else if err != nil {
 		return Result{Text: "There is something wrong, please try again."}, err
 	} else {
-		// res.Text = c.formatHolidayDetails(holiday)
-		res.Text = fmt.Sprintf("%+v", holiday)
+		res.Text = c.formatHolidayDetails(holiday)
 		res.AddKeyboardPagination(offset, holiday.CountRows, commandf(c, cmdHolidayGet))
 		res.AddKeyboardRow()
 		res.AddKeyboardButton("Delete", commandf(c, cmdHolidayDelAsk, holiday.ID))
@@ -124,7 +130,7 @@ func (c *HolidayCommand) setDraftHolidayDays(userID int64, input string) error {
 
 func (c *HolidayCommand) addHolidayStart(ctx context.Context, userID int64) (Result, error) {
 	c.newDraftHoliday(userID)
-	res := Result{Text: "Please pick vacation start date.", State: c.addHolidayStartDate}
+	res := Result{Text: "Please pick holiday start date.", State: c.addHolidayStartDate}
 	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	return res, nil
 }
@@ -137,7 +143,7 @@ func (c *HolidayCommand) addHolidayStartDate(ctx context.Context, pl Payload) (R
 		return res, nil
 	}
 
-	res.Text, res.State = "Please pick vacation end date.", c.addHolidayEndDate
+	res.Text, res.State = "Please pick holiday end date.", c.addHolidayEndDate
 	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	return res, nil
 }
@@ -166,4 +172,24 @@ func (c *HolidayCommand) addHolidayDaysAndSave(ctx context.Context, pl Payload) 
 	}
 
 	return c.showHolidayDetails(ctx, pl.UserID, 0)
+}
+
+func (c *HolidayCommand) deleteHolidayAsk(ctx context.Context, userID int64, holidayID int64) (Result, error) {
+	res := Result{Text: "Are you sure you want to delete the selected holiday?"}
+	res.AddKeyboardButton("Yes, delete the holiday", commandf(c, cmdHolidayDelYes, holidayID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("No", commandf(c, cmdHolidayGet))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdHolidayGet))
+	return res, nil
+}
+
+func (c *HolidayCommand) deleteHolidayConfirm(ctx context.Context, userID int64, holidayID int64) (Result, error) {
+	affected, err := c.storage.DeleteHolidayFromDB(ctx, userID, holidayID)
+	if err != nil || affected != 1 {
+		return Result{Text: "Holiday not found."}, err
+	}
+	res := Result{Text: "Holiday has been successfully deleted!"}
+	res.AddKeyboardButton("« Back to my holidays", c.Prefix())
+	return res, nil
 }
