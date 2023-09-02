@@ -8,7 +8,7 @@ on:
 
 jobs:
 
-  build-linux:
+  build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -19,10 +19,8 @@ jobs:
     - name: Install gcc-aarch64-linux-gnu
       run: sudo apt install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
-    - name: Build
-      run: |
-        go build -o ./bin/main-linux-amd64
-        GOARCH=arm64 CC=aarch64-linux-gnu-gcc go build -o ./bin/main-linux-arm64
+    - name: Build arm64
+      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/main-linux-arm64
 
     - name: Test
       run: go test -v ./...
@@ -30,6 +28,6 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
-        name: go-build
+        name: build
         path: bin
 
