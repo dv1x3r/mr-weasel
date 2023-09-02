@@ -6,12 +6,6 @@ GOOSE=goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING}
 build:
 	go build -o bin/$(APP_NAME)
 
-compile:
-	GOOS=darwin GOARCH=arm64 go build -o ./bin/$(APP_NAME)-darwin-arm64
-	GOOS=linux GOARCH=arm64 go build -o ./bin/$(APP_NAME)-linux-arm64
-	GOOS=linux GOARCH=amd64 go build -o ./bin/$(APP_NAME)-linux-amd64
-	GOOS=windows GOARCH=amd64 go build -o ./bin/$(APP_NAME)-windows-amd64.exe
-
 run:
 	go build -o ./bin/$(APP_NAME) && ./bin/$(APP_NAME)
 
@@ -45,7 +39,7 @@ db-create:
 	@read -p "Migration name: " VALUE; \
 	$(GOOSE) create "$$VALUE" sql
 
-go-install:
+go-tools:
 	go install golang.org/x/tools/gopls@latest
 	go install github.com/pressly/goose/v3/cmd/goose@latest
 	go install github.com/go-delve/delve/cmd/dlv@latest
