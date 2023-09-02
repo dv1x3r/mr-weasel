@@ -24,6 +24,7 @@ jobs:
       run: GOARCH=${{ matrix.arch }} go build -v -o ./bin/main-${{ matrix.os }}-${{ matrix.arch }}
     - name: Test
       run: go test -v ./...
+    - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
         name: go-build
