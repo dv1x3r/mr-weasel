@@ -39,15 +39,24 @@ jobs:
 
   deploy:
     needs: build
-    environment: teh
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
           name: build
+          path: app
   
       - name: Download migrations artifacts
         uses: actions/download-artifact@v3
         with:
           name: migrations
+          path: app/migrations
+
+      - name: Copy artifacts via scp
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          key: ${{ secrets.SSH_KEY}}
+          source: app
+          target: ~/app
