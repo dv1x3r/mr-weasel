@@ -25,9 +25,29 @@ jobs:
     - name: Test
       run: go test -v ./...
 
-    - name: Upload artifact
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
         name: build
         path: bin
 
+    - name: Upload migrations artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: migrations
+        path: migrations
+
+  deploy:
+    needs: build
+    environment: teh
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+  
+      - name: Download migrations artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: migrations
