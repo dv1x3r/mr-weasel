@@ -19,10 +19,10 @@ jobs:
     - name: Install gcc-aarch64-linux-gnu
       run: sudo apt install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
-    - name: Build arm64
+    - name: Go Build arm64
       run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/main-linux-arm64
 
-    - name: Test
+    - name: Go Test -v
       run: go test -v ./...
 
     - name: Upload build artifacts
@@ -39,7 +39,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: teh
+    runs-on: self-hosted
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
