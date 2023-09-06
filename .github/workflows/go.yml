@@ -39,17 +39,18 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: self-hosted
+    runs-on: self-hosted-teh
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v3
         with:
           name: build
-          path: app
+          path: ~/app/${{ github.event.repository.name }}
+
   
       - name: Download migrations artifacts
         uses: actions/download-artifact@v3
         with:
           name: migrations
-          path: app/migrations
+          path: ~/app/${{ github.event.repository.name }}/migrations
 
