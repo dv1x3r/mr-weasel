@@ -61,6 +61,6 @@ jobs:
           source .env
           goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
 
-      - name: Reload service
-        run: sudo systemctl reload mr-weasel.service
+      - name: Restart service
+        run: sudo systemctl restart mr-weasel.service
         # weasel ALL = NOPASSWD: /bin/systemctl reload mr-weasel.service
