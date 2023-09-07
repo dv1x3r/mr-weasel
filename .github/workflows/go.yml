@@ -20,7 +20,7 @@ jobs:
       run: sudo apt install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
     - name: Go Build arm64
-      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/${{ github.event.repository.name }}
+      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/mr-weasel
 
     - name: Go Test -v
       run: go test -v ./...
@@ -47,19 +47,20 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: build
-          path: ~/app/${{ github.event.repository.name }}
+          path: ~/app/mr-weasel
 
       - name: Download migrations artifacts
         uses: actions/download-artifact@v3
         with:
           name: migrations
-          path: ~/app/${{ github.event.repository.name }}/migrations
+          path: ~/app/mr-weasel/migrations
 
       - name: Migrage database
-        working-directory: /home/weasel/app/${{ github.event.repository.name }}
+        working-directory: /home/weasel/app/mr-weasel
         run: |
           source .env
           goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
 
       - name: Reload service
-        run: echo placeholder
+        run: sudo systemctl reload mr-weasel.service
+        # weasel ALL = NOPASSWD: /bin/systemctl reload mr-weasel.service
