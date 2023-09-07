@@ -1,10 +1,10 @@
-name: Go Build, Test, Deploy
+name: Go deployment
 
-on:
-  push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+on: workflow_dispatch
+  # push:
+  #   branches: [ "master" ]
+  # pull_request:
+  #   branches: [ "master" ]
 
 jobs:
 
@@ -20,7 +20,7 @@ jobs:
       run: sudo apt install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
     - name: Go Build arm64
-      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/main-linux-arm64
+      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/${{ github.event.repository.name }}
 
     - name: Go Test -v
       run: go test -v ./...
@@ -47,10 +47,17 @@ jobs:
           name: build
           path: ~/app/${{ github.event.repository.name }}
 
-  
       - name: Download migrations artifacts
         uses: actions/download-artifact@v3
         with:
           name: migrations
           path: ~/app/${{ github.event.repository.name }}/migrations
 
+      - name: Migrage database
+        working-directory: /home/weasel/app/${{ github.event.repository.name }}
+        run: |
+          source .env
+          goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
+
+      - name: Reload service
+        run: echo placeholder
