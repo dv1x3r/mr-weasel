@@ -29,7 +29,9 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: build
-        path: bin
+        path: |
+          bin
+          app.service
 
     - name: Upload migrations artifacts
       uses: actions/upload-artifact@v3
