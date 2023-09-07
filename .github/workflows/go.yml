@@ -1,10 +1,9 @@
 name: Go deployment
 
-on: workflow_dispatch
-  # push:
-  #   branches: [ "master" ]
-  # pull_request:
-  #   branches: [ "master" ]
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
 
 jobs:
 
