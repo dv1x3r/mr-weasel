@@ -37,6 +37,10 @@ jobs:
     needs: build
     runs-on: self-hosted-teh
     steps:
+      - name: Stop service
+        run: sudo systemctl stop mr-weasel.service
+        # weasel ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
+
       - name: Download app artifacts
         uses: actions/download-artifact@v3
         with:
@@ -50,5 +54,5 @@ jobs:
           goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
 
       - name: Restart service
-        run: sudo systemctl restart mr-weasel.service
-        # weasel ALL = NOPASSWD: /bin/systemctl reload mr-weasel.service
+        run: sudo systemctl start mr-weasel.service
+        # weasel ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
