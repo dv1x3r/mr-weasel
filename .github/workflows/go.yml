@@ -1,10 +1,9 @@
 name: Go deployment
 
-on: workflow_dispatch
-  # push:
-  #   branches: [ "master" ]
-  # pull_request:
-  #   branches: [ "master" ]
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
 
 jobs:
 
@@ -20,7 +19,7 @@ jobs:
       run: sudo apt install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
     - name: Go Build arm64
-      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./bin/mr-weasel
+      run: GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc go build -o ./mr-weasel
 
     - name: Go Test -v
       run: go test -v ./...
@@ -30,30 +29,19 @@ jobs:
       with:
         name: build
         path: |
-          bin
-          app.service
-
-    - name: Upload migrations artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: migrations
-        path: migrations
+          mr-weasel
+          mr-weasel.service
+          migrations
 
   deploy:
     needs: build
     runs-on: self-hosted-teh
     steps:
-      - name: Download build artifacts
+      - name: Download app artifacts
         uses: actions/download-artifact@v3
         with:
           name: build
           path: ~/app/mr-weasel
-
-      - name: Download migrations artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: migrations
-          path: ~/app/mr-weasel/migrations
 
       - name: Migrage database
         working-directory: /home/weasel/app/mr-weasel

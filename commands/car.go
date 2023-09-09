@@ -177,6 +177,7 @@ func (c *CarCommand) setDraftCarPlate(userID int64, input string) {
 	if input == "/skip" {
 		c.draftCars[userID].Plate.Valid = false
 	} else {
+		c.draftCars[userID].Plate.Valid = true
 		c.draftCars[userID].Plate.String = input
 	}
 }
