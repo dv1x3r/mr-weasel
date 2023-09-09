@@ -86,6 +86,10 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.addServiceStart(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarServiceGet:
 		return c.showServiceDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarServiceDelAsk:
+		return c.deleteServiceAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarServiceDelYes:
+		return c.deleteServiceConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	default:
 		return c.showCarList(ctx, pl.UserID)
 	}
@@ -519,4 +523,24 @@ func (c *CarCommand) addServiceEurosAndSave(ctx context.Context, pl Payload) (Re
 		return Result{Text: "There is something wrong, please try again."}, err
 	}
 	return c.showServiceDetails(ctx, pl.UserID, c.draftService[pl.UserID].CarID, 0)
+}
+
+func (c *CarCommand) deleteServiceAsk(ctx context.Context, userID int64, carID int64, serviceID int64) (Result, error) {
+	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
+	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarServiceDelYes, carID, serviceID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("No", commandf(c, cmdCarServiceGet, carID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarServiceGet, carID))
+	return res, nil
+}
+
+func (c *CarCommand) deleteServiceConfirm(ctx context.Context, userID int64, carID int64, serviceID int64) (Result, error) {
+	affected, err := c.storage.DeleteServiceFromDB(ctx, userID, serviceID)
+	if err != nil || affected != 1 {
+		return Result{Text: "Receipt not found."}, err
+	}
+	res := Result{Text: "Receipt has been successfully deleted!"}
+	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarServiceGet, carID))
+	return res, nil
 }
