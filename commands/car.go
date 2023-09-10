@@ -45,6 +45,7 @@ const (
 	cmdCarUpdName       = "upd_name"
 	cmdCarUpdYear       = "upd_year"
 	cmdCarUpdPlate      = "upd_plate"
+	cmdCarUpdPrice      = "upd_price"
 	cmdCarDelAsk        = "del"
 	cmdCarDelYes        = "del_yes"
 	cmdCarFuelAdd       = "fuel_add"
@@ -76,6 +77,8 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.updateCarAskYear(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarUpdPlate:
 		return c.updateCarAskPlate(ctx, pl.UserID, safeGetInt64(args, 1))
+	case cmdCarUpdPrice:
+		return c.updateCarAskPrice(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarDelAsk:
 		return c.deleteCarAsk(ctx, pl.UserID, safeGetInt64(args, 1))
 	case cmdCarDelYes:
@@ -111,12 +114,17 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 
 func (c *CarCommand) formatCarDetails(car st.CarDetails) string {
 	html := fmt.Sprintf("🚘 <b>Car:</b> %s (%d)\n", car.Name, car.Year)
+	if car.Price.Valid {
+		html += fmt.Sprintf("💲 <b>Price:</b> %d€\n", car.Price.Int64)
+	} else {
+		html += fmt.Sprintf("💲 <b>Price:</b> 🚫\n")
+	}
+	html += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
 	if car.Plate.Valid {
 		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> %s\n", car.Plate.String)
 	} else {
 		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> 🚫\n")
 	}
-	html += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
 	return html
 }
 
@@ -131,6 +139,7 @@ func (c *CarCommand) showCarDetails(ctx context.Context, userID int64, carID int
 	res := Result{Text: c.formatCarDetails(car)}
 	res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
 	res.AddKeyboardButton("Service", commandf(c, cmdCarServiceGet, carID))
+	res.AddKeyboardButton("Lease", commandf(c, cmdCarLeaseGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
 	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
@@ -196,6 +205,18 @@ func (c *CarCommand) setDraftCarPlate(userID int64, input string) {
 	}
 }
 
+func (c *CarCommand) setDraftCarPrice(userID int64, input string) error {
+	if input == "/skip" {
+		c.draftCars[userID].Price.Valid = false
+		return nil
+	} else {
+		price, err := strconv.Atoi(input)
+		c.draftCars[userID].Price.Int64 = int64(price)
+		c.draftCars[userID].Price.Valid = true
+		return err
+	}
+}
+
 func (c *CarCommand) addCarStart(ctx context.Context, pl Payload) (Result, error) {
 	c.newDraftCar(pl.UserID)
 	return Result{Text: "Please choose a name for your car.", State: c.addCarName}, nil
@@ -210,11 +231,18 @@ func (c *CarCommand) addCarYear(ctx context.Context, pl Payload) (Result, error)
 	if err := c.setDraftCarYear(pl.UserID, pl.Command); err != nil {
 		return Result{Text: "Please enter a valid number.", State: c.addCarYear}, nil
 	}
-	return Result{Text: "What is your plate number? /skip", State: c.addCarPlateAndSave}, nil
+	return Result{Text: "What is your plate number? /skip", State: c.addCarPlate}, nil
 }
 
-func (c *CarCommand) addCarPlateAndSave(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addCarPlate(ctx context.Context, pl Payload) (Result, error) {
 	c.setDraftCarPlate(pl.UserID, pl.Command)
+	return Result{Text: "What is the price? /skip", State: c.addCarPriceAndSave}, nil
+}
+
+func (c *CarCommand) addCarPriceAndSave(ctx context.Context, pl Payload) (Result, error) {
+	if err := c.setDraftCarPrice(pl.UserID, pl.Command); err != nil {
+		return Result{Text: "Please enter a valid number.", State: c.addCarPriceAndSave}, nil
+	}
 	carID, err := c.insertDraftCarIntoDB(ctx, pl.UserID)
 	if err != nil {
 		return Result{Text: "There is something wrong, please try again."}, err
@@ -235,6 +263,7 @@ func (c *CarCommand) showCarUpdate(ctx context.Context, userID int64, carID int6
 	res.AddKeyboardButton("Set Year", commandf(c, cmdCarUpdYear, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Set Plate", commandf(c, cmdCarUpdPlate, carID))
+	res.AddKeyboardButton("Set Price", commandf(c, cmdCarUpdPrice, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	return res, nil
@@ -259,6 +288,13 @@ func (c *CarCommand) updateCarAskPlate(ctx context.Context, userID int64, carID 
 		return Result{Text: "Car not found."}, err
 	}
 	return Result{Text: "What is the new car plate? /skip", State: c.updateCarSavePlate}, nil
+}
+
+func (c *CarCommand) updateCarAskPrice(ctx context.Context, userID int64, carID int64) (Result, error) {
+	if err := c.fetchDraftCarFromDB(ctx, userID, carID); err != nil {
+		return Result{Text: "Car not found."}, err
+	}
+	return Result{Text: "What is the new car price? /skip", State: c.updateCarSavePrice}, nil
 }
 
 func (c *CarCommand) updateCarSaveName(ctx context.Context, pl Payload) (Result, error) {
@@ -287,6 +323,17 @@ func (c *CarCommand) updateCarSaveYear(ctx context.Context, pl Payload) (Result,
 
 func (c *CarCommand) updateCarSavePlate(ctx context.Context, pl Payload) (Result, error) {
 	c.setDraftCarPlate(pl.UserID, pl.Command)
+	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
+		return Result{Text: "Update failed, try again."}, err
+	}
+	res := Result{Text: "Car plate has been successfully updated!"}
+	car := c.draftCars[pl.UserID]
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
+	return res, nil
+}
+
+func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) (Result, error) {
+	c.setDraftCarPrice(pl.UserID, pl.Command)
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
 		return Result{Text: "Update failed, try again."}, err
 	}
@@ -562,8 +609,10 @@ func (c *CarCommand) deleteServiceConfirm(ctx context.Context, userID int64, car
 }
 
 func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
-	html := fmt.Sprintf("🛠️ %s\n", lease.Description)
-	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", lease.GetEuro())
+	html := fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", lease.GetEuro())
+	if lease.Description.Valid {
+		html += fmt.Sprintf("🛠️ %s\n", lease.Description.String)
+	}
 	html += fmt.Sprintf("📅 %s\n", lease.GetTimestamp())
 	return html
 }
@@ -603,7 +652,12 @@ func (c *CarCommand) setDraftLeaseTimestamp(userID int64, input string) error {
 }
 
 func (c *CarCommand) setDraftLeaseDescription(userID int64, input string) {
-	c.draftLease[userID].Description = input
+	if input == "/skip" {
+		c.draftLease[userID].Description.Valid = false
+	} else {
+		c.draftLease[userID].Description.Valid = true
+		c.draftLease[userID].Description.String = input
+	}
 }
 
 func (c *CarCommand) setDraftLeaseEuros(userID int64, input string) error {
@@ -627,7 +681,7 @@ func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) (Result,
 		return res, nil
 	}
 
-	res.Text, res.State = "Provide lease description.", c.addLeaseDescription
+	res.Text, res.State = "Provide lease description. /skip", c.addLeaseDescription
 	res.AddKeyboardRow() // remove calendar keyboard
 	return res, nil
 }

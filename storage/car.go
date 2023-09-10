@@ -22,6 +22,7 @@ type CarBase struct {
 	Name   string         `db:"name"`
 	Year   int64          `db:"year"`
 	Plate  sql.NullString `db:"plate"`
+	Price  sql.NullInt64  `db:"price"`
 }
 
 type CarDetails struct {
@@ -32,7 +33,7 @@ type CarDetails struct {
 func (s *CarStorage) SelectCarsFromDB(ctx context.Context, userID int64) ([]CarDetails, error) {
 	var cars []CarDetails
 	stmt := `
-		select id, user_id, name, year, plate
+		select id, user_id, name, year, plate, price
 		from car
 		where user_id = ?
 		order by year, name;
@@ -50,6 +51,7 @@ func (s *CarStorage) GetCarFromDB(ctx context.Context, userID int64, carID int64
 			,c.name
 			,c.year
 			,c.plate
+			,c.price
 			,coalesce(f.kilometers, 0) as kilometers
 		from car c
 		left join (
@@ -75,8 +77,8 @@ func (s *CarStorage) DeleteCarFromDB(ctx context.Context, userID int64, carID in
 }
 
 func (s *CarStorage) InsertCarIntoDB(ctx context.Context, car CarBase) (int64, error) {
-	stmt := "insert into car (user_id, name, year, plate) values (?,?,?,?);"
-	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate)
+	stmt := "insert into car (user_id, name, year, plate, price) values (?,?,?,?,?);"
+	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate, car.Price)
 	if err != nil {
 		return 0, err
 	}
@@ -84,8 +86,8 @@ func (s *CarStorage) InsertCarIntoDB(ctx context.Context, car CarBase) (int64, e
 }
 
 func (s *CarStorage) UpdateCarInDB(ctx context.Context, car CarBase) (int64, error) {
-	stmt := "update car set user_id = ?, name = ?, year = ?, plate = ? where id = ?;"
-	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate, car.ID)
+	stmt := "update car set user_id = ?, name = ?, year = ?, plate = ?, price = ? where id = ?;"
+	res, err := s.db.ExecContext(ctx, stmt, car.UserID, car.Name, car.Year, car.Plate, car.Price, car.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -239,15 +241,15 @@ func (s *CarStorage) DeleteServiceFromDB(ctx context.Context, userID int64, serv
 }
 
 type LeaseBase struct {
-	ID          int64  `db:"id"`
-	CarID       int64  `db:"car_id"`
-	Timestamp   int64  `db:"timestamp"`
-	Description string `db:"description"`
-	Cents       int64  `db:"cents"`
+	ID          int64          `db:"id"`
+	CarID       int64          `db:"car_id"`
+	Timestamp   int64          `db:"timestamp"`
+	Description sql.NullString `db:"description"`
+	Cents       int64          `db:"cents"`
 }
 
 type LeaseDetails struct {
-	ServiceBase
+	LeaseBase
 	CountRows int64 `db:"countrows"`
 }
 
