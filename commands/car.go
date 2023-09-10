@@ -16,6 +16,7 @@ type CarCommand struct {
 	draftCars    map[int64]*st.CarBase
 	draftFuel    map[int64]*st.FuelBase
 	draftService map[int64]*st.ServiceBase
+	draftLease   map[int64]*st.LeaseBase
 }
 
 func NewCarCommand(storage *st.CarStorage) *CarCommand {
@@ -24,6 +25,7 @@ func NewCarCommand(storage *st.CarStorage) *CarCommand {
 		draftCars:    make(map[int64]*st.CarBase),
 		draftFuel:    make(map[int64]*st.FuelBase),
 		draftService: make(map[int64]*st.ServiceBase),
+		draftLease:   make(map[int64]*st.LeaseBase),
 	}
 	return c
 }
@@ -53,6 +55,10 @@ const (
 	cmdCarServiceGet    = "service_get"
 	cmdCarServiceDelAsk = "service_del"
 	cmdCarServiceDelYes = "service_del_yes"
+	cmdCarLeaseAdd      = "lease_add"
+	cmdCarLeaseGet      = "lease_get"
+	cmdCarLeaseDelAsk   = "lease_del"
+	cmdCarLeaseDelYes   = "lease_del_yes"
 )
 
 func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
@@ -90,6 +96,14 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
 		return c.deleteServiceAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarServiceDelYes:
 		return c.deleteServiceConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarLeaseAdd:
+		return c.addLeaseStart(ctx, pl.UserID, safeGetInt64(args, 1))
+	case cmdCarLeaseGet:
+		return c.showLeaseDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarLeaseDelAsk:
+		return c.deleteLeaseAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdCarLeaseDelYes:
+		return c.deleteLeaseConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	default:
 		return c.showCarList(ctx, pl.UserID)
 	}
@@ -310,7 +324,8 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, userID int64, carID i
 func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
 	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
 	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
-	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm %.2fL/Km (%dKm)\n", fuel.KilometersR, fuel.GetLitersPerKilometer(), fuel.Kilometers)
+	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
+	html += fmt.Sprintf("🏭 <b>Total:</b> %dKm\n", fuel.Kilometers)
 	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
 	return html
 }
@@ -543,5 +558,111 @@ func (c *CarCommand) deleteServiceConfirm(ctx context.Context, userID int64, car
 	}
 	res := Result{Text: "Receipt has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarServiceGet, carID))
+	return res, nil
+}
+
+func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
+	html := fmt.Sprintf("🛠️ %s\n", lease.Description)
+	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", lease.GetEuro())
+	html += fmt.Sprintf("📅 %s\n", lease.GetTimestamp())
+	return html
+}
+
+func (c *CarCommand) showLeaseDetails(ctx context.Context, userID int64, carID int64, offset int64) (Result, error) {
+	res := Result{}
+	lease, err := c.storage.GetLeaseFromDB(ctx, userID, carID, offset)
+	if errors.Is(err, sql.ErrNoRows) {
+		res.Text = "No lease receipts found."
+	} else if err != nil {
+		return Result{Text: "There is something wrong, please try again."}, err
+	} else {
+		res.Text = c.formatLeaseDetails(lease)
+		res.AddKeyboardPagination(offset, lease.CountRows, commandf(c, cmdCarLeaseGet, carID))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Delete", commandf(c, cmdCarLeaseDelAsk, carID, lease.ID))
+	}
+	res.AddKeyboardButton("Add", commandf(c, cmdCarLeaseAdd, carID))
+	res.AddKeyboardRow()
+	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
+	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
+	return res, nil
+}
+
+func (c *CarCommand) insertDraftLeaseIntoDB(ctx context.Context, userID int64) (int64, error) {
+	return c.storage.InsertLeaseIntoDB(ctx, *c.draftLease[userID])
+}
+
+func (c *CarCommand) newDraftLease(userID int64, carID int64) {
+	c.draftLease[userID] = &st.LeaseBase{CarID: carID}
+}
+
+func (c *CarCommand) setDraftLeaseTimestamp(userID int64, input string) error {
+	timestamp, err := strconv.Atoi(input)
+	c.draftLease[userID].Timestamp = int64(timestamp)
+	return err
+}
+
+func (c *CarCommand) setDraftLeaseDescription(userID int64, input string) {
+	c.draftLease[userID].Description = input
+}
+
+func (c *CarCommand) setDraftLeaseEuros(userID int64, input string) error {
+	euro, err := strconv.ParseFloat(input, 64)
+	c.draftLease[userID].Cents = int64(euro * 100)
+	return err
+}
+
+func (c *CarCommand) addLeaseStart(ctx context.Context, userID int64, carID int64) (Result, error) {
+	c.newDraftLease(userID, carID)
+	res := Result{Text: "Please pick a receipt date.", State: c.addLeaseTimestamp}
+	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	return res, nil
+}
+
+func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) (Result, error) {
+	res := Result{}
+	if res.UpdateKeyboardCalendar(pl.Command) {
+		return res, nil
+	} else if c.setDraftLeaseTimestamp(pl.UserID, pl.Command) != nil {
+		return res, nil
+	}
+
+	res.Text, res.State = "Provide lease description.", c.addLeaseDescription
+	res.AddKeyboardRow() // remove calendar keyboard
+	return res, nil
+}
+
+func (c *CarCommand) addLeaseDescription(ctx context.Context, pl Payload) (Result, error) {
+	c.setDraftLeaseDescription(pl.UserID, pl.Command)
+	return Result{Text: "How much money did you spend in Euros?", State: c.addLeaseEurosAndSave}, nil
+}
+
+func (c *CarCommand) addLeaseEurosAndSave(ctx context.Context, pl Payload) (Result, error) {
+	if err := c.setDraftLeaseEuros(pl.UserID, pl.Command); err != nil {
+		return Result{Text: "Please enter a valid decimal number.", State: c.addLeaseEurosAndSave}, nil
+	}
+	if _, err := c.insertDraftLeaseIntoDB(ctx, pl.UserID); err != nil {
+		return Result{Text: "There is something wrong, please try again."}, err
+	}
+	return c.showLeaseDetails(ctx, pl.UserID, c.draftLease[pl.UserID].CarID, 0)
+}
+
+func (c *CarCommand) deleteLeaseAsk(ctx context.Context, userID int64, carID int64, leaseID int64) (Result, error) {
+	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
+	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarLeaseDelYes, carID, leaseID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("No", commandf(c, cmdCarLeaseGet, carID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarLeaseGet, carID))
+	return res, nil
+}
+
+func (c *CarCommand) deleteLeaseConfirm(ctx context.Context, userID int64, carID int64, leaseID int64) (Result, error) {
+	affected, err := c.storage.DeleteLeaseFromDB(ctx, userID, leaseID)
+	if err != nil || affected != 1 {
+		return Result{Text: "Receipt not found."}, err
+	}
+	res := Result{Text: "Receipt has been successfully deleted!"}
+	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarLeaseGet, carID))
 	return res, nil
 }
