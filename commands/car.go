@@ -337,7 +337,7 @@ func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) (Result
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
 		return Result{Text: "Update failed, try again."}, err
 	}
-	res := Result{Text: "Car plate has been successfully updated!"}
+	res := Result{Text: "Car price has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	return res, nil
