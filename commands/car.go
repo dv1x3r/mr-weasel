@@ -142,7 +142,6 @@ func (c *CarCommand) showCarDetails(ctx context.Context, userID int64, carID int
 	res.AddKeyboardButton("Lease", commandf(c, cmdCarLeaseGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
-	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("« Back to my cars", c.Prefix())
 	return res, nil
@@ -264,6 +263,8 @@ func (c *CarCommand) showCarUpdate(ctx context.Context, userID int64, carID int6
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Set Plate", commandf(c, cmdCarUpdPlate, carID))
 	res.AddKeyboardButton("Set Price", commandf(c, cmdCarUpdPrice, carID))
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	return res, nil
