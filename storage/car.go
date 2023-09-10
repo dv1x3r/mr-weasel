@@ -131,7 +131,7 @@ func (f *FuelDetails) GetEurPerKilometer() float64 {
 }
 
 func (f *FuelDetails) GetLitersPerKilometer() float64 {
-	return float64(f.KilometersR) / f.GetLiters()
+	return (f.GetLiters() / float64(f.KilometersR)) * 100
 }
 
 func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int64, offset int64) (FuelDetails, error) {

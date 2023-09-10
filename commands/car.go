@@ -371,7 +371,7 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, userID int64, carID i
 func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
 	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
 	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
-	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
+	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/100Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
 	html += fmt.Sprintf("🏭 <b>Total:</b> %dKm\n", fuel.Kilometers)
 	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
 	return html
