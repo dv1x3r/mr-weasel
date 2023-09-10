@@ -146,7 +146,7 @@ func (s *CarStorage) GetFuelFromDB(ctx context.Context, userID int64, carID int6
 			,f.kilometers
 			,f.cents
 			,coalesce(f.kilometers - lag(f.kilometers) over (order by f.timestamp, f.id), f.kilometers) as kilometersr
-			,count(*) over (partition by car_id) as countrows
+			,count(*) over () as countrows
 		from fuel f
 		join car c on c.id = f.car_id 
 		where c.user_id = ? and c.id = ?
@@ -208,7 +208,7 @@ func (s *CarStorage) GetServiceFromDB(ctx context.Context, userID int64, carID i
 			,s.timestamp
 			,s.description
 			,s.cents
-			,count(*) over (partition by car_id) as countrows
+			,count(*) over () as countrows
 		from service s
 		join car c on c.id = s.car_id 
 		where c.user_id = ? and c.id = ?
@@ -250,15 +250,20 @@ type LeaseBase struct {
 
 type LeaseDetails struct {
 	LeaseBase
+	CentsRT   int64 `db:"cents_rt"`
 	CountRows int64 `db:"countrows"`
 }
 
-func (s *LeaseBase) GetEuro() float64 {
-	return float64(s.Cents) / 100
+func (l *LeaseBase) GetEuro() float64 {
+	return float64(l.Cents) / 100
 }
 
-func (s *LeaseBase) GetTimestamp() string {
-	return time.Unix(s.Timestamp, 0).UTC().Format("Monday, 02 January 2006")
+func (l *LeaseDetails) GetEuroRT() float64 {
+	return float64(l.CentsRT) / 100
+}
+
+func (l *LeaseBase) GetTimestamp() string {
+	return time.Unix(l.Timestamp, 0).UTC().Format("Monday, 02 January 2006")
 }
 
 func (s *CarStorage) GetLeaseFromDB(ctx context.Context, userID int64, carID int64, offset int64) (LeaseDetails, error) {
@@ -270,7 +275,8 @@ func (s *CarStorage) GetLeaseFromDB(ctx context.Context, userID int64, carID int
 			,l.timestamp
 			,l.description
 			,l.cents
-			,count(*) over (partition by car_id) as countrows
+			,sum(l.cents) over (order by l.timestamp) as cents_rt
+			,count(*) over () as countrows
 		from lease l
 		join car c on c.id = l.car_id 
 		where c.user_id = ? and c.id = ?

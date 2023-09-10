@@ -609,7 +609,7 @@ func (c *CarCommand) deleteServiceConfirm(ctx context.Context, userID int64, car
 }
 
 func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
-	html := fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", lease.GetEuro())
+	html := fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€ RT)\n", lease.GetEuro(), lease.GetEuroRT())
 	if lease.Description.Valid {
 		html += fmt.Sprintf("🛠️ %s\n", lease.Description.String)
 	}
