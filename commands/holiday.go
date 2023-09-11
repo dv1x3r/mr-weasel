@@ -28,7 +28,7 @@ func (HolidayCommand) Prefix() string {
 }
 
 func (HolidayCommand) Description() string {
-	return "day off's storage"
+	return "manage holiday days"
 }
 
 const (
@@ -95,7 +95,7 @@ func (c *HolidayCommand) showHolodayDaysByYear(ctx context.Context, userID int64
 		res.Text = "Holiday days by year:"
 		res.AddKeyboardButton("Manage", commandf(c, cmdHolidayGet))
 		for _, v := range holidays {
-			res.Text += fmt.Sprintf("\n<b>%d</b> - %d days", v.Year, v.Days)
+			res.Text += fmt.Sprintf("\n<b>%d</b> - %d offline days", v.Year, v.Days)
 		}
 	}
 

@@ -35,7 +35,7 @@ func (CarCommand) Prefix() string {
 }
 
 func (CarCommand) Description() string {
-	return "manage car costs"
+	return "manage car expenses"
 }
 
 const (
