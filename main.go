@@ -20,11 +20,17 @@ func main() {
 	db := sqlx.MustConnect(dbDriver, dbString)
 	tgClient := telegram.NewClient(os.Getenv("TG_TOKEN"), false).MustConnect()
 	tgManager := telegram.NewManager(tgClient)
-	tgManager.AddCommands(
-		commands.NewPingCommand(),
-		commands.NewCarCommand(storage.NewCarStorage(db)),
-		commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
-	)
+	if os.Getenv("RTX_MODE") == "on" {
+		tgManager.AddCommands(
+			commands.NewPythonCommand(),
+		)
+	} else {
+		tgManager.AddCommands(
+			commands.NewPingCommand(),
+			commands.NewCarCommand(storage.NewCarStorage(db)),
+			commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
+		)
+	}
 	tgManager.PublishCommands()
 	tgManager.Start()
 }
