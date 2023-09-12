@@ -84,7 +84,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		return
 	}
 
-	_, err = m.client.SendMessage(ctx, SendMessageConfig{
+	botMessage, err := m.client.SendMessage(ctx, SendMessageConfig{
 		ChatID:      message.Chat.ID,
 		Text:        res.Text,
 		ParseMode:   "HTML",
@@ -92,6 +92,22 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	})
 	if err != nil {
 		log.Println("[ERROR]", err)
+	}
+
+	if res.ResultChan != nil {
+		go func() {
+			res = <-res.ResultChan
+			_, err = m.client.SendMessage(ctx, SendMessageConfig{
+				ChatID:           botMessage.Chat.ID,
+				Text:             res.Text,
+				ParseMode:        "HTML",
+				ReplyMarkup:      m.commandKeyboardToInlineMarkup(res.Keyboard),
+				ReplyToMessageId: botMessage.MessageID,
+			})
+			if err != nil {
+				log.Println("[ERROR]", err)
+			}
+		}()
 	}
 }
 
@@ -121,8 +137,10 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		res.Text = callbackQuery.Message.Text
 	}
 
+	var botMessage Message
+
 	if res.Keyboard != nil {
-		_, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
+		botMessage, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
 			ChatID:      callbackQuery.Message.Chat.ID,
 			MessageID:   callbackQuery.Message.MessageID,
 			Text:        res.Text,
@@ -133,7 +151,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 			log.Println("[ERROR]", err)
 		}
 	} else {
-		_, err = m.client.SendMessage(ctx, SendMessageConfig{
+		botMessage, err = m.client.SendMessage(ctx, SendMessageConfig{
 			ChatID:      callbackQuery.Message.Chat.ID,
 			Text:        res.Text,
 			ParseMode:   "HTML",
@@ -142,6 +160,22 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		if err != nil {
 			log.Println("[ERROR]", err)
 		}
+	}
+
+	if res.ResultChan != nil {
+		go func() {
+			res = <-res.ResultChan
+			_, err = m.client.SendMessage(ctx, SendMessageConfig{
+				ChatID:           botMessage.Chat.ID,
+				Text:             res.Text,
+				ParseMode:        "HTML",
+				ReplyMarkup:      m.commandKeyboardToInlineMarkup(res.Keyboard),
+				ReplyToMessageId: botMessage.MessageID,
+			})
+			if err != nil {
+				log.Println("[ERROR]", err)
+			}
+		}()
 	}
 }
 

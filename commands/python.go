@@ -1,12 +1,18 @@
 package commands
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"mr-weasel/utils"
+)
 
 type PythonCommand struct {
+	queue *utils.Queue
 }
 
-func NewPythonCommand() *PythonCommand {
-	return &PythonCommand{}
+func NewPythonCommand(queue *utils.Queue) *PythonCommand {
+	return &PythonCommand{queue: queue}
 }
 
 func (PythonCommand) Prefix() string {
@@ -18,5 +24,16 @@ func (PythonCommand) Description() string {
 }
 
 func (c *PythonCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
-	return Result{}, nil
+	resultChan := make(chan Result)
+	go func() {
+		if !c.queue.Lock() {
+			resultChan <- Result{Text: "There are too many queued jobs, please wait."}
+			return
+		}
+		defer c.queue.Unlock()
+		time.Sleep(10 * time.Second)
+		resultChan <- Result{Text: "Done, fuck you!"}
+	}()
+
+	return Result{Text: "background job probably started", ResultChan: resultChan}, nil
 }

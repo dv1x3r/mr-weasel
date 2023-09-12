@@ -22,9 +22,10 @@ type Payload struct {
 }
 
 type Result struct {
-	Text     string
-	State    HandlerFunc
-	Keyboard [][]Button
+	Text       string
+	State      HandlerFunc
+	Keyboard   [][]Button
+	ResultChan chan Result
 }
 
 type Button struct {
