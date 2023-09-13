@@ -18,21 +18,21 @@ func (TestCommand) Description() string {
 	return "Test Command"
 }
 
-func (tc *TestCommand) Execute(ctx context.Context, pl commands.Payload) (commands.Result, error) {
+func (tc *TestCommand) Execute(ctx context.Context, pl commands.Payload) {
 	if pl.Command == "state" {
-		return commands.Result{State: tc.ExecuteState}, nil
+		pl.ResultChan <- commands.Result{State: tc.ExecuteState}
 	}
-	return commands.Result{}, nil
+	pl.ResultChan <- commands.Result{}
 }
 
-func (tc *TestCommand) ExecuteState(ctx context.Context, pl commands.Payload) (commands.Result, error) {
-	return commands.Result{}, nil
+func (tc *TestCommand) ExecuteState(ctx context.Context, pl commands.Payload) {
+	pl.ResultChan <- commands.Result{}
 }
 
 func TestGetHandlerFunc(t *testing.T) {
 	t.Run("NotFound", func(t *testing.T) {
 		manager := NewManager(nil)
-		fn, ok := manager.getHandlerFunc(0, "/test")
+		fn, ok := manager.getExecuteFunc(0, "/test")
 		if fn != nil || ok {
 			t.Fatalf("expected [nil, false], actual [%p %t]\n", fn, ok)
 		}
@@ -41,7 +41,7 @@ func TestGetHandlerFunc(t *testing.T) {
 	t.Run("Found", func(t *testing.T) {
 		manager := NewManager(nil)
 		manager.AddCommands(new(TestCommand))
-		fn, ok := manager.getHandlerFunc(0, "/test")
+		fn, ok := manager.getExecuteFunc(0, "/test")
 		if fn == nil || !ok {
 			t.Fatalf("expected [nil, false], actual [%p %t]\n", fn, ok)
 		}
