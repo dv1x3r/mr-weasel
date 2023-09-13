@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"sync"
 
@@ -25,6 +26,10 @@ func (SeparateSongCommand) Description() string {
 }
 
 func (c *SeparateSongCommand) Execute(ctx context.Context, pl Payload) {
+	c.startProcessing(ctx, pl, "smash.mp3")
+}
+
+func (c *SeparateSongCommand) startProcessing(ctx context.Context, pl Payload, fileName string) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
@@ -32,7 +37,11 @@ func (c *SeparateSongCommand) Execute(ctx context.Context, pl Payload) {
 		defer wg.Done()
 		if c.queue.Lock() {
 			defer c.queue.Unlock()
-			c.python(pl)
+			if err := c.runPython(ctx, fileName); err != nil {
+				pl.ResultChan <- Result{Text: "Failed!", Error: err}
+			} else {
+				pl.ResultChan <- Result{Text: "Done!"}
+			}
 		} else {
 			pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
 		}
@@ -40,18 +49,19 @@ func (c *SeparateSongCommand) Execute(ctx context.Context, pl Payload) {
 
 	pl.ResultChan <- Result{Text: "background job probably started"}
 	wg.Wait()
+
 }
 
-func (c *SeparateSongCommand) python(pl Payload) {
-	path, err := exec.LookPath("sleep")
-	if err != nil {
-		pl.ResultChan <- Result{Text: "Command failed successfully!", Error: err}
-	}
-	cmd := exec.Command(path, "5")
-	err = cmd.Run()
-	if err != nil {
-		pl.ResultChan <- Result{Text: "Command failed successfully!", Error: err}
-	} else {
-		pl.ResultChan <- Result{Text: "Done!"}
-	}
+func (c *SeparateSongCommand) runPython(ctx context.Context, fileName string) error {
+	cmd := exec.CommandContext(
+		ctx,
+		"/home/dx/source/audio-separator/.venv/bin/python",
+		"/home/dx/source/audio-separator/cli.py",
+		"/home/dx/source/audio-separator/tracks/"+fileName,
+		"--model_file_dir=/home/dx/source/audio-separator/models/",
+		"--output_dir=/home/dx/source/audio-separator/tracks/",
+		"--use_cuda",
+	)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	return cmd.Run()
 }
