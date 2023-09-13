@@ -10,16 +10,11 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"mr-weasel/utils"
 )
 
 const apiEndpoint = "https://api.telegram.org/bot%s/%s"
-
-func wrapIfErr(msg string, err error) error {
-	if err != nil {
-		return fmt.Errorf("%s: %w", msg, err)
-	}
-	return nil
-}
 
 type Client struct {
 	client *http.Client
@@ -36,14 +31,14 @@ func NewClient(token string, debug bool) *Client {
 }
 
 func (c *Client) Connect() (*Client, error) {
-	const op = "telegram.Connect"
+	const op = "telegram.Client.Connect"
 	me, err := c.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
 		log.Println("[ERROR] Failed to start the bot")
 	} else {
 		log.Printf("[INFO] Logged in as [%s]\n", me.Username)
 	}
-	return c, wrapIfErr(op, err)
+	return c, utils.WrapIfErr(op, err)
 }
 
 func (c *Client) MustConnect() *Client {
@@ -57,42 +52,42 @@ func (c *Client) MustConnect() *Client {
 func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 	const op = "telegram.Client.GetMe"
 	value, err := executeMethod[User](ctx, c, cfg)
-	return value, wrapIfErr(op, err)
+	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
 func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
 	const op = "telegram.Client.GetUpdates"
 	value, err := executeMethod[[]Update](ctx, c, cfg)
-	return value, wrapIfErr(op, err)
+	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
 	const op = "telegram.Client.SendMessage"
 	value, err := executeMethod[Message](ctx, c, cfg)
-	return value, wrapIfErr(op, err)
+	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
 	const op = "telegram.Client.EditMessageText"
 	value, err := executeMethod[Message](ctx, c, cfg)
-	return value, wrapIfErr(op, err)
+	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to send answers to callback queries sent from inline keyboards. The answer will be displayed to the user as a notification at the top of the chat screen or as an alert. On success, True is returned.
 func (c *Client) AnswerCallbackQuery(ctx context.Context, cfg AnswerCallbackQueryConfig) (bool, error) {
 	const op = "telegram.Client.AnswerCallbackQuery"
 	value, err := executeMethod[bool](ctx, c, cfg)
-	return value, wrapIfErr(op, err)
+	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
 	const op = "telegram.Client.SetMyCommands"
 	value, err := executeMethod[bool](ctx, c, cfg)
-	return value, wrapIfErr(op, err)
+	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to receive incoming updates using long polling. Starts a background goroutine, and returns a Channel with Update objects.

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"mr-weasel/utils"
@@ -23,17 +24,21 @@ func (PythonCommand) Description() string {
 	return "test long running command"
 }
 
-func (c *PythonCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
-	resultChan := make(chan Result)
+func (c *PythonCommand) Execute(ctx context.Context, pl Payload) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
 	go func() {
+		defer wg.Done()
 		if !c.queue.Lock() {
-			resultChan <- Result{Text: "There are too many queued jobs, please wait."}
+			pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
 			return
 		}
 		defer c.queue.Unlock()
 		time.Sleep(10 * time.Second)
-		resultChan <- Result{Text: "Done, fuck you!"}
+		pl.ResultChan <- Result{Text: "Done, fuck you!"}
 	}()
 
-	return Result{Text: "background job probably started", ResultChan: resultChan}, nil
+	pl.ResultChan <- Result{Text: "background job probably started"}
+	wg.Wait()
 }
