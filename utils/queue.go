@@ -1,18 +1,14 @@
 package utils
 
 type Queue struct {
-	maxQueue    int
-	maxParallel int
-	queueChan   chan int
-	execChan    chan int
+	queueChan chan int
+	execChan  chan int
 }
 
-func NewQueue(maxQueue int, maxParallel int) *Queue {
+func NewQueue(queueBuffer, execBuffer int) *Queue {
 	return &Queue{
-		maxQueue:    maxQueue,
-		maxParallel: maxParallel,
-		queueChan:   make(chan int, maxQueue),
-		execChan:    make(chan int, maxParallel),
+		queueChan: make(chan int, queueBuffer),
+		execChan:  make(chan int, execBuffer),
 	}
 }
 

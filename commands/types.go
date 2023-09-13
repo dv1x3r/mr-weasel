@@ -8,24 +8,25 @@ import (
 	"time"
 )
 
+type ExecuteFunc = func(context.Context, Payload)
+
 type Handler interface {
 	Prefix() string
 	Description() string
-	Execute(context.Context, Payload) (Result, error)
+	Execute(context.Context, Payload)
 }
 
-type HandlerFunc = func(context.Context, Payload) (Result, error)
-
 type Payload struct {
-	UserID  int64
-	Command string
+	UserID     int64
+	Command    string
+	ResultChan chan Result
 }
 
 type Result struct {
-	Text       string
-	State      HandlerFunc
-	Keyboard   [][]Button
-	ResultChan chan Result
+	Text     string
+	State    ExecuteFunc
+	Keyboard [][]Button
+	Error    error
 }
 
 type Button struct {

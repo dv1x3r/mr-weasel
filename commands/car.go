@@ -62,53 +62,53 @@ const (
 	cmdCarLeaseDelYes   = "lease_del_yes"
 )
 
-func (c *CarCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
 	case cmdCarAdd:
-		return c.addCarStart(ctx, pl)
+		c.addCarStart(ctx, pl)
 	case cmdCarGet:
-		return c.showCarDetails(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.showCarDetails(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarUpd:
-		return c.showCarUpdate(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.showCarUpdate(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarUpdName:
-		return c.updateCarAskName(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.updateCarAskName(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarUpdYear:
-		return c.updateCarAskYear(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.updateCarAskYear(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarUpdPlate:
-		return c.updateCarAskPlate(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.updateCarAskPlate(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarUpdPrice:
-		return c.updateCarAskPrice(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.updateCarAskPrice(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarDelAsk:
-		return c.deleteCarAsk(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.deleteCarAsk(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarDelYes:
-		return c.deleteCarConfirm(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.deleteCarConfirm(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarFuelAdd:
-		return c.addFuelStart(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.addFuelStart(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarFuelGet:
-		return c.showFuelDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.showFuelDetails(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarFuelDelAsk:
-		return c.deleteFuelAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.deleteFuelAsk(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarFuelDelYes:
-		return c.deleteFuelConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.deleteFuelConfirm(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarServiceAdd:
-		return c.addServiceStart(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.addServiceStart(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarServiceGet:
-		return c.showServiceDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.showServiceDetails(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarServiceDelAsk:
-		return c.deleteServiceAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.deleteServiceAsk(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarServiceDelYes:
-		return c.deleteServiceConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.deleteServiceConfirm(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarLeaseAdd:
-		return c.addLeaseStart(ctx, pl.UserID, safeGetInt64(args, 1))
+		c.addLeaseStart(ctx, pl, safeGetInt64(args, 1))
 	case cmdCarLeaseGet:
-		return c.showLeaseDetails(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.showLeaseDetails(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarLeaseDelAsk:
-		return c.deleteLeaseAsk(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.deleteLeaseAsk(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdCarLeaseDelYes:
-		return c.deleteLeaseConfirm(ctx, pl.UserID, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.deleteLeaseConfirm(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	default:
-		return c.showCarList(ctx, pl.UserID)
+		c.showCarList(ctx, pl)
 	}
 }
 
@@ -128,29 +128,31 @@ func (c *CarCommand) formatCarDetails(car st.CarDetails) string {
 	return html
 }
 
-func (c *CarCommand) showCarDetails(ctx context.Context, userID int64, carID int64) (Result, error) {
-	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
+func (c *CarCommand) showCarDetails(ctx context.Context, pl Payload, carID int64) {
+	res := Result{}
+	car, err := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Result{Text: "Car not found."}, nil
+		res.Text = "Car not found."
 	} else if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		res.Text, res.Error = "There is something wrong, please try again.", err
+	} else {
+		res.Text = c.formatCarDetails(car)
+		res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
+		res.AddKeyboardButton("Service", commandf(c, cmdCarServiceGet, carID))
+		res.AddKeyboardButton("Lease", commandf(c, cmdCarLeaseGet, carID))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
+		res.AddKeyboardRow()
 	}
-
-	res := Result{Text: c.formatCarDetails(car)}
-	res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
-	res.AddKeyboardButton("Service", commandf(c, cmdCarServiceGet, carID))
-	res.AddKeyboardButton("Lease", commandf(c, cmdCarLeaseGet, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
-	res.AddKeyboardRow()
 	res.AddKeyboardButton("« Back to my cars", c.Prefix())
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, error) {
-	cars, err := c.storage.SelectCarsFromDB(ctx, userID)
+func (c *CarCommand) showCarList(ctx context.Context, pl Payload) {
+	cars, err := c.storage.SelectCarsFromDB(ctx, pl.UserID)
 	if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		return
 	}
 
 	res := Result{Text: "Choose your car from the list below:"}
@@ -162,7 +164,7 @@ func (c *CarCommand) showCarList(ctx context.Context, userID int64) (Result, err
 	}
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("« New Car »", commandf(c, cmdCarAdd, nil))
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) fetchDraftCarFromDB(ctx context.Context, userID int64, carID int64) error {
@@ -216,157 +218,172 @@ func (c *CarCommand) setDraftCarPrice(userID int64, input string) error {
 	}
 }
 
-func (c *CarCommand) addCarStart(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addCarStart(ctx context.Context, pl Payload) {
 	c.newDraftCar(pl.UserID)
-	return Result{Text: "Please choose a name for your car.", State: c.addCarName}, nil
+	pl.ResultChan <- Result{Text: "Please choose a name for your car.", State: c.addCarName}
 }
 
-func (c *CarCommand) addCarName(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addCarName(ctx context.Context, pl Payload) {
 	c.setDraftCarName(pl.UserID, pl.Command)
-	return Result{Text: "What is the model year?", State: c.addCarYear}, nil
+	pl.ResultChan <- Result{Text: "What is the model year?", State: c.addCarYear}
 }
 
-func (c *CarCommand) addCarYear(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addCarYear(ctx context.Context, pl Payload) {
 	if err := c.setDraftCarYear(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid number.", State: c.addCarYear}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid number.", State: c.addCarYear}
+	} else {
+		pl.ResultChan <- Result{Text: "What is your plate number? /skip", State: c.addCarPlate}
 	}
-	return Result{Text: "What is your plate number? /skip", State: c.addCarPlate}, nil
 }
 
-func (c *CarCommand) addCarPlate(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addCarPlate(ctx context.Context, pl Payload) {
 	c.setDraftCarPlate(pl.UserID, pl.Command)
-	return Result{Text: "What is the price? /skip", State: c.addCarPriceAndSave}, nil
+	pl.ResultChan <- Result{Text: "What is the price? /skip", State: c.addCarPriceAndSave}
 }
 
-func (c *CarCommand) addCarPriceAndSave(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addCarPriceAndSave(ctx context.Context, pl Payload) {
 	if err := c.setDraftCarPrice(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid number.", State: c.addCarPriceAndSave}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid number.", State: c.addCarPriceAndSave}
+		return
 	}
 	carID, err := c.insertDraftCarIntoDB(ctx, pl.UserID)
 	if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		return
 	}
-	return c.showCarDetails(ctx, pl.UserID, carID)
+	c.showCarDetails(ctx, pl, carID)
 }
 
-func (c *CarCommand) showCarUpdate(ctx context.Context, userID int64, carID int64) (Result, error) {
-	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
+func (c *CarCommand) showCarUpdate(ctx context.Context, pl Payload, carID int64) {
+	res := Result{}
+	car, err := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Result{Text: "Car not found."}, nil
+		res.Text = "Car not found."
 	} else if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		res.Text, res.Error = "There is something wrong, please try again.", err
+	} else {
+		res.Text = c.formatCarDetails(car)
+		res.AddKeyboardButton("Set Name", commandf(c, cmdCarUpdName, carID))
+		res.AddKeyboardButton("Set Year", commandf(c, cmdCarUpdYear, carID))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Set Plate", commandf(c, cmdCarUpdPlate, carID))
+		res.AddKeyboardButton("Set Price", commandf(c, cmdCarUpdPrice, carID))
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
+		res.AddKeyboardRow()
 	}
-
-	res := Result{Text: c.formatCarDetails(car)}
-	res.AddKeyboardButton("Set Name", commandf(c, cmdCarUpdName, carID))
-	res.AddKeyboardButton("Set Year", commandf(c, cmdCarUpdYear, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Set Plate", commandf(c, cmdCarUpdPlate, carID))
-	res.AddKeyboardButton("Set Price", commandf(c, cmdCarUpdPrice, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
-	res.AddKeyboardRow()
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) updateCarAskName(ctx context.Context, userID int64, carID int64) (Result, error) {
-	if err := c.fetchDraftCarFromDB(ctx, userID, carID); err != nil {
-		return Result{Text: "Car not found."}, err
+func (c *CarCommand) updateCarAskName(ctx context.Context, pl Payload, carID int64) {
+	if err := c.fetchDraftCarFromDB(ctx, pl.UserID, carID); err != nil {
+		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
+	} else {
+		pl.ResultChan <- Result{Text: "What is the new car name?", State: c.updateCarSaveName}
 	}
-	return Result{Text: "What is the new car name?", State: c.updateCarSaveName}, nil
 }
 
-func (c *CarCommand) updateCarAskYear(ctx context.Context, userID int64, carID int64) (Result, error) {
-	if err := c.fetchDraftCarFromDB(ctx, userID, carID); err != nil {
-		return Result{Text: "Car not found."}, err
+func (c *CarCommand) updateCarAskYear(ctx context.Context, pl Payload, carID int64) {
+	if err := c.fetchDraftCarFromDB(ctx, pl.UserID, carID); err != nil {
+		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
+	} else {
+		pl.ResultChan <- Result{Text: "What is the new car year?", State: c.updateCarSaveYear}
 	}
-	return Result{Text: "What is the new car year?", State: c.updateCarSaveYear}, nil
 }
 
-func (c *CarCommand) updateCarAskPlate(ctx context.Context, userID int64, carID int64) (Result, error) {
-	if err := c.fetchDraftCarFromDB(ctx, userID, carID); err != nil {
-		return Result{Text: "Car not found."}, err
+func (c *CarCommand) updateCarAskPlate(ctx context.Context, pl Payload, carID int64) {
+	if err := c.fetchDraftCarFromDB(ctx, pl.UserID, carID); err != nil {
+		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
+	} else {
+		pl.ResultChan <- Result{Text: "What is the new car plate? /skip", State: c.updateCarSavePlate}
 	}
-	return Result{Text: "What is the new car plate? /skip", State: c.updateCarSavePlate}, nil
 }
 
-func (c *CarCommand) updateCarAskPrice(ctx context.Context, userID int64, carID int64) (Result, error) {
-	if err := c.fetchDraftCarFromDB(ctx, userID, carID); err != nil {
-		return Result{Text: "Car not found."}, err
+func (c *CarCommand) updateCarAskPrice(ctx context.Context, pl Payload, carID int64) {
+	if err := c.fetchDraftCarFromDB(ctx, pl.UserID, carID); err != nil {
+		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
+	} else {
+		pl.ResultChan <- Result{Text: "What is the new car price? /skip", State: c.updateCarSavePrice}
 	}
-	return Result{Text: "What is the new car price? /skip", State: c.updateCarSavePrice}, nil
 }
 
-func (c *CarCommand) updateCarSaveName(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) updateCarSaveName(ctx context.Context, pl Payload) {
 	c.setDraftCarName(pl.UserID, pl.Command)
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "Update failed, try again."}, err
+		pl.ResultChan <- Result{Text: "Update failed, try again.", Error: err}
+		return
 	}
 	res := Result{Text: "Car name has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) updateCarSaveYear(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) updateCarSaveYear(ctx context.Context, pl Payload) {
 	if err := c.setDraftCarYear(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid number.", State: c.updateCarSaveYear}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid number.", State: c.updateCarSaveYear}
+		return
 	}
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "Update failed, try again."}, err
+		pl.ResultChan <- Result{Text: "Update failed, try again.", Error: err}
+		return
 	}
 	res := Result{Text: "Car year has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) updateCarSavePlate(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) updateCarSavePlate(ctx context.Context, pl Payload) {
 	c.setDraftCarPlate(pl.UserID, pl.Command)
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "Update failed, try again."}, err
+		pl.ResultChan <- Result{Text: "Update failed, try again.", Error: err}
+		return
 	}
 	res := Result{Text: "Car plate has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) {
 	c.setDraftCarPrice(pl.UserID, pl.Command)
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "Update failed, try again."}, err
+		pl.ResultChan <- Result{Text: "Update failed, try again.", Error: err}
+		return
 	}
 	res := Result{Text: "Car price has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) deleteCarAsk(ctx context.Context, userID int64, carID int64) (Result, error) {
-	car, err := c.storage.GetCarFromDB(ctx, userID, carID)
+func (c *CarCommand) deleteCarAsk(ctx context.Context, pl Payload, carID int64) {
+	car, err := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	if err != nil {
-		return Result{Text: "Car not found."}, err
+		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
+		return
 	}
-
 	res := Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)?", car.Name, car.Year)}
 	res.AddKeyboardButton("Yes, delete the car", commandf(c, cmdCarDelYes, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("No", commandf(c, cmdCarGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) deleteCarConfirm(ctx context.Context, userID int64, carID int64) (Result, error) {
-	affected, err := c.storage.DeleteCarFromDB(ctx, userID, carID)
+func (c *CarCommand) deleteCarConfirm(ctx context.Context, pl Payload, carID int64) {
+	res := Result{}
+	affected, err := c.storage.DeleteCarFromDB(ctx, pl.UserID, carID)
 	if err != nil || affected != 1 {
-		return Result{Text: "Car not found."}, err
+		res.Text, res.Error = "Car not found.", err
+	} else {
+		res.Text = "Car has been successfully deleted!"
 	}
-	res := Result{Text: "Car has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my cars", c.Prefix())
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
@@ -378,13 +395,13 @@ func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
 	return html
 }
 
-func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID int64, offset int64) (Result, error) {
+func (c *CarCommand) showFuelDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
 	res := Result{}
-	fuel, err := c.storage.GetFuelFromDB(ctx, userID, carID, offset)
+	fuel, err := c.storage.GetFuelFromDB(ctx, pl.UserID, carID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "No fuel receipts found."
 	} else if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatFuelDetails(fuel)
 		res.AddKeyboardPagination(offset, fuel.CountRows, commandf(c, cmdCarFuelGet, carID))
@@ -393,9 +410,9 @@ func (c *CarCommand) showFuelDetails(ctx context.Context, userID int64, carID in
 	}
 	res.AddKeyboardButton("Add", commandf(c, cmdCarFuelAdd, carID))
 	res.AddKeyboardRow()
-	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
+	car, _ := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) insertDraftFuelIntoDB(ctx context.Context, userID int64) (int64, error) {
@@ -434,73 +451,81 @@ func (c *CarCommand) setDraftFuelEuros(userID int64, input string) error {
 	return err
 }
 
-func (c *CarCommand) addFuelStart(ctx context.Context, userID int64, carID int64) (Result, error) {
-	c.newDraftFuel(userID, carID)
+func (c *CarCommand) addFuelStart(ctx context.Context, pl Payload, carID int64) {
+	c.newDraftFuel(pl.UserID, carID)
 	res := Result{Text: "Please pick a receipt date.", State: c.addFuelTimestamp}
 	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		return res, nil
-	} else if c.setDraftFuelTimestamp(pl.UserID, pl.Command) != nil {
-		return res, nil
+		pl.ResultChan <- res
+		return
 	}
-
+	if c.setDraftFuelTimestamp(pl.UserID, pl.Command) != nil {
+		pl.ResultChan <- res
+		return
+	}
 	res.Text, res.State = "What is the fuel type?", c.addFuelType
 	res.AddKeyboardRow() // remove calendar keyboard
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) addFuelType(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addFuelType(ctx context.Context, pl Payload) {
 	c.setDraftFuelType(pl.UserID, pl.Command)
-	return Result{Text: "What is the fuel amount in Liters?", State: c.addFuelLiters}, nil
+	pl.ResultChan <- Result{Text: "What is the fuel amount in Liters?", State: c.addFuelLiters}
 }
 
-func (c *CarCommand) addFuelLiters(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addFuelLiters(ctx context.Context, pl Payload) {
 	if err := c.setDraftFuelLiters(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid decimal number.", State: c.addFuelLiters}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid decimal number.", State: c.addFuelLiters}
+	} else {
+		pl.ResultChan <- Result{Text: "What is your total mileage now in Kilometers?", State: c.addFuelKilometers}
 	}
-	return Result{Text: "What is your total mileage now in Kilometers?", State: c.addFuelKilometers}, nil
 }
 
-func (c *CarCommand) addFuelKilometers(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addFuelKilometers(ctx context.Context, pl Payload) {
 	if err := c.setDraftFuelKilometers(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid whole number.", State: c.addFuelKilometers}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid whole number.", State: c.addFuelKilometers}
+	} else {
+		pl.ResultChan <- Result{Text: "How much money did you spend in Euros?", State: c.addFuelEurosAndSave}
 	}
-	return Result{Text: "How much money did you spend in Euros?", State: c.addFuelEurosAndSave}, nil
 }
 
-func (c *CarCommand) addFuelEurosAndSave(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addFuelEurosAndSave(ctx context.Context, pl Payload) {
 	if err := c.setDraftFuelEuros(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid decimal number.", State: c.addFuelEurosAndSave}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid decimal number.", State: c.addFuelEurosAndSave}
+		return
 	}
 	if _, err := c.insertDraftFuelIntoDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		return
 	}
-	return c.showFuelDetails(ctx, pl.UserID, c.draftFuel[pl.UserID].CarID, 0)
+	c.showFuelDetails(ctx, pl, c.draftFuel[pl.UserID].CarID, 0)
 }
 
-func (c *CarCommand) deleteFuelAsk(ctx context.Context, userID int64, carID int64, fuelID int64) (Result, error) {
+func (c *CarCommand) deleteFuelAsk(ctx context.Context, pl Payload, carID int64, fuelID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
 	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarFuelDelYes, carID, fuelID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("No", commandf(c, cmdCarFuelGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarFuelGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) deleteFuelConfirm(ctx context.Context, userID int64, carID int64, fuelID int64) (Result, error) {
-	affected, err := c.storage.DeleteFuelFromDB(ctx, userID, fuelID)
+func (c *CarCommand) deleteFuelConfirm(ctx context.Context, pl Payload, carID int64, fuelID int64) {
+	res := Result{}
+	affected, err := c.storage.DeleteFuelFromDB(ctx, pl.UserID, fuelID)
 	if err != nil || affected != 1 {
-		return Result{Text: "Receipt not found."}, err
+		res.Text, res.Error = "Receipt not found.", err
+	} else {
+		res.Text = "Receipt has been successfully deleted!"
 	}
-	res := Result{Text: "Receipt has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) formatServiceDetails(service st.ServiceDetails) string {
@@ -510,13 +535,13 @@ func (c *CarCommand) formatServiceDetails(service st.ServiceDetails) string {
 	return html
 }
 
-func (c *CarCommand) showServiceDetails(ctx context.Context, userID int64, carID int64, offset int64) (Result, error) {
+func (c *CarCommand) showServiceDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
 	res := Result{}
-	service, err := c.storage.GetServiceFromDB(ctx, userID, carID, offset)
+	service, err := c.storage.GetServiceFromDB(ctx, pl.UserID, carID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "No service receipts found."
 	} else if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatServiceDetails(service)
 		res.AddKeyboardPagination(offset, service.CountRows, commandf(c, cmdCarServiceGet, carID))
@@ -525,9 +550,9 @@ func (c *CarCommand) showServiceDetails(ctx context.Context, userID int64, carID
 	}
 	res.AddKeyboardButton("Add", commandf(c, cmdCarServiceAdd, carID))
 	res.AddKeyboardRow()
-	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
+	car, _ := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) insertDraftServiceIntoDB(ctx context.Context, userID int64) (int64, error) {
@@ -554,59 +579,65 @@ func (c *CarCommand) setDraftServiceEuros(userID int64, input string) error {
 	return err
 }
 
-func (c *CarCommand) addServiceStart(ctx context.Context, userID int64, carID int64) (Result, error) {
-	c.newDraftService(userID, carID)
+func (c *CarCommand) addServiceStart(ctx context.Context, pl Payload, carID int64) {
+	c.newDraftService(pl.UserID, carID)
 	res := Result{Text: "Please pick a receipt date.", State: c.addServiceTimestamp}
 	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		return res, nil
-	} else if c.setDraftServiceTimestamp(pl.UserID, pl.Command) != nil {
-		return res, nil
+		pl.ResultChan <- res
+		return
 	}
-
+	if c.setDraftServiceTimestamp(pl.UserID, pl.Command) != nil {
+		pl.ResultChan <- res
+		return
+	}
 	res.Text, res.State = "Provide service description.", c.addServiceDescription
 	res.AddKeyboardRow() // remove calendar keyboard
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) addServiceDescription(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addServiceDescription(ctx context.Context, pl Payload) {
 	c.setDraftServiceDescription(pl.UserID, pl.Command)
-	return Result{Text: "How much money did you spend in Euros?", State: c.addServiceEurosAndSave}, nil
+	pl.ResultChan <- Result{Text: "How much money did you spend in Euros?", State: c.addServiceEurosAndSave}
 }
 
-func (c *CarCommand) addServiceEurosAndSave(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addServiceEurosAndSave(ctx context.Context, pl Payload) {
 	if err := c.setDraftServiceEuros(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid decimal number.", State: c.addServiceEurosAndSave}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid decimal number.", State: c.addServiceEurosAndSave}
+		return
 	}
 	if _, err := c.insertDraftServiceIntoDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		return
 	}
-	return c.showServiceDetails(ctx, pl.UserID, c.draftService[pl.UserID].CarID, 0)
+	c.showServiceDetails(ctx, pl, c.draftService[pl.UserID].CarID, 0)
 }
 
-func (c *CarCommand) deleteServiceAsk(ctx context.Context, userID int64, carID int64, serviceID int64) (Result, error) {
+func (c *CarCommand) deleteServiceAsk(ctx context.Context, pl Payload, carID int64, serviceID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
 	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarServiceDelYes, carID, serviceID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("No", commandf(c, cmdCarServiceGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarServiceGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) deleteServiceConfirm(ctx context.Context, userID int64, carID int64, serviceID int64) (Result, error) {
-	affected, err := c.storage.DeleteServiceFromDB(ctx, userID, serviceID)
+func (c *CarCommand) deleteServiceConfirm(ctx context.Context, pl Payload, carID int64, serviceID int64) {
+	res := Result{}
+	affected, err := c.storage.DeleteServiceFromDB(ctx, pl.UserID, serviceID)
 	if err != nil || affected != 1 {
-		return Result{Text: "Receipt not found."}, err
+		res.Text, res.Error = "Receipt not found.", err
+	} else {
+		res.Text = "Receipt has been successfully deleted!"
 	}
-	res := Result{Text: "Receipt has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarServiceGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
@@ -618,13 +649,13 @@ func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
 	return html
 }
 
-func (c *CarCommand) showLeaseDetails(ctx context.Context, userID int64, carID int64, offset int64) (Result, error) {
+func (c *CarCommand) showLeaseDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
 	res := Result{}
-	lease, err := c.storage.GetLeaseFromDB(ctx, userID, carID, offset)
+	lease, err := c.storage.GetLeaseFromDB(ctx, pl.UserID, carID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "No lease receipts found."
 	} else if err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatLeaseDetails(lease)
 		res.AddKeyboardPagination(offset, lease.CountRows, commandf(c, cmdCarLeaseGet, carID))
@@ -633,9 +664,9 @@ func (c *CarCommand) showLeaseDetails(ctx context.Context, userID int64, carID i
 	}
 	res.AddKeyboardButton("Add", commandf(c, cmdCarLeaseAdd, carID))
 	res.AddKeyboardRow()
-	car, _ := c.storage.GetCarFromDB(ctx, userID, carID)
+	car, _ := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
 func (c *CarCommand) insertDraftLeaseIntoDB(ctx context.Context, userID int64) (int64, error) {
@@ -667,57 +698,62 @@ func (c *CarCommand) setDraftLeaseEuros(userID int64, input string) error {
 	return err
 }
 
-func (c *CarCommand) addLeaseStart(ctx context.Context, userID int64, carID int64) (Result, error) {
-	c.newDraftLease(userID, carID)
+func (c *CarCommand) addLeaseStart(ctx context.Context, pl Payload, carID int64) {
+	c.newDraftLease(pl.UserID, carID)
 	res := Result{Text: "Please pick a receipt date.", State: c.addLeaseTimestamp}
 	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		return res, nil
+		pl.ResultChan <- res
+		return
 	} else if c.setDraftLeaseTimestamp(pl.UserID, pl.Command) != nil {
-		return res, nil
+		pl.ResultChan <- res
+		return
 	}
-
 	res.Text, res.State = "Provide lease description. /skip", c.addLeaseDescription
 	res.AddKeyboardRow() // remove calendar keyboard
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) addLeaseDescription(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addLeaseDescription(ctx context.Context, pl Payload) {
 	c.setDraftLeaseDescription(pl.UserID, pl.Command)
-	return Result{Text: "How much money did you spend in Euros?", State: c.addLeaseEurosAndSave}, nil
+	pl.ResultChan <- Result{Text: "How much money did you spend in Euros?", State: c.addLeaseEurosAndSave}
 }
 
-func (c *CarCommand) addLeaseEurosAndSave(ctx context.Context, pl Payload) (Result, error) {
+func (c *CarCommand) addLeaseEurosAndSave(ctx context.Context, pl Payload) {
 	if err := c.setDraftLeaseEuros(pl.UserID, pl.Command); err != nil {
-		return Result{Text: "Please enter a valid decimal number.", State: c.addLeaseEurosAndSave}, nil
+		pl.ResultChan <- Result{Text: "Please enter a valid decimal number.", State: c.addLeaseEurosAndSave}
+		return
 	}
 	if _, err := c.insertDraftLeaseIntoDB(ctx, pl.UserID); err != nil {
-		return Result{Text: "There is something wrong, please try again."}, err
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		return
 	}
-	return c.showLeaseDetails(ctx, pl.UserID, c.draftLease[pl.UserID].CarID, 0)
+	c.showLeaseDetails(ctx, pl, c.draftLease[pl.UserID].CarID, 0)
 }
 
-func (c *CarCommand) deleteLeaseAsk(ctx context.Context, userID int64, carID int64, leaseID int64) (Result, error) {
+func (c *CarCommand) deleteLeaseAsk(ctx context.Context, pl Payload, carID int64, leaseID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
 	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarLeaseDelYes, carID, leaseID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("No", commandf(c, cmdCarLeaseGet, carID))
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarLeaseGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }
 
-func (c *CarCommand) deleteLeaseConfirm(ctx context.Context, userID int64, carID int64, leaseID int64) (Result, error) {
-	affected, err := c.storage.DeleteLeaseFromDB(ctx, userID, leaseID)
+func (c *CarCommand) deleteLeaseConfirm(ctx context.Context, pl Payload, carID int64, leaseID int64) {
+	res := Result{}
+	affected, err := c.storage.DeleteLeaseFromDB(ctx, pl.UserID, leaseID)
 	if err != nil || affected != 1 {
-		return Result{Text: "Receipt not found."}, err
+		res.Text, res.Error = "Receipt not found.", err
+	} else {
+		res.Text = "Receipt has been successfully deleted!"
 	}
-	res := Result{Text: "Receipt has been successfully deleted!"}
 	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarLeaseGet, carID))
-	return res, nil
+	pl.ResultChan <- res
 }

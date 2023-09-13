@@ -6,19 +6,20 @@ import (
 	"strings"
 
 	"mr-weasel/commands"
+	"mr-weasel/utils"
 )
 
 type Manager struct {
 	client   *Client                        // Telegram API Client
 	handlers map[string]commands.Handler    // Map of registered command handlers.
-	states   map[int64]commands.HandlerFunc // Map of active user states.
+	states   map[int64]commands.ExecuteFunc // Map of active user states.
 }
 
 func NewManager(client *Client) *Manager {
 	return &Manager{
 		client:   client,
 		handlers: make(map[string]commands.Handler),
-		states:   make(map[int64]commands.HandlerFunc),
+		states:   make(map[int64]commands.ExecuteFunc),
 	}
 }
 
@@ -31,6 +32,7 @@ func (m *Manager) AddCommands(handlers ...commands.Handler) {
 }
 
 func (m *Manager) PublishCommands() {
+	const op = "telegram.Manager.PublishCommands"
 	botCommands := make([]BotCommand, 0, len(m.handlers))
 	for _, handler := range m.handlers {
 		botCommands = append(botCommands, BotCommand{
@@ -42,7 +44,7 @@ func (m *Manager) PublishCommands() {
 	cfg := SetMyCommandsConfig{Commands: botCommands}
 	_, err := m.client.SetMyCommands(context.Background(), cfg)
 	if err != nil {
-		log.Println("[ERROR]", err)
+		log.Println("[ERROR]", utils.WrapIfErr(op, err))
 	}
 }
 
@@ -70,116 +72,150 @@ func (m *Manager) processUpdate(ctx context.Context, update Update) {
 }
 
 func (m *Manager) processMessage(ctx context.Context, message Message) {
-	pl := commands.Payload{UserID: message.From.ID, Command: message.Text}
-	res, err := m.executeCommand(ctx, pl)
-	if err != nil {
-		log.Println("[ERROR]", err)
+	const op = "telegram.Manager.processMessage"
+	pl := commands.Payload{
+		UserID:     message.From.ID,
+		Command:    message.Text,
+		ResultChan: make(chan commands.Result),
 	}
 
-	// If it is normal message, user can change and escape states
-	m.setState(pl.UserID, res.State, true)
-
-	// Skip if there is no response text
-	if res.Text == "" {
+	fn, ok := m.getExecuteFunc(pl.UserID, pl.Command)
+	if !ok {
 		return
 	}
 
-	botMessage, err := m.client.SendMessage(ctx, SendMessageConfig{
-		ChatID:      message.Chat.ID,
-		Text:        res.Text,
-		ParseMode:   "HTML",
-		ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
-	})
-	if err != nil {
-		log.Println("[ERROR]", err)
-	}
+	go func() {
+		defer close(pl.ResultChan)
+		fn(ctx, pl)
+	}()
 
-	if res.ResultChan != nil {
-		go func() {
-			res = <-res.ResultChan
-			_, err = m.client.SendMessage(ctx, SendMessageConfig{
-				ChatID:           botMessage.Chat.ID,
-				Text:             res.Text,
+	go func() {
+		var previousResponse Message
+		var err error
+
+		for result := range pl.ResultChan {
+
+			if result.Error != nil {
+				log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
+			}
+
+			if result.State != nil {
+				m.states[pl.UserID] = result.State
+			} else if previousResponse.MessageID == 0 {
+				// Only the root response can clear the state
+				delete(m.states, pl.UserID)
+			}
+
+			if result.Text == "" {
+				continue
+			}
+
+			previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
+				ChatID:           message.Chat.ID,
+				Text:             result.Text,
 				ParseMode:        "HTML",
-				ReplyMarkup:      m.commandKeyboardToInlineMarkup(res.Keyboard),
-				ReplyToMessageId: botMessage.MessageID,
+				ReplyMarkup:      m.commandKeyboardToInlineMarkup(result.Keyboard),
+				ReplyToMessageId: previousResponse.MessageID,
 			})
 			if err != nil {
-				log.Println("[ERROR]", err)
+				log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			}
-		}()
-	}
+
+		}
+	}()
 }
 
 func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
-	pl := commands.Payload{UserID: callbackQuery.From.ID, Command: callbackQuery.Data}
-	res, err := m.executeCommand(ctx, pl)
-	if err != nil {
-		log.Println("[ERROR]", err)
+	const op = "telegram.Manager.processCallbackQuery"
+	pl := commands.Payload{
+		UserID:     callbackQuery.From.ID,
+		Command:    callbackQuery.Data,
+		ResultChan: make(chan commands.Result),
 	}
 
-	// If it is callback event, user can change state only
-	// If it is callback event, user can't clear his current state
-	m.setState(pl.UserID, res.State, false)
-
-	_, err = m.client.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
-	if err != nil {
-		log.Println("[ERROR]", err)
-	}
-
-	// Skip if there is no text and keyboard
-	if res.Text == "" && res.Keyboard == nil {
+	fn, ok := m.getExecuteFunc(pl.UserID, pl.Command)
+	if !ok {
 		return
 	}
 
-	// If result text is empty, then use the original value
-	if res.Text == "" {
-		res.Text = callbackQuery.Message.Text
+	// Answer to the callback query just to dismiss "Loading..." prompt on the top
+	_, err := m.client.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
+	if err != nil {
+		log.Println("[ERROR]", utils.WrapIfErr(op, err))
 	}
 
-	var botMessage Message
+	go func() {
+		defer close(pl.ResultChan)
+		fn(ctx, pl)
+	}()
 
-	if res.Keyboard != nil {
-		botMessage, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
-			ChatID:      callbackQuery.Message.Chat.ID,
-			MessageID:   callbackQuery.Message.MessageID,
-			Text:        res.Text,
-			ParseMode:   "HTML",
-			ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
-		})
-		if err != nil {
-			log.Println("[ERROR]", err)
-		}
-	} else {
-		botMessage, err = m.client.SendMessage(ctx, SendMessageConfig{
-			ChatID:      callbackQuery.Message.Chat.ID,
-			Text:        res.Text,
-			ParseMode:   "HTML",
-			ReplyMarkup: m.commandKeyboardToInlineMarkup(res.Keyboard),
-		})
-		if err != nil {
-			log.Println("[ERROR]", err)
-		}
-	}
+	go func() {
+		var previousResponse Message
 
-	if res.ResultChan != nil {
-		go func() {
-			res = <-res.ResultChan
-			_, err = m.client.SendMessage(ctx, SendMessageConfig{
-				ChatID:           botMessage.Chat.ID,
-				Text:             res.Text,
-				ParseMode:        "HTML",
-				ReplyMarkup:      m.commandKeyboardToInlineMarkup(res.Keyboard),
-				ReplyToMessageId: botMessage.MessageID,
-			})
-			if err != nil {
-				log.Println("[ERROR]", err)
+		for result := range pl.ResultChan {
+
+			if result.Error != nil {
+				log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
 			}
-		}()
-	}
+
+			if result.State != nil {
+				m.states[pl.UserID] = result.State
+			}
+
+			// Skip if there is no text and keyboard
+			if result.Text == "" && result.Keyboard == nil {
+				continue
+			}
+
+			// If result text is empty, then use the original value
+			// (useful for calendar script)
+			if result.Text == "" {
+				result.Text = callbackQuery.Message.Text
+			}
+
+			if previousResponse.MessageID == 0 {
+				if result.Keyboard != nil {
+					// Root response with keyboard changes callback message
+					_, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
+						ChatID:      callbackQuery.Message.Chat.ID,
+						MessageID:   callbackQuery.Message.MessageID,
+						Text:        result.Text,
+						ParseMode:   "HTML",
+						ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+					})
+					if err != nil {
+						log.Println("[ERROR]", utils.WrapIfErr(op, err))
+					}
+				} else {
+					// Root response with no keyboard spawns new message
+					previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
+						ChatID:    callbackQuery.Message.Chat.ID,
+						Text:      result.Text,
+						ParseMode: "HTML",
+					})
+					if err != nil {
+						log.Println("[ERROR]", utils.WrapIfErr(op, err))
+					}
+				}
+			} else {
+				// Each channel update response spawns new message (background processing)
+				previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
+					ChatID:      callbackQuery.Message.Chat.ID,
+					Text:        result.Text,
+					ParseMode:   "HTML",
+					ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+				})
+				if err != nil {
+					log.Println("[ERROR]", utils.WrapIfErr(op, err))
+				}
+			}
+
+		}
+	}()
+
 }
 
-func (m *Manager) getHandlerFunc(userID int64, text string) (commands.HandlerFunc, bool) {
+func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFunc, bool) {
 	if strings.HasPrefix(text, "/") { // New command
 		prefix := strings.SplitN(text, " ", 2)[0]
 		handler, ok := m.handlers[prefix]
@@ -189,21 +225,6 @@ func (m *Manager) getHandlerFunc(userID int64, text string) (commands.HandlerFun
 	}
 	fn, ok := m.states[userID] // Stateful command
 	return fn, ok
-}
-
-func (m *Manager) executeCommand(ctx context.Context, pl commands.Payload) (commands.Result, error) {
-	if fn, ok := m.getHandlerFunc(pl.UserID, pl.Command); ok {
-		return fn(ctx, pl)
-	}
-	return commands.Result{}, nil
-}
-
-func (m *Manager) setState(userID int64, state commands.HandlerFunc, clear bool) {
-	if state != nil {
-		m.states[userID] = state
-	} else if clear {
-		delete(m.states, userID)
-	}
 }
 
 func (m *Manager) commandKeyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
