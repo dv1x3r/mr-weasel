@@ -70,26 +70,36 @@ func (m *Manager) processUpdate(ctx context.Context, update Update) {
 }
 
 func (m *Manager) processMessage(ctx context.Context, message Message) {
-	pl := commands.Payload{UserID: message.From.ID, Command: message.Text}
+	pl := commands.Payload{
+		UserID:     message.From.ID,
+		Command:    message.Text,
+		ResultChan: make(chan commands.Result),
+	}
+
 	fn, ok := m.getExecuteFunc(pl.UserID, pl.Command)
 	if !ok {
 		return
 	}
 
-	resChan, err := fn(ctx, pl)
-	if err != nil {
-		log.Println("[ERROR]", err)
-		return
-	}
+	go func() {
+		fn(ctx, pl)
+		close(pl.ResultChan)
+	}()
 
 	go func() {
 		var previousResponse Message
 
-		for res := range resChan {
+		for res := range pl.ResultChan {
 
-			if res.UpdateState != nil {
-				m.states[pl.UserID] = res.UpdateState
-			} else if res.ClearState {
+			if res.Error != nil {
+				log.Println("[ERROR]", res.Error)
+				continue
+			}
+
+			if res.State != nil {
+				m.states[pl.UserID] = res.State
+			} else if previousResponse.MessageID == 0 {
+				// Only the root response can clear the state
 				delete(m.states, pl.UserID)
 			}
 
@@ -97,6 +107,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 				continue
 			}
 
+			var err error
 			previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
 				ChatID:           message.Chat.ID,
 				Text:             res.Text,
@@ -113,33 +124,35 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 }
 
 func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
-	pl := commands.Payload{UserID: callbackQuery.From.ID, Command: callbackQuery.Data}
+	pl := commands.Payload{
+		UserID:     callbackQuery.From.ID,
+		Command:    callbackQuery.Data,
+		ResultChan: make(chan commands.Result),
+	}
+
 	fn, ok := m.getExecuteFunc(pl.UserID, pl.Command)
 	if !ok {
 		return
 	}
 
-	resChan, err := fn(ctx, pl)
-	if err != nil {
-		log.Println("[ERROR]", err)
-		return
-	}
-
 	// Answer to the callback query just to dismiss "Loading..." prompt on the top
-	_, err = m.client.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
+	_, err := m.client.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
 	if err != nil {
 		log.Println("[ERROR]", err)
 	}
 
 	go func() {
+		fn(ctx, pl)
+		close(pl.ResultChan)
+	}()
+
+	go func() {
 		var previousResponse Message
 
-		for res := range resChan {
+		for res := range pl.ResultChan {
 
-			if res.UpdateState != nil {
-				m.states[pl.UserID] = res.UpdateState
-			} else if res.ClearState {
-				delete(m.states, pl.UserID)
+			if res.State != nil {
+				m.states[pl.UserID] = res.State
 			}
 
 			// Skip if there is no text and keyboard

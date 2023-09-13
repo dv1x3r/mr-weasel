@@ -16,13 +16,14 @@ func (PingCommand) Description() string {
 	return "answer with pong"
 }
 
-func (PingCommand) Execute(ctx context.Context, pl Payload) (Result, error) {
+func (PingCommand) Execute(ctx context.Context, pl Payload) {
 	if pl.Command == "/ping me" {
-		return Result{Text: "What is your name?", State: personalized}, nil
+		pl.ResultChan <- Result{Text: "What is your name?", State: personalized}
+	} else {
+		pl.ResultChan <- Result{Text: "pong!"}
 	}
-	return Result{Text: "pong!"}, nil
 }
 
-func personalized(ctx context.Context, pl Payload) (Result, error) {
-	return Result{Text: "Pong to " + pl.Command + "!"}, nil
+func personalized(ctx context.Context, pl Payload) {
+	pl.ResultChan <- Result{Text: "Pong to " + pl.Command + "!"}
 }
