@@ -30,13 +30,13 @@ func (c *PythonCommand) Execute(ctx context.Context, pl Payload) {
 
 	go func() {
 		defer wg.Done()
-		if !c.queue.Lock() {
+		if c.queue.Lock() {
+			defer c.queue.Unlock()
+			time.Sleep(10 * time.Second)
+			pl.ResultChan <- Result{Text: "Done, fuck you!"}
+		} else {
 			pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
-			return
 		}
-		defer c.queue.Unlock()
-		time.Sleep(10 * time.Second)
-		pl.ResultChan <- Result{Text: "Done, fuck you!"}
 	}()
 
 	pl.ResultChan <- Result{Text: "background job probably started"}
