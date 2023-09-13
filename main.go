@@ -26,7 +26,7 @@ func main() {
 
 	if os.Getenv("RTX_MODE") == "on" {
 		tgManager.AddCommands(
-			commands.NewPythonCommand(queue),
+			commands.NewSeparateSongCommand(queue),
 		)
 	} else {
 		tgManager.AddCommands(
