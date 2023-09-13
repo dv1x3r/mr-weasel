@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
+type ExecuteFunc = func(context.Context, Payload) (chan Result, error)
+
 type Handler interface {
 	Prefix() string
 	Description() string
-	Execute(context.Context, Payload) (Result, error)
+	Execute(context.Context, Payload) (chan Result, error)
 }
-
-type HandlerFunc = func(context.Context, Payload) (Result, error)
 
 type Payload struct {
 	UserID  int64
@@ -22,10 +22,10 @@ type Payload struct {
 }
 
 type Result struct {
-	Text       string
-	State      HandlerFunc
-	Keyboard   [][]Button
-	ResultChan chan Result
+	Text        string
+	ClearState  bool
+	UpdateState ExecuteFunc
+	Keyboard    [][]Button
 }
 
 type Button struct {
