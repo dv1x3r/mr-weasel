@@ -461,15 +461,17 @@ func (c *CarCommand) addFuelStart(ctx context.Context, pl Payload, carID int64) 
 func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		pl.ResultChan <- res
+		pl.ResultChan <- res // new month is selected
 		return
 	}
 	if c.setDraftFuelTimestamp(pl.UserID, pl.Command) != nil {
-		pl.ResultChan <- res
+		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addFuelTimestamp}
 		return
 	}
-	res.Text, res.State = "What is the fuel type?", c.addFuelType
+	res.Text = "Fuel receipt date: " + c.draftFuel[pl.UserID].GetTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
+	pl.ResultChan <- res
+	res = Result{Text: "What is the fuel type?", State: c.addFuelType}
 	pl.ResultChan <- res
 }
 
@@ -589,15 +591,17 @@ func (c *CarCommand) addServiceStart(ctx context.Context, pl Payload, carID int6
 func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		pl.ResultChan <- res
+		pl.ResultChan <- res // new month is selected
 		return
 	}
 	if c.setDraftServiceTimestamp(pl.UserID, pl.Command) != nil {
-		pl.ResultChan <- res
+		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addServiceTimestamp}
 		return
 	}
-	res.Text, res.State = "Provide service description.", c.addServiceDescription
+	res.Text = "Service receipt date: " + c.draftService[pl.UserID].GetTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
+	pl.ResultChan <- res
+	res = Result{Text: "Provide service description.", State: c.addServiceDescription}
 	pl.ResultChan <- res
 }
 
@@ -708,14 +712,17 @@ func (c *CarCommand) addLeaseStart(ctx context.Context, pl Payload, carID int64)
 func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		pl.ResultChan <- res
-		return
-	} else if c.setDraftLeaseTimestamp(pl.UserID, pl.Command) != nil {
-		pl.ResultChan <- res
+		pl.ResultChan <- res // new month is selected
 		return
 	}
-	res.Text, res.State = "Provide lease description. /skip", c.addLeaseDescription
+	if c.setDraftLeaseTimestamp(pl.UserID, pl.Command) != nil {
+		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addLeaseTimestamp}
+		return
+	}
+	res.Text = "Lease receipt date: " + c.draftLease[pl.UserID].GetTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
+	pl.ResultChan <- res
+	res = Result{Text: "Provide lease description. /skip", State: c.addLeaseDescription}
 	pl.ResultChan <- res
 }
 

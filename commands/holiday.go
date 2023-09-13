@@ -134,14 +134,17 @@ func (c *HolidayCommand) addHolidayStart(ctx context.Context, pl Payload) {
 func (c *HolidayCommand) addHolidayStartDate(ctx context.Context, pl Payload) {
 	res := Result{}
 	if res.UpdateKeyboardCalendar(pl.Command) {
-		pl.ResultChan <- res
-		return
-	} else if c.setDraftHolidayStartDate(pl.UserID, pl.Command) != nil {
-		pl.ResultChan <- res
+		pl.ResultChan <- res // new month is selected
 		return
 	}
-
-	res.Text, res.State = "Please pick holiday end date.", c.addHolidayEndDate
+	if c.setDraftHolidayStartDate(pl.UserID, pl.Command) != nil {
+		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addHolidayStartDate}
+		return
+	}
+	res.Text = "Holiday start date: " + c.draftHolidays[pl.UserID].GetStartTimestamp()
+	res.AddKeyboardRow() // remove calendar keyboard
+	pl.ResultChan <- res
+	res = Result{Text: "Please pick holiday end date.", State: c.addHolidayEndDate}
 	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	pl.ResultChan <- res
 }
@@ -151,13 +154,15 @@ func (c *HolidayCommand) addHolidayEndDate(ctx context.Context, pl Payload) {
 	if res.UpdateKeyboardCalendar(pl.Command) {
 		pl.ResultChan <- res
 		return
-	} else if c.setDraftHolidayEndDate(pl.UserID, pl.Command) != nil {
+	}
+	if c.setDraftHolidayEndDate(pl.UserID, pl.Command) != nil {
 		pl.ResultChan <- res
 		return
 	}
-
-	res.Text, res.State = "Enter number of working days.", c.addHolidayDaysAndSave
+	res.Text = "Holiday end date: " + c.draftHolidays[pl.UserID].GetEndTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
+	pl.ResultChan <- res
+	res = Result{Text: "Enter number of working days.", State: c.addHolidayDaysAndSave}
 	pl.ResultChan <- res
 }
 
@@ -166,13 +171,11 @@ func (c *HolidayCommand) addHolidayDaysAndSave(ctx context.Context, pl Payload) 
 		pl.ResultChan <- Result{Text: "Please enter a valid whole number.", State: c.addHolidayDaysAndSave}
 		return
 	}
-
 	_, err := c.insertDraftHolidayIntoDB(ctx, pl.UserID)
 	if err != nil {
 		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 		return
 	}
-
 	c.showHolidayDetails(ctx, pl, 0)
 }
 

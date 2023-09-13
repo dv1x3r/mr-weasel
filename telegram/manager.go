@@ -176,7 +176,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 			if previousResponse.MessageID == 0 {
 				if result.Keyboard != nil {
 					// Root response with keyboard changes callback message
-					_, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
+					previousResponse, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
 						ChatID:      callbackQuery.Message.Chat.ID,
 						MessageID:   callbackQuery.Message.MessageID,
 						Text:        result.Text,
