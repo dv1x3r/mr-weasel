@@ -220,10 +220,14 @@ func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFun
 		prefix := strings.SplitN(text, " ", 2)[0]
 		handler, ok := m.handlers[prefix]
 		if ok {
+			log.Printf("[VERB] %d: %s\n", userID, text)
 			return handler.Execute, true
 		}
 	}
 	fn, ok := m.states[userID] // Stateful command
+	if ok {
+		log.Printf("[VERB] %d: %s\n", userID, utils.GetFunctionName(fn))
+	}
 	return fn, ok
 }
 
