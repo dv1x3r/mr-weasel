@@ -78,9 +78,10 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		return
 	}
 
-	fileURL := ""
+	var fileURL string
+	var err error
+
 	if message.Audio != nil {
-		var err error
 		fileURL, err = m.client.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
