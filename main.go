@@ -20,13 +20,15 @@ func main() {
 	}
 	db := sqlx.MustConnect(dbDriver, dbString)
 
+	blob := utils.NewBlob(db)
+	queue := utils.NewQueue(8, 1)
+
 	tgClient := telegram.NewClient(os.Getenv("TG_TOKEN"), false).MustConnect()
 	tgManager := telegram.NewManager(tgClient)
-	queue := utils.NewQueue(3, 1)
 
 	if os.Getenv("RTX_MODE") == "on" {
 		tgManager.AddCommands(
-			commands.NewSeparateSongCommand(queue),
+			commands.NewSeparateSongCommand(blob, queue),
 		)
 	} else {
 		tgManager.AddCommands(
