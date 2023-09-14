@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -435,7 +436,7 @@ func (c *CarCommand) setDraftFuelType(userID int64, input string) {
 
 func (c *CarCommand) setDraftFuelLiters(userID int64, input string) error {
 	liters, err := strconv.ParseFloat(input, 64)
-	c.draftFuel[userID].Milliliters = int64(liters * 1000)
+	c.draftFuel[userID].Milliliters = int64(math.Round(liters * 1000))
 	return err
 }
 
@@ -447,7 +448,7 @@ func (c *CarCommand) setDraftFuelKilometers(userID int64, input string) error {
 
 func (c *CarCommand) setDraftFuelEuros(userID int64, input string) error {
 	euro, err := strconv.ParseFloat(input, 64)
-	c.draftFuel[userID].Cents = int64(euro * 100)
+	c.draftFuel[userID].Cents = int64(math.Round(euro * 100))
 	return err
 }
 
@@ -577,7 +578,7 @@ func (c *CarCommand) setDraftServiceDescription(userID int64, input string) {
 
 func (c *CarCommand) setDraftServiceEuros(userID int64, input string) error {
 	euro, err := strconv.ParseFloat(input, 64)
-	c.draftService[userID].Cents = int64(euro * 100)
+	c.draftService[userID].Cents = int64(math.Round(euro * 100))
 	return err
 }
 
@@ -698,7 +699,7 @@ func (c *CarCommand) setDraftLeaseDescription(userID int64, input string) {
 
 func (c *CarCommand) setDraftLeaseEuros(userID int64, input string) error {
 	euro, err := strconv.ParseFloat(input, 64)
-	c.draftLease[userID].Cents = int64(euro * 100)
+	c.draftLease[userID].Cents = int64(math.Round(euro * 100))
 	return err
 }
 
