@@ -19,8 +19,14 @@ type Handler interface {
 type Payload struct {
 	UserID     int64
 	Command    string
-	FileURL    string
+	Media      *PayloadMedia
 	ResultChan chan Result
+}
+
+type PayloadMedia struct {
+	FileID   string
+	FileName string
+	FileURL  string
 }
 
 type Result struct {
@@ -94,7 +100,7 @@ func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
 
 	r.AddKeyboardRow()
 	r.AddKeyboardButton("«", fmt.Sprintf("%d %d", dtPrev.Year(), dtPrev.Month()))
-	r.AddKeyboardButton("Pick Today", fmt.Sprint(time.Now().Unix()))
+	// r.AddKeyboardButton("Pick Today", fmt.Sprint(time.Now().Unix()))
 	r.AddKeyboardButton("»", fmt.Sprintf("%d %d", dtNext.Year(), dtNext.Month()))
 }
 

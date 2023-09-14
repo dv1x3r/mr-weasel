@@ -3,8 +3,7 @@
 create table blob (
     id integer primary key,
     user_id integer not null,
-    is_deleted boolean not null,
-    uploaded_at integer not null
+    file_id text not null
 ) strict;
 -- +goose StatementEnd
 

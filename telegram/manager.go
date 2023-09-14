@@ -78,21 +78,29 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		return
 	}
 
-	var fileURL string
-	var err error
+	userID := message.From.ID
+	command := message.Text
+	var media *commands.PayloadMedia
 
 	if message.Audio != nil {
-		fileURL, err = m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
+		fileURL, err := m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			return
+		} else if command == "" {
+			command = message.Audio.FileName
+		}
+		media = &commands.PayloadMedia{
+			FileID:   message.Audio.FileID,
+			FileName: message.Audio.FileName,
+			FileURL:  fileURL,
 		}
 	}
 
 	pl := commands.Payload{
-		UserID:     message.From.ID,
-		Command:    message.Text,
-		FileURL:    fileURL,
+		UserID:     userID,
+		Command:    command,
+		Media:      media,
 		ResultChan: make(chan commands.Result),
 	}
 

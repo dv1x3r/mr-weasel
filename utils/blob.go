@@ -1,7 +1,14 @@
 package utils
 
 import (
+	"context"
+	// "io/fs"
 	"net/http"
+	// "net/url"
+	// "os"
+	// "path/filepath"
+
+	// "mr-weasel/commands"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -15,52 +22,64 @@ func NewBlob(db *sqlx.DB) *Blob {
 	return &Blob{db: db, httpClient: &http.Client{}}
 }
 
-func (b *Blob) DownloadTelegramAudioIntoBlob(url string) (int64, error) {
-	// 1. user uploads the song
-	// check if url starts with https://api.telegram.org/
-	// if yes, then just download the file
-	// if not, then try to use yt-dlp
-	// insert into blob (id, user_id, file_id, is_deleted, uploaded_at);
-
-	// parsedURL, err := url.Parse(pl.FileURL)
-	// if err != nil {
-	// 	pl.ResultChan <- Result{Text: "Invalid link format, can you try another one?", State: c.receiveURL}
-	// 	return
-	// }
-
-	// if parsedURL.Hostname() == "api.telegram.org" {
-	// 	resp, err := c.httpClient.Get(pl.FileURL)
-	// 	if err != nil {
-	// 		pl.ResultChan <- Result{Text: "Unable to download the file, please try again :c", State: c.receiveURL, Error: err}
-	// 		return
-	// 	}
-	// 	defer resp.Body.Close()
-
-	// 	blobID := 0 // temp
-
-	// 	extension := filepath.Ext(parsedURL.Path)
-	// 	blobName := fmt.Sprintf("%d%s", blobID, extension)
-	// 	blobPath := filepath.Join("blob", blobName)
-
-	// 	_ = os.Mkdir("blob", fs.ModePerm)
-	// 	file, err := os.Create(blobPath)
-	// 	if err != nil {
-	// 		pl.ResultChan <- Result{Text: "Unable to save the file on the server, please try again :c", State: c.receiveURL, Error: err}
-	// 		return
-	// 	}
-	// 	defer file.Close()
-	// 	size, err := io.Copy(file, resp.Body)
-	// 	pl.ResultChan <- Result{Text: "File has been received! size " + fmt.Sprintf("%d", size)}
-
-	// } else {
-	// 	// TODO: yt-dlp
-	// 	pl.ResultChan <- Result{Text: "sorry, links are not supported atm, please send me audio file", State: c.receiveURL}
-	// 	return
-	// }
-
-	return 0, nil
+type BlobBase struct {
+	ID     int64  `db:"id"`
+	UserID int64  `db:"user_id"`
+	FileID string `db:"file_id"`
 }
 
-func (b *Blob) DownloadYouTubeAudioIntoBlob(url string) (int64, error) {
-	return 0, nil
+func (b *Blob) GetBlobFromDB(ctx context.Context, userID int64, blobID int64) (BlobBase, error) {
+	var blob BlobBase
+	stmt := `select id, user_id, file_id from blob where user_id = ? and id = ?;`
+	err := b.db.GetContext(ctx, &blob, stmt, userID, blobID)
+	return blob, err
 }
+
+func (b *Blob) InsertBlobIntoDB(ctx context.Context, blob BlobBase) (int64, error) {
+	stmt := "insert into blob (user_id, file_id) values (?,?);"
+	res, err := b.db.ExecContext(ctx, stmt, blob.UserID, blob.FileID)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (b *Blob) DownloadBlob(ctx context.Context, userID int64, blobID int64) {
+
+}
+
+func (b *Blob) UploadBlob(ctx context.Context, userID int64, blobID int64) {
+
+}
+
+// func (b *Blob) DownloadUrl(ctx context.Context, pl commands.Payload) (BlobBase, error) {
+// parsedURL, err := url.Parse(fullURL)
+// if err != nil {
+// 	return BlobBase{}, err
+// }
+
+// if parserURL.Hostname() == "api.telegram.org" {
+// 	resp, err := b.httpClient.Get(fullURL)
+// 	if err == nil {
+// 		return BlobBase{}, err
+// 	}
+// 	defer resp.Body.Close()
+// 	// b.InsertBlobIntoDB(ctx, BlobBase{UserID: userID, FileID: })
+
+// } else {
+
+// }
+
+// blobPath := filepath.Join(b.blobPath, blobName)
+
+// file, err := os.Create(blobPath)
+// // 	if err != nil {
+// // 		pl.ResultChan <- Result{Text: "Unable to save the file on the server, please try again :c", State: c.receiveURL, Error: err}
+// 		return
+// 	}
+// 	defer file.Close()
+// 	size, err := io.Copy(file, resp.Body)
+// 	pl.ResultChan <- Result{Text: "File has been received! size " + fmt.Sprintf("%d", size)}
+
+// return BlobBase{}, nil
+// }
