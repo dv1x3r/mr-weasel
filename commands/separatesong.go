@@ -2,7 +2,6 @@ package commands
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/exec"
 	"sync"
@@ -27,12 +26,26 @@ func (SeparateSongCommand) Description() string {
 }
 
 func (c *SeparateSongCommand) Execute(ctx context.Context, pl Payload) {
-	pl.ResultChan <- Result{Text: "Please send me an audio file or YouTube link.", State: c.receiveFileIdOrURL}
+	pl.ResultChan <- Result{Text: "Please send me an audio file or YouTube link.", State: c.receiveURL}
 }
 
-func (c *SeparateSongCommand) receiveFileIdOrURL(ctx context.Context, pl Payload) {
-	log.Println(pl.FileURL)
+func (c *SeparateSongCommand) receiveURL(ctx context.Context, pl Payload) {
+	// 1. user uploads the song
+	// check if url starts with https://api.telegram.org/
+	// if yes, then just download the file
+	// if not, then try to use yt-dlp
+	// insert into blob (id, user_id, file_id, is_deleted, uploaded_at);
+	// log.Println(pl.FileURL)
+
+	// 2. run python magic
 	// c.startProcessing(ctx, pl, "smash.mp3")
+
+	// 3. user selects what he wants to download
+	blobID := 0
+	res := Result{Text: "Song has been successfully processed!"}
+	res.AddKeyboardButton("Get Music", commandf(c, "get_music", blobID))
+	res.AddKeyboardButton("Get Voice", commandf(c, "get_voice", blobID))
+	pl.ResultChan <- res
 }
 
 func (c *SeparateSongCommand) startProcessing(ctx context.Context, pl Payload, fileName string) {
