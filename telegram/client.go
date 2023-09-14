@@ -15,6 +15,7 @@ import (
 )
 
 const apiEndpoint = "https://api.telegram.org/bot%s/%s"
+const apiFileEndpoint = "https://api.telegram.org/file/bot%s/%s"
 
 type Client struct {
 	client *http.Client
@@ -83,16 +84,19 @@ func (c *Client) AnswerCallbackQuery(ctx context.Context, cfg AnswerCallbackQuer
 	return value, utils.WrapIfErr(op, err)
 }
 
+// Use this method to get basic information about a file and prepare it for downloading. On success, a File object is returned.
 func (c *Client) GetFile(ctx context.Context, cfg GetFileConfig) (File, error) {
 	const op = "telegram.Client.GetFile"
 	value, err := executeMethod[File](ctx, c, cfg)
 	return value, utils.WrapIfErr(op, err)
 }
 
+// Use this method to get basic information about a file and prepare it for downloading. On success, a File URL is returned (which contains the bot token).
 func (c *Client) GetFileURL(ctx context.Context, cfg GetFileConfig) (string, error) {
 	const op = "telegram.Client.GetFileURL"
 	file, err := c.GetFile(ctx, cfg)
-	return file.FilePath, utils.WrapIfErr(op, err)
+	fileURL := fmt.Sprintf(apiFileEndpoint, c.token, file.FilePath)
+	return fileURL, utils.WrapIfErr(op, err)
 }
 
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
