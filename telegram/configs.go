@@ -96,6 +96,15 @@ func (AnswerCallbackQueryConfig) Method() string {
 	return "answerCallbackQuery"
 }
 
+type GetFileConfig struct {
+	// File identifier to get information about.
+	FileID string `json:"file_id"`
+}
+
+func (GetFileConfig) Method() string {
+	return "getFile"
+}
+
 type SetMyCommandsConfig struct {
 	// A JSON-serialized list of bot commands to be set as the list of the bot's commands. At most 100 commands can be specified.
 	Commands []BotCommand `json:"commands"`

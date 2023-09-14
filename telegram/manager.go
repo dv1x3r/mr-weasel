@@ -73,15 +73,26 @@ func (m *Manager) processUpdate(ctx context.Context, update Update) {
 
 func (m *Manager) processMessage(ctx context.Context, message Message) {
 	const op = "telegram.Manager.processMessage"
+	fn, ok := m.getExecuteFunc(message.From.ID, message.Text)
+	if !ok {
+		return
+	}
+
+	fileURL := ""
+	if message.Audio != nil {
+		var err error
+		fileURL, err = m.client.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
+		if err != nil {
+			log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			return
+		}
+	}
+
 	pl := commands.Payload{
 		UserID:     message.From.ID,
 		Command:    message.Text,
+		FileURL:    fileURL,
 		ResultChan: make(chan commands.Result),
-	}
-
-	fn, ok := m.getExecuteFunc(pl.UserID, pl.Command)
-	if !ok {
-		return
 	}
 
 	go func() {

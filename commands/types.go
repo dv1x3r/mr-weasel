@@ -19,6 +19,7 @@ type Handler interface {
 type Payload struct {
 	UserID     int64
 	Command    string
+	FileURL    string
 	ResultChan chan Result
 }
 

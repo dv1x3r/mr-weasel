@@ -93,6 +93,8 @@ type Message struct {
 	ReplyToMessage *Message `json:"reply_to_message,omitempty"`
 	// Optional. For text messages, the actual UTF-8 text of the message.
 	Text string `json:"text,omitempty"`
+	// Optional. Message is an audio file, information about the file.
+	Audio *Audio `json:"audio,omitempty"`
 	// Optional. Inline keyboard attached to the message. login_url buttons are represented as ordinary url buttons.
 	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
@@ -114,6 +116,59 @@ type MessageEntity struct {
 	Language string `json:"language,omitempty"`
 	// Optional. For “custom_emoji” only, unique identifier of the custom emoji. Use getCustomEmojiStickers to get full information about the sticker.
 	CustomEmojiId string `json:"custom_emoji_id,omitempty"`
+}
+
+// This object represents one size of a photo or a file / sticker thumbnail.
+type PhotoSize struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Photo width.
+	Width int64 `json:"width"`
+	// Photo height.
+	Height int64 `json:"height"`
+	// Optional. File size in bytes.
+	FileSize int64 `json:"file_size,omitempty"`
+}
+
+// This object represents an audio file to be treated as music by the Telegram clients.
+type Audio struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Duration of the audio in seconds as defined by sender
+	Duration int64 `json:"duration"`
+	// Optional. Performer of the audio as defined by sender or by audio tags.
+	Performer string `json:"performer,omitempty"`
+	// Optional. Title of the audio as defined by sender or by audio tags.
+	Title string `json:"title,omitempty"`
+	// Optional. Original filename as defined by sender.
+	FileName string `json:"file_name,omitempty"`
+	// Optional. MIME type of the file as defined by sender.
+	MimeType string `json:"mime_type,omitempty"`
+	// Optional. File size in bytes. It can be bigger than 2^31 and some programming languages may have difficulty/silent defects in interpreting it.
+	// But it has at most 52 significant bits, so a signed 64-bit integer or double-precision float type are safe for storing this value.
+	FileSize int64 `json:"file_size,omitempty"`
+	// Optional. Thumbnail of the album cover to which the music file belongs.
+	Thumbnail *PhotoSize `json:"thumbnail,omitempty"`
+}
+
+// This object represents a file ready to be downloaded.
+// The file can be downloaded via the link https://api.telegram.org/file/bot<token>/<file_path>.
+// It is guaranteed that the link will be valid for at least 1 hour.
+// When the link expires, a new one can be requested by calling getFile.
+type File struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Optional. File size in bytes. It can be bigger than 2^31 and some programming languages may have difficulty/silent defects in interpreting it.
+	// But it has at most 52 significant bits, so a signed 64-bit integer or double-precision float type are safe for storing this value.
+	FileSize int64 `json:"file_size,omitempty"`
+	// Optional. File path. Use https://api.telegram.org/file/bot<token>/<file_path> to get the file.
+	FilePath string `json:"file_path,omitempty"`
 }
 
 // This object represents an inline keyboard that appears right next to the message it belongs to.

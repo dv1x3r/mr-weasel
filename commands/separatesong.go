@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/exec"
 	"sync"
@@ -26,7 +27,12 @@ func (SeparateSongCommand) Description() string {
 }
 
 func (c *SeparateSongCommand) Execute(ctx context.Context, pl Payload) {
-	c.startProcessing(ctx, pl, "smash.mp3")
+	pl.ResultChan <- Result{Text: "Please send me an audio file or YouTube link.", State: c.receiveFileIdOrURL}
+}
+
+func (c *SeparateSongCommand) receiveFileIdOrURL(ctx context.Context, pl Payload) {
+	log.Println(pl.FileURL)
+	// c.startProcessing(ctx, pl, "smash.mp3")
 }
 
 func (c *SeparateSongCommand) startProcessing(ctx context.Context, pl Payload, fileName string) {

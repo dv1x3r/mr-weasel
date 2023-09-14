@@ -83,6 +83,18 @@ func (c *Client) AnswerCallbackQuery(ctx context.Context, cfg AnswerCallbackQuer
 	return value, utils.WrapIfErr(op, err)
 }
 
+func (c *Client) GetFile(ctx context.Context, cfg GetFileConfig) (File, error) {
+	const op = "telegram.Client.GetFile"
+	value, err := executeMethod[File](ctx, c, cfg)
+	return value, utils.WrapIfErr(op, err)
+}
+
+func (c *Client) GetFileURL(ctx context.Context, cfg GetFileConfig) (string, error) {
+	const op = "telegram.Client.GetFileURL"
+	file, err := c.GetFile(ctx, cfg)
+	return file.FilePath, utils.WrapIfErr(op, err)
+}
+
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
 	const op = "telegram.Client.SetMyCommands"
@@ -111,6 +123,7 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 					close(ch)
 					return
 				} else {
+					log.Println("[WARN]", err)
 					log.Println("[WARN] Failed to get updates, retrying in 3 seconds...")
 					time.Sleep(time.Second * 3)
 					continue
