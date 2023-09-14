@@ -18,16 +18,16 @@ const apiEndpoint = "https://api.telegram.org/bot%s/%s"
 const apiFileEndpoint = "https://api.telegram.org/file/bot%s/%s"
 
 type Client struct {
-	client *http.Client
-	token  string
-	debug  bool
+	httpClient *http.Client
+	token      string
+	debug      bool
 }
 
 func NewClient(token string, debug bool) *Client {
 	return &Client{
-		client: &http.Client{Timeout: 100 * time.Second},
-		token:  token,
-		debug:  debug,
+		httpClient: &http.Client{Timeout: 100 * time.Second},
+		token:      token,
+		debug:      debug,
 	}
 }
 
@@ -179,7 +179,7 @@ func (c *Client) makeRequest(ctx context.Context, cfg Config) (*APIResponse, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := c.client.Do(req)
+	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

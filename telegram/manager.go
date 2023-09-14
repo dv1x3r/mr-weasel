@@ -10,14 +10,14 @@ import (
 )
 
 type Manager struct {
-	client   *Client                        // Telegram API Client
+	tgClient *Client                        // Telegram API Client
 	handlers map[string]commands.Handler    // Map of registered command handlers.
 	states   map[int64]commands.ExecuteFunc // Map of active user states.
 }
 
-func NewManager(client *Client) *Manager {
+func NewManager(tgClient *Client) *Manager {
 	return &Manager{
-		client:   client,
+		tgClient: tgClient,
 		handlers: make(map[string]commands.Handler),
 		states:   make(map[int64]commands.ExecuteFunc),
 	}
@@ -42,7 +42,7 @@ func (m *Manager) PublishCommands() {
 	}
 
 	cfg := SetMyCommandsConfig{Commands: botCommands}
-	_, err := m.client.SetMyCommands(context.Background(), cfg)
+	_, err := m.tgClient.SetMyCommands(context.Background(), cfg)
 	if err != nil {
 		log.Println("[ERROR]", utils.WrapIfErr(op, err))
 	}
@@ -57,7 +57,7 @@ func (m *Manager) Start() {
 		Timeout:        60,
 		AllowedUpdates: []string{"message", "callback_query"},
 	}
-	updates := m.client.GetUpdatesChan(ctx, cfg, 100)
+	updates := m.tgClient.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
 		m.processUpdate(ctx, update)
 	}
@@ -82,7 +82,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	var err error
 
 	if message.Audio != nil {
-		fileURL, err = m.client.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
+		fileURL, err = m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			return
@@ -122,7 +122,7 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 				continue
 			}
 
-			previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
+			previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
 				ChatID:           message.Chat.ID,
 				Text:             result.Text,
 				ParseMode:        "HTML",
@@ -151,7 +151,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 	}
 
 	// Answer to the callback query just to dismiss "Loading..." prompt on the top
-	_, err := m.client.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
+	_, err := m.tgClient.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
 	if err != nil {
 		log.Println("[ERROR]", utils.WrapIfErr(op, err))
 	}
@@ -188,7 +188,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 			if previousResponse.MessageID == 0 {
 				if result.Keyboard != nil {
 					// Root response with keyboard changes callback message
-					previousResponse, err = m.client.EditMessageText(ctx, EditMessageTextConfig{
+					previousResponse, err = m.tgClient.EditMessageText(ctx, EditMessageTextConfig{
 						ChatID:      callbackQuery.Message.Chat.ID,
 						MessageID:   callbackQuery.Message.MessageID,
 						Text:        result.Text,
@@ -200,7 +200,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 					}
 				} else {
 					// Root response with no keyboard spawns new message
-					previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
+					previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
 						ChatID:    callbackQuery.Message.Chat.ID,
 						Text:      result.Text,
 						ParseMode: "HTML",
@@ -211,7 +211,7 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 				}
 			} else {
 				// Each channel update response spawns new message (background processing)
-				previousResponse, err = m.client.SendMessage(ctx, SendMessageConfig{
+				previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
 					ChatID:      callbackQuery.Message.Chat.ID,
 					Text:        result.Text,
 					ParseMode:   "HTML",
