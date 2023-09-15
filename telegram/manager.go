@@ -91,9 +91,9 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 			command = message.Audio.FileName
 		}
 		blobPayload = &utils.BlobPayload{
-			FileID:      message.Audio.FileID,
-			Description: message.Audio.FileName,
-			URL:         URL,
+			FileID:   message.Audio.FileID,
+			FileName: message.Audio.FileName,
+			URL:      URL,
 		}
 	}
 

@@ -79,7 +79,7 @@ func (c *SeparateSongCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	html := fmt.Sprintf("File has been uploaded successfully!\n")
-	html += fmt.Sprintf("📂 %s\n", blob.Description)
+	html += fmt.Sprintf("📂 %s\n", blob.OriginalName)
 
 	res = Result{Text: html}
 	res.AddKeyboardButton("Start Processing", commandf(c, "start", blob.ID))

@@ -26,33 +26,32 @@ func NewBlob(db *sqlx.DB) *Blob {
 }
 
 type BlobBase struct {
-	ID          int64  `db:"id"`
-	UserID      int64  `db:"user_id"`
-	FileID      string `db:"file_id"`
-	Extension   string `db:"extension"`
-	Description string `db:"description"`
+	ID           int64  `db:"id"`
+	UserID       int64  `db:"user_id"`
+	FileID       string `db:"file_id"`
+	OriginalName string `db:"original_name"`
 }
 
 func (b *BlobBase) GetAbsolutePath() string {
-	return filepath.Join(downloadPath, fmt.Sprintf("%d%s", b.ID, b.Extension))
+	return filepath.Join(downloadPath, fmt.Sprintf("%d%s", b.ID, filepath.Ext(b.OriginalName)))
 }
 
 type BlobPayload struct {
-	FileID      string
-	Description string
-	URL         string
+	FileID   string
+	FileName string
+	URL      string
 }
 
 func (b *Blob) GetBlobFromDB(ctx context.Context, userID int64, blobID int64) (BlobBase, error) {
 	var blob BlobBase
-	stmt := `select id, user_id, file_id, extension, description from blob where user_id = ? and id = ?;`
+	stmt := `select id, user_id, file_id, original_name from blob where user_id = ? and id = ?;`
 	err := b.db.GetContext(ctx, &blob, stmt, userID, blobID)
 	return blob, err
 }
 
 func (b *Blob) InsertBlobIntoDB(ctx context.Context, blob BlobBase) (int64, error) {
-	stmt := "insert into blob (user_id, file_id, extension, description) values (?,?,?,?);"
-	res, err := b.db.ExecContext(ctx, stmt, blob.UserID, blob.FileID, blob.Extension, blob.Description)
+	stmt := "insert into blob (user_id, file_id, original_name) values (?,?,?);"
+	res, err := b.db.ExecContext(ctx, stmt, blob.UserID, blob.FileID, blob.OriginalName)
 	if err != nil {
 		return 0, err
 	}
@@ -79,10 +78,9 @@ func (b *Blob) DownloadBlob(ctx context.Context, userID int64, blobPayload *Blob
 	defer res.Body.Close()
 
 	blobID, err := b.InsertBlobIntoDB(ctx, BlobBase{
-		UserID:      userID,
-		FileID:      blobPayload.FileID,
-		Extension:   filepath.Ext(URL.String()),
-		Description: blobPayload.Description,
+		UserID:       userID,
+		FileID:       blobPayload.FileID,
+		OriginalName: blobPayload.FileName,
 	})
 	if err != nil {
 		return BlobBase{}, err
