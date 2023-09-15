@@ -349,7 +349,10 @@ func (c *CarCommand) updateCarSavePlate(ctx context.Context, pl Payload) {
 }
 
 func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) {
-	c.setDraftCarPrice(pl.UserID, pl.Command)
+	if c.setDraftCarPrice(pl.UserID, pl.Command) != nil {
+		pl.ResultChan <- Result{Text: "Please enter a valid whole number.", State: c.updateCarSavePrice}
+		return
+	}
 	if _, err := c.updateDraftCarInDB(ctx, pl.UserID); err != nil {
 		pl.ResultChan <- Result{Text: "Update failed, try again.", Error: err}
 		return
