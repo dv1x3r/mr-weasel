@@ -50,49 +50,50 @@ func (c *SeparateSongCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func (c *SeparateSongCommand) downloadSong(ctx context.Context, pl Payload) {
-	res := Result{Text: "Downloading the song..."}
-	pl.ResultChan <- res
-
 	var blob utils.BlobBase
 	var err error
 
 	if pl.BlobPayload != nil {
+		res := Result{Text: "📂 " + pl.BlobPayload.FileName}
+		res.AddKeyboardButton("Downloading...", "-")
+		pl.ResultChan <- res
+
 		blob, err = c.blob.DownloadBlob(ctx, pl.UserID, pl.BlobPayload)
 		if err != nil {
-			pl.ResultChan <- Result{
-				Text:  "Whoops, download failed :c try again",
+			res = Result{
+				Text:  "Whoops, download failed. Try again :c",
 				State: c.downloadSong,
 				Error: err,
 			}
+			res.AddKeyboardRow()
+			pl.ResultChan <- res
 			return
 		}
+
 	} else {
+		res := Result{Text: "🌐 Please wait..."}
+		res.AddKeyboardButton("Downloading...", "-")
+		pl.ResultChan <- res
+
 		blob, err = c.blob.DownloadYouTube(ctx, pl.UserID, pl.Command)
 		if err != nil {
-			pl.ResultChan <- Result{
+			res = Result{
 				Text:  "Whoops, please try another link :c",
 				State: c.downloadSong,
 				Error: err,
 			}
+			res.AddKeyboardRow()
+			pl.ResultChan <- res
 			return
 		}
 	}
 
-	html := fmt.Sprintf("File has been uploaded successfully!\n")
-	html += fmt.Sprintf("📂 %s\n", blob.OriginalName)
-
-	res = Result{Text: html}
-	res.AddKeyboardButton("Start Processing", commandf(c, "start", blob.ID))
+	res := Result{Text: fmt.Sprintf("📂 %s\n", blob.OriginalName)}
+	res.AddKeyboardButton("Start Processing", commandf(c, cmdSeparateSongStart, blob.ID))
 	pl.ResultChan <- res
 }
 
 func (c *SeparateSongCommand) startProcessing(ctx context.Context, pl Payload, blobID int64) {
-	res := Result{}
-	res.AddKeyboardButton("Downloading the song...", "-")
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", commandf(c, "cancel"))
-	pl.ResultChan <- res
-
 	if c.queue.Lock() {
 		defer c.queue.Unlock()
 		c.processFile(ctx, pl, blobID)
