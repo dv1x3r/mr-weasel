@@ -34,7 +34,7 @@ type BlobBase struct {
 }
 
 func (b *BlobBase) GetAbsolutePath() string {
-	return filepath.Join(downloadPath, fmt.Sprintf("%d.%s", b.ID, b.Extension))
+	return filepath.Join(downloadPath, fmt.Sprintf("%d%s", b.ID, b.Extension))
 }
 
 type BlobPayload struct {
