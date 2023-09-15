@@ -59,15 +59,16 @@ func (m *Manager) Start() {
 	}
 	updates := m.tgClient.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
-		m.processUpdate(ctx, update)
-	}
-}
-
-func (m *Manager) processUpdate(ctx context.Context, update Update) {
-	if update.Message != nil && update.Message.From != nil {
-		m.processMessage(ctx, *update.Message)
-	} else if update.CallbackQuery != nil {
-		m.processCallbackQuery(ctx, *update.CallbackQuery)
+		if update.Message != nil && update.Message.From != nil {
+			m.processMessage(ctx, *update.Message)
+		} else if update.CallbackQuery != nil {
+			m.processCallbackQuery(ctx, *update.CallbackQuery)
+			// Answer to the callback query just to dismiss "Loading..." prompt on the top
+			_, err := m.tgClient.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
+			if err != nil {
+				log.Println("[ERROR]", err)
+			}
+		}
 	}
 }
 
@@ -78,17 +79,12 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		return
 	}
 
-	userID := message.From.ID
-	command := message.Text
 	var blobPayload *utils.BlobPayload
-
 	if message.Audio != nil {
 		URL, err := m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			return
-		} else if command == "" {
-			command = message.Audio.FileName
 		}
 		blobPayload = &utils.BlobPayload{
 			FileID:   message.Audio.FileID,
@@ -98,8 +94,8 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	}
 
 	pl := commands.Payload{
-		UserID:      userID,
-		Command:     command,
+		UserID:      message.From.ID,
+		Command:     message.Text,
 		BlobPayload: blobPayload,
 		ResultChan:  make(chan commands.Result),
 	}
@@ -109,49 +105,14 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		fn(ctx, pl)
 	}()
 
-	go func() {
-		var previousResponse Message
-		var err error
-
-		for result := range pl.ResultChan {
-
-			if result.Error != nil {
-				log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
-			}
-
-			if result.State != nil {
-				m.states[pl.UserID] = result.State
-			} else if previousResponse.MessageID == 0 {
-				// Only the root response can clear the state
-				delete(m.states, pl.UserID)
-			}
-
-			if result.Text == "" {
-				continue
-			}
-
-			previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
-				ChatID:           message.Chat.ID,
-				Text:             result.Text,
-				ParseMode:        "HTML",
-				ReplyMarkup:      m.commandKeyboardToInlineMarkup(result.Keyboard),
-				ReplyToMessageId: previousResponse.MessageID,
-			})
-			if err != nil {
-				log.Println("[ERROR]", utils.WrapIfErr(op, err))
-			}
-
-		}
-	}()
+	go m.processResults(ctx, pl, message)
 }
 
 func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
-
-	// Answer to the callback query just to dismiss "Loading..." prompt on the top
-	_, err := m.tgClient.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: callbackQuery.ID})
-	if err != nil {
-		log.Println("[ERROR]", utils.WrapIfErr(op, err))
+	fn, ok := m.getExecuteFunc(callbackQuery.From.ID, callbackQuery.Data)
+	if !ok {
+		return
 	}
 
 	pl := commands.Payload{
@@ -160,66 +121,66 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		ResultChan: make(chan commands.Result),
 	}
 
-	fn, ok := m.getExecuteFunc(pl.UserID, pl.Command)
-	if !ok {
-		return
-	}
-
 	go func() {
 		defer close(pl.ResultChan)
 		fn(ctx, pl)
 	}()
 
-	go func() {
-		var previousResponse Message
+	go m.processResults(ctx, pl, *callbackQuery.Message)
+}
 
-		for result := range pl.ResultChan {
+func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse Message) {
+	const op = "telegram.Manager.processResults"
+	var err error
 
-			if result.Error != nil {
-				log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
-			}
+	for result := range pl.ResultChan {
+		if result.Error != nil {
+			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
+		}
 
+		// if both previous and new response contain a keyboard, then it is update
+		if result.Keyboard != nil && previousResponse.ReplyMarkup != nil {
+			// in case of update we can both only change states
 			if result.State != nil {
 				m.states[pl.UserID] = result.State
 			}
 
-			isResultRoot := previousResponse.MessageID == 0
-			isResultBacground := previousResponse.MessageID != 0
-			withKeyboard := result.Keyboard != nil
-			withText := result.Text != ""
-			isNewResponse := (isResultRoot && withText && !withKeyboard) || (isResultBacground && withText)
-
-			// keep original callback text if not specified explicitly
-			if result.Text == "" && result.Keyboard != nil {
-				result.Text = callbackQuery.Message.Text
+			// in case of update, keep original text if not specified explicitly
+			if result.Text == "" {
+				result.Text = previousResponse.Text
 			}
 
-			if isNewResponse {
-				previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
-					ChatID:      callbackQuery.Message.Chat.ID,
-					Text:        result.Text,
-					ParseMode:   "HTML",
-					ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
-					// ReplyToMessageId: previousResponse.MessageID, // TODO: works bad with calendar widget
-				})
-				if err != nil {
-					log.Println("[ERROR]", utils.WrapIfErr(op, err))
-				}
-			} else if withKeyboard {
-				previousResponse, err = m.tgClient.EditMessageText(ctx, EditMessageTextConfig{
-					ChatID:      callbackQuery.Message.Chat.ID,
-					MessageID:   callbackQuery.Message.MessageID,
-					Text:        result.Text,
-					ParseMode:   "HTML",
-					ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
-				})
-				if err != nil {
-					log.Println("[ERROR]", utils.WrapIfErr(op, err))
-				}
+			previousResponse, err = m.tgClient.EditMessageText(ctx, EditMessageTextConfig{
+				ChatID:      previousResponse.Chat.ID,
+				MessageID:   previousResponse.MessageID,
+				Text:        result.Text,
+				ParseMode:   "HTML",
+				ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+			})
+			if err != nil {
+				log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			}
+
+		} else if result.Text != "" {
+			// in case of new reponse message we can both change and escape states
+			if result.State != nil {
+				m.states[pl.UserID] = result.State
+			} else {
+				delete(m.states, pl.UserID)
+			}
+
+			previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
+				ChatID:      previousResponse.Chat.ID,
+				Text:        result.Text,
+				ParseMode:   "HTML",
+				ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+			})
+			if err != nil {
+				log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			}
 		}
-	}()
 
+	}
 }
 
 func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFunc, bool) {
