@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"mr-weasel/utils"
 )
 
 type ExecuteFunc = func(context.Context, Payload)
@@ -17,16 +19,10 @@ type Handler interface {
 }
 
 type Payload struct {
-	UserID     int64
-	Command    string
-	Media      *PayloadMedia
-	ResultChan chan Result
-}
-
-type PayloadMedia struct {
-	FileID   string
-	FileName string
-	FileURL  string
+	UserID      int64
+	Command     string
+	BlobPayload *utils.BlobPayload
+	ResultChan  chan Result
 }
 
 type Result struct {
