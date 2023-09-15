@@ -141,7 +141,7 @@ func (c *HolidayCommand) addHolidayStartDate(ctx context.Context, pl Payload) {
 		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addHolidayStartDate}
 		return
 	}
-	res.Text = "Holiday start date: " + c.draftHolidays[pl.UserID].GetStartTimestamp()
+	res.Text = "Start: " + c.draftHolidays[pl.UserID].GetStartTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Please pick holiday end date.", State: c.addHolidayEndDate}
@@ -159,7 +159,7 @@ func (c *HolidayCommand) addHolidayEndDate(ctx context.Context, pl Payload) {
 		pl.ResultChan <- res
 		return
 	}
-	res.Text = "Holiday end date: " + c.draftHolidays[pl.UserID].GetEndTimestamp()
+	res.Text = "End: " + c.draftHolidays[pl.UserID].GetEndTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Enter number of working days.", State: c.addHolidayDaysAndSave}

@@ -469,7 +469,7 @@ func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) {
 		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addFuelTimestamp}
 		return
 	}
-	res.Text = "Fuel receipt date: " + c.draftFuel[pl.UserID].GetTimestamp()
+	res.Text = "Date: " + c.draftFuel[pl.UserID].GetTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "What is the fuel type?", State: c.addFuelType}
@@ -599,7 +599,7 @@ func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) {
 		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addServiceTimestamp}
 		return
 	}
-	res.Text = "Service receipt date: " + c.draftService[pl.UserID].GetTimestamp()
+	res.Text = "Date: " + c.draftService[pl.UserID].GetTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Provide service description.", State: c.addServiceDescription}
@@ -720,7 +720,7 @@ func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) {
 		pl.ResultChan <- Result{Text: "Please pick a date from the calendar.", State: c.addLeaseTimestamp}
 		return
 	}
-	res.Text = "Lease receipt date: " + c.draftLease[pl.UserID].GetTimestamp()
+	res.Text = "Date: " + c.draftLease[pl.UserID].GetTimestamp()
 	res.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Provide lease description. /skip", State: c.addLeaseDescription}
