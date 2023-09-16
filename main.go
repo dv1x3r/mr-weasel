@@ -30,7 +30,7 @@ func main() {
 
 	if os.Getenv("RTX_MODE") == "on" {
 		tgManager.AddCommands(
-			commands.NewSeparateSongCommand(blob, queue),
+			commands.NewExtractVoiceCommand(blob, queue),
 		)
 	} else {
 		tgManager.AddCommands(
