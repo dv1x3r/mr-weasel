@@ -10,6 +10,8 @@ import (
 	"mr-weasel/utils"
 )
 
+const cmdCancel = "/cancel"
+
 type ExecuteFunc = func(context.Context, Payload)
 
 type Handler interface {
