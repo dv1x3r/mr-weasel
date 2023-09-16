@@ -61,7 +61,7 @@ func (c *SeparateSongCommand) downloadSong(ctx context.Context, pl Payload) {
 		blob, err = c.blob.DownloadBlob(ctx, pl.UserID, pl.BlobPayload)
 		if err != nil {
 			res = Result{
-				Text:  "Whoops, download failed. Try again :c",
+				Text:  "Whoops, download failed, try again :c",
 				State: c.downloadSong,
 				Error: err,
 			}
@@ -105,7 +105,10 @@ func (c *SeparateSongCommand) startProcessing(ctx context.Context, pl Payload, b
 func (c *SeparateSongCommand) processFile(ctx context.Context, pl Payload, blobID int64) {
 	blob, err := c.blob.GetBlobFromDB(ctx, pl.UserID, blobID)
 	if err != nil {
-		pl.ResultChan <- Result{Text: fmt.Sprintf("Song file not found.\nCan you formard it to me again?"), State: c.downloadSong}
+		pl.ResultChan <- Result{
+			Text:  "File not found, can you please forward it to me?",
+			State: c.downloadSong,
+		}
 		return
 	}
 
@@ -129,16 +132,16 @@ func (c *SeparateSongCommand) processFile(ctx context.Context, pl Payload, blobI
 	err = cmd.Run()
 	if err != nil {
 		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, "start", blob.ID))
+		res.AddKeyboardButton("Retry", commandf(c, cmdSeparateSongStart, blob.ID))
 		pl.ResultChan <- res
-		pl.ResultChan <- Result{Text: "Whoops, python script failed :c Try again", Error: err}
+		pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
 		return
 	}
 
 	res = Result{}
 	res.AddKeyboardButton("Uploading results...", "-")
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", commandf(c, "cancel"))
+	res.AddKeyboardButton("Cancel", cmdCancel)
 	pl.ResultChan <- res
 
 	// TODO: upload here
@@ -146,11 +149,8 @@ func (c *SeparateSongCommand) processFile(ctx context.Context, pl Payload, blobI
 	voiceBlobID := 0
 
 	res = Result{}
-	res.AddKeyboardButton("Done!", "-")
-	pl.ResultChan <- res
-
-	res = Result{Text: "Song has been successfully processed!"}
 	res.AddKeyboardButton("Get Music", commandf(c, "music", musicBlobID))
 	res.AddKeyboardButton("Get Voice", commandf(c, "voice", voiceBlobID))
 	pl.ResultChan <- res
+	pl.ResultChan <- Result{Text: "Song has been successfully processed!"}
 }
