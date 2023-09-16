@@ -48,10 +48,7 @@ func (m *Manager) PublishCommands() {
 	}
 }
 
-func (m *Manager) Start() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+func (m *Manager) Start(ctx context.Context) {
 	cfg := GetUpdatesConfig{
 		Offset:         -1,
 		Timeout:        60,

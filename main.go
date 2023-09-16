@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
 
 	"mr-weasel/commands"
 	"mr-weasel/storage"
@@ -39,5 +41,19 @@ func main() {
 	}
 
 	tgManager.PublishCommands()
-	tgManager.Start()
+	tgManager.Start(mainContext())
+}
+
+func mainContext() context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		select {
+		case <-c:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx
 }
