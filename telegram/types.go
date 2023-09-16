@@ -217,32 +217,3 @@ type BotCommandScope struct {
 	ChatID int64  `json:"chat_id,omitempty"`
 	UserID int64  `json:"user_id,omitempty"`
 }
-
-// Represents an audio file to be treated as music to be sent.
-type InputMediaAudio struct {
-	// Type of the result, must be audio.
-	Type string `json:"type"`
-	// File to send. Pass a file_id to send a file that exists on the Telegram servers (recommended),
-	// pass an HTTP URL for Telegram to get a file from the Internet,
-	// or pass “attach://<file_attach_name>” to upload a new one using multipart/form-data under <file_attach_name> name.
-	Media string `json:"media"`
-	// Optional. Thumbnail of the file sent.
-	// Thumbnails can't be reused and can be only uploaded as a new file,
-	// so you can pass “attach://<file_attach_name>” if the thumbnail was uploaded using multipart/form-data under <file_attach_name>.
-	Thumbnail string `json:"thumbnail,omitempty"`
-	// Optional. Caption of the audio to be sent, 0-1024 characters after entities parsing.
-	Caption string `json:"caption,omitempty"`
-	// Optional. Mode for parsing entities in the audio caption. See formatting options for more details.
-	ParseMode string `json:"parse_mode,omitempty"`
-	// Optional. List of special entities that appear in the caption, which can be specified instead of parse_mode.
-	CaptionEntities []MessageEntity `json:"caption_entities,omitempty"`
-	// Optional. Duration of the audio in seconds.
-	Duration int64 `json:"duration,omitempty"`
-	// Optional. Performer of the audio.
-	Performer string `json:"performer,omitempty"`
-	// Optional. Title of the audio.
-	Title string `json:"title,omitempty"`
-}
-
-type InputFile interface {
-}

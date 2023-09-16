@@ -70,6 +70,13 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 	return value, utils.WrapIfErr(op, err)
 }
 
+// Use this method to send audio files, if you want Telegram clients to display them in the music player.
+func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig) (Message, error) {
+	const op = "telegram.Client.SendAudio"
+	value, err := executeMethod[Message](ctx, c, cfg)
+	return value, utils.WrapIfErr(op, err)
+}
+
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
 	const op = "telegram.Client.EditMessageText"

@@ -56,6 +56,46 @@ func (SendMessageConfig) Method() string {
 	return "sendMessage"
 }
 
+type SendAudioConfig struct {
+	// Unique identifier for the target chat or username of the target channel.
+	ChatID int64 `json:"chat_id"`
+	// Unique identifier for the target message thread (topic) of the forum; for forum supergroups only.
+	MessageThreadID int64 `json:"message_thread_id,omitempty"`
+	// Audio file to send.
+	// Pass a file_id as String to send an audio file that exists on the Telegram servers (recommended),
+	// pass an HTTP URL as a String for Telegram to get an audio file from the Internet,
+	// or upload a new one using multipart/form-data.
+	Audio string `json:"audio,omitempty"`
+	// Audio caption, 0-1024 characters after entities parsing.
+	Caption string `json:"caption,omitempty"`
+	// Mode for parsing entities in the audio caption.
+	ParseMode string `json:"parse_mode,omitempty"`
+	// A JSON-serialized list of special entities that appear in the caption, which can be specified instead of parse_mode.
+	CaptionEntities []MessageEntity `json:"caption_entities,omitempty"`
+	// Duration of the audio in seconds.
+	Duration int64 `json:"duration,omitempty"`
+	// Performer.
+	Performer string `json:"performer,omitempty"`
+	// Track name.
+	Title string `json:"title,omitempty"`
+	// Thumbnail of the file sent; can be ignored if thumbnail generation for the file is supported server-side.
+	Thumbnail string `json:"thumbnail,omitempty"`
+	// Sends the message silently. Users will receive a notification with no sound.
+	DisableNotification bool `json:"disable_notification,omitempty"`
+	// Protects the contents of the sent message from forwarding and saving.
+	ProtectContent bool `json:"protect_content,omitempty"`
+	// If the message is a reply, ID of the original message.
+	ReplyToMessageID int64 `json:"reply_to_message_id,omitempty"`
+	// Pass True if the message should be sent even if the specified replied-to message is not found.
+	AllowSendingWithoutReply bool `json:"allow_sending_without_reply,omitempty"`
+	// Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
+	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+}
+
+func (SendAudioConfig) Method() string {
+	return "sendAudio"
+}
+
 type EditMessageTextConfig struct {
 	// Optional. Required if inline_message_id is not specified. Unique identifier for the target chat or username of the target channel.
 	ChatID int64 `json:"chat_id,omitempty"`
