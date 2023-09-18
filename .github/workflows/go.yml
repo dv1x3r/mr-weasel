@@ -30,8 +30,8 @@ jobs:
         name: build
         path: |
           mr-weasel
-          mr-weasel.service
           migrations
+          .service
 
   deploy:
     needs: build
