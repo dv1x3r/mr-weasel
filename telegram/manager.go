@@ -98,8 +98,8 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 	}
 
 	go func() {
-		defer close(pl.ResultChan)
 		fn(ctx, pl)
+		close(pl.ResultChan)
 	}()
 
 	go m.processResults(ctx, pl, message)
@@ -119,8 +119,8 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 	}
 
 	go func() {
-		defer close(pl.ResultChan)
 		fn(ctx, pl)
+		close(pl.ResultChan)
 	}()
 
 	go m.processResults(ctx, pl, *callbackQuery.Message)
