@@ -6,8 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -52,49 +56,49 @@ func (c *Client) MustConnect() *Client {
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
 func (c *Client) GetMe(ctx context.Context, cfg GetMeConfig) (User, error) {
 	const op = "telegram.Client.GetMe"
-	value, err := executeMethod[User](ctx, c, cfg)
+	value, err := executeMethod[User](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to receive incoming updates using long polling. Returns an Array of Update objects.
 func (c *Client) GetUpdates(ctx context.Context, cfg GetUpdatesConfig) ([]Update, error) {
 	const op = "telegram.Client.GetUpdates"
-	value, err := executeMethod[[]Update](ctx, c, cfg)
+	value, err := executeMethod[[]Update](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to send text messages. On success, the sent Message is returned.
 func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Message, error) {
 	const op = "telegram.Client.SendMessage"
-	value, err := executeMethod[Message](ctx, c, cfg)
+	value, err := executeMethod[Message](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to send audio files, if you want Telegram clients to display them in the music player.
-func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig) (Message, error) {
+func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media map[string]string) (Message, error) {
 	const op = "telegram.Client.SendAudio"
-	value, err := executeMethod[Message](ctx, c, cfg)
+	value, err := executeMethod[Message](ctx, c, cfg, media)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
 	const op = "telegram.Client.EditMessageText"
-	value, err := executeMethod[Message](ctx, c, cfg)
+	value, err := executeMethod[Message](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to send answers to callback queries sent from inline keyboards. The answer will be displayed to the user as a notification at the top of the chat screen or as an alert. On success, True is returned.
 func (c *Client) AnswerCallbackQuery(ctx context.Context, cfg AnswerCallbackQueryConfig) (bool, error) {
 	const op = "telegram.Client.AnswerCallbackQuery"
-	value, err := executeMethod[bool](ctx, c, cfg)
+	value, err := executeMethod[bool](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to get basic information about a file and prepare it for downloading. On success, a File object is returned.
 func (c *Client) GetFile(ctx context.Context, cfg GetFileConfig) (File, error) {
 	const op = "telegram.Client.GetFile"
-	value, err := executeMethod[File](ctx, c, cfg)
+	value, err := executeMethod[File](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
@@ -109,7 +113,7 @@ func (c *Client) GetFileURL(ctx context.Context, cfg GetFileConfig) (string, err
 // Use this method to change the list of the bot's commands. See this manual for more details about bot commands. Returns True on success.
 func (c *Client) SetMyCommands(ctx context.Context, cfg SetMyCommandsConfig) (bool, error) {
 	const op = "telegram.Client.SetMyCommands"
-	value, err := executeMethod[bool](ctx, c, cfg)
+	value, err := executeMethod[bool](ctx, c, cfg, nil)
 	return value, utils.WrapIfErr(op, err)
 }
 
@@ -153,38 +157,94 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
-func executeMethod[T any](ctx context.Context, client *Client, cfg Config) (T, error) {
-	var value T
+func writeMultipart(body *bytes.Buffer, cfg Config, media map[string]string) (string, error) {
+	writer := multipart.NewWriter(body)
+	defer writer.Close()
 
-	res, err := client.makeRequest(ctx, cfg)
+	cfgJson, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	var cfgMap map[string]any
+	err = json.Unmarshal(cfgJson, &cfgMap)
+	if err != nil {
+		return "", err
+	}
+
+	log.Printf("%+v\n", cfgMap)
+
+	for mapField, mapValue := range cfgMap {
+		if reflect.ValueOf(mapValue).Kind() == reflect.Map {
+			mapValueJson, err := json.Marshal(mapValue)
+			if err != nil {
+				return "", err
+			}
+			writer.WriteField(mapField, fmt.Sprint(mapValueJson))
+		} else {
+			writer.WriteField(mapField, fmt.Sprint(mapValue))
+		}
+	}
+
+	for partName, filePath := range media {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
+
+		part, err := writer.CreateFormFile(partName, "kek.mp3")
+		if err != nil {
+			return "", err
+		}
+		io.Copy(part, file)
+	}
+
+	return writer.FormDataContentType(), nil
+}
+
+func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media map[string]string) (T, error) {
+	var value T
+	var err error
+
+	body := new(bytes.Buffer)
+	contentType := "application/json"
+
+	if cfg != nil && media == nil {
+		// application/json response
+		if err = json.NewEncoder(body).Encode(cfg); err != nil {
+			return value, err
+		}
+	} else if cfg != nil && media != nil {
+		// multitype/form-data response
+		contentType, err = writeMultipart(body, cfg, media)
+	}
+
+	if client.debug {
+		log.Printf("[DEBUG] Request %s %s %+v %+v\b", contentType, cfg.Method(), cfg, media)
+	}
+
+	url := fmt.Sprintf(apiEndpoint, client.token, cfg.Method())
+	res, err := client.makeRequest(ctx, url, contentType, body)
 	if err != nil {
 		return value, err
+	}
+
+	if client.debug {
+		log.Println("[DEBUG] Response", cfg.Method(), strings.TrimSpace(string(res.Result)))
 	}
 
 	err = json.Unmarshal(res.Result, &value)
 	return value, err
 }
 
-func (c *Client) makeRequest(ctx context.Context, cfg Config) (*APIResponse, error) {
-	url := fmt.Sprintf(apiEndpoint, c.token, cfg.Method())
-
-	params := new(bytes.Buffer)
-	if cfg != nil {
-		err := json.NewEncoder(params).Encode(cfg)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if c.debug {
-		log.Println("[DEBUG] Request", cfg.Method(), strings.TrimSpace(string(params.Bytes())))
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, params)
+func (c *Client) makeRequest(ctx context.Context, url string, contentType string, body *bytes.Buffer) (*APIResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+
+	req.Header.Set("Content-Type", contentType)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -210,10 +270,6 @@ func (c *Client) makeRequest(ctx context.Context, cfg Config) (*APIResponse, err
 			Message:            apiRes.Description,
 			ResponseParameters: parameters,
 		}
-	}
-
-	if c.debug {
-		log.Println("[DEBUG] Response", cfg.Method(), strings.TrimSpace(string(apiRes.Result)))
 	}
 
 	return apiRes, nil
