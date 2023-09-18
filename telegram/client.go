@@ -11,7 +11,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"time"
 
@@ -75,7 +74,7 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 }
 
 // Use this method to send audio files, if you want Telegram clients to display them in the music player.
-func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media map[string]string) (Message, error) {
+func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media MultipartAttachments) (Message, error) {
 	const op = "telegram.Client.SendAudio"
 	value, err := executeMethod[Message](ctx, c, cfg, media)
 	return value, utils.WrapIfErr(op, err)
@@ -157,53 +156,32 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
-func writeMultipart(body *bytes.Buffer, cfg Config, media map[string]string) (string, error) {
+func writeMultipart(body *bytes.Buffer, cfg Config, media MultipartAttachments) (string, error) {
 	writer := multipart.NewWriter(body)
 	defer writer.Close()
 
-	cfgJson, err := json.Marshal(cfg)
-	if err != nil {
-		return "", err
-	}
+	// var objmap map[string]json.RawMessage
+	// err := json.Unmarshal(data, &objmap)
 
-	var cfgMap map[string]any
-	err = json.Unmarshal(cfgJson, &cfgMap)
-	if err != nil {
-		return "", err
-	}
-
-	log.Printf("%+v\n", cfgMap)
-
-	for mapField, mapValue := range cfgMap {
-		if reflect.ValueOf(mapValue).Kind() == reflect.Map {
-			mapValueJson, err := json.Marshal(mapValue)
-			if err != nil {
-				return "", err
-			}
-			writer.WriteField(mapField, fmt.Sprint(mapValueJson))
-		} else {
-			writer.WriteField(mapField, fmt.Sprint(mapValue))
-		}
-	}
-
-	for partName, filePath := range media {
-		file, err := os.Open(filePath)
+	for partName, partFile := range media {
+		file, err := os.Open(partFile.Path)
 		if err != nil {
 			return "", err
 		}
 		defer file.Close()
 
-		part, err := writer.CreateFormFile(partName, "kek.mp3")
+		part, err := writer.CreateFormFile(partName, partFile.Name)
 		if err != nil {
 			return "", err
 		}
+
 		io.Copy(part, file)
 	}
 
 	return writer.FormDataContentType(), nil
 }
 
-func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media map[string]string) (T, error) {
+func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media MultipartAttachments) (T, error) {
 	var value T
 	var err error
 

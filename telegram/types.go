@@ -33,6 +33,13 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("telegram.APIError: %d %s", e.Code, e.Message)
 }
 
+type MultipartAttachments = map[string]MultipartFile
+
+type MultipartFile struct {
+	Name string
+	Path string
+}
+
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
 type Update struct {
 	// The update's unique identifier
