@@ -80,6 +80,16 @@ func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media Form)
 	return value, utils.WrapIfErr(op, err)
 }
 
+// Use this method to send a group of photos, videos, documents or audios as an album. Documents and audio files can be only grouped in an album with messages of the same type. On success, an array of Messages that were sent is returned.
+func (c *Client) SendMediaGroup(ctx context.Context, cfg SendMediaGroupConfig, media Form) ([]Message, error) {
+	const op = "telegram.Client.SendMediaGroup"
+	for _, media := range cfg.Media {
+		media.SetInputMediaType()
+	}
+	value, err := executeMethod[[]Message](ctx, c, cfg, media)
+	return value, utils.WrapIfErr(op, err)
+}
+
 // Use this method to edit text and game messages. On success, if the edited message is not an inline message, the edited Message is returned, otherwise True is returned.
 func (c *Client) EditMessageText(ctx context.Context, cfg EditMessageTextConfig) (Message, error) {
 	const op = "telegram.Client.EditMessageText"

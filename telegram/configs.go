@@ -96,6 +96,27 @@ func (SendAudioConfig) Method() string {
 	return "sendAudio"
 }
 
+type SendMediaGroupConfig struct {
+	// Unique identifier for the target chat or username of the target channel.
+	ChatID int64 `json:"chat_id"`
+	// Optional. Unique identifier for the target message thread (topic) of the forum; for forum supergroups only.
+	MessageThreadID int64 `json:"message_thread_id,omitempty"`
+	// A JSON-serialized array describing messages to be sent, must include 2-10 items.
+	Media []InputMedia `json:"media"`
+	// Optional. Sends messages silently. Users will receive a notification with no sound.
+	DisableNotification bool `json:"disable_notification,omitempty"`
+	// Optional. Protects the contents of the sent messages from forwarding and saving.
+	ProtectContent bool `json:"protect_content,omitempty"`
+	// Optional. If the messages are a reply, ID of the original message.
+	ReplyToMessageID int64 `json:"reply_to_message_id,omitempty"`
+	// Optional. Pass True if the message should be sent even if the specified replied-to message is not found.
+	AllowSendingWithoutReply bool `json:"allow_sending_without_reply,omitempty"`
+}
+
+func (SendMediaGroupConfig) Method() string {
+	return "sendMediaGroup"
+}
+
 type EditMessageTextConfig struct {
 	// Optional. Required if inline_message_id is not specified. Unique identifier for the target chat or username of the target channel.
 	ChatID int64 `json:"chat_id,omitempty"`

@@ -225,6 +225,12 @@ type BotCommandScope struct {
 	UserID int64  `json:"user_id,omitempty"`
 }
 
+// This object represents the content of a media message to be sent.
+// It should be one of: InputMediaAnimation, InputMediaDocument, InputMediaAudio, InputMediaPhoto, InputMediaVideo.
+type InputMedia interface {
+	SetInputMediaType()
+}
+
 // Represents an audio file to be treated as music to be sent.
 type InputMediaAudio struct {
 	// Type of the result, must be audio.
@@ -251,5 +257,6 @@ type InputMediaAudio struct {
 	Title string `json:"title,omitempty"`
 }
 
-type InputFile interface {
+func (im *InputMediaAudio) SetInputMediaType() {
+	im.Type = "audio"
 }
