@@ -33,9 +33,9 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("telegram.APIError: %d %s", e.Code, e.Message)
 }
 
-type MultipartAttachments = map[string]MultipartFile
+type Form = map[string]FormFile
 
-type MultipartFile struct {
+type FormFile struct {
 	Name string
 	Path string
 }

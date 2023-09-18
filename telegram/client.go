@@ -74,7 +74,7 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 }
 
 // Use this method to send audio files, if you want Telegram clients to display them in the music player.
-func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media MultipartAttachments) (Message, error) {
+func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media Form) (Message, error) {
 	const op = "telegram.Client.SendAudio"
 	value, err := executeMethod[Message](ctx, c, cfg, media)
 	return value, utils.WrapIfErr(op, err)
@@ -156,12 +156,24 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
-func writeMultipart(body *bytes.Buffer, cfg Config, media MultipartAttachments) (string, error) {
+func writeMultipart(body *bytes.Buffer, cfg Config, media Form) (string, error) {
 	writer := multipart.NewWriter(body)
 	defer writer.Close()
 
-	// var objmap map[string]json.RawMessage
-	// err := json.Unmarshal(data, &objmap)
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	var raw map[string]json.RawMessage
+	err = json.Unmarshal(data, &raw)
+	if err != nil {
+		return "", err
+	}
+
+	for fieldName, fieldValue := range raw {
+		writer.WriteField(fieldName, string(fieldValue))
+	}
 
 	for partName, partFile := range media {
 		file, err := os.Open(partFile.Path)
@@ -181,7 +193,7 @@ func writeMultipart(body *bytes.Buffer, cfg Config, media MultipartAttachments) 
 	return writer.FormDataContentType(), nil
 }
 
-func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media MultipartAttachments) (T, error) {
+func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media Form) (T, error) {
 	var value T
 	var err error
 
@@ -190,12 +202,16 @@ func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media
 
 	if cfg != nil && media == nil {
 		// application/json response
-		if err = json.NewEncoder(body).Encode(cfg); err != nil {
+		err = json.NewEncoder(body).Encode(cfg)
+		if err != nil {
 			return value, err
 		}
 	} else if cfg != nil && media != nil {
 		// multitype/form-data response
 		contentType, err = writeMultipart(body, cfg, media)
+		if err != nil {
+			return value, err
+		}
 	}
 
 	if client.debug {
