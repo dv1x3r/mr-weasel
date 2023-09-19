@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	"mr-weasel/commands"
@@ -166,7 +167,14 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			form := Form{}
 			media := []InputMedia{}
 
-			for name, path := range result.Audio {
+			keys := make([]string, 0, len(result.Audio))
+			for k := range result.Audio {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+
+			for _, name := range keys {
+				path := result.Audio[name]
 				form[name] = FormFile{Name: name, Path: path, Delete: result.DeleteFiles}
 				media = append(media, &InputMediaAudio{Media: "attach://" + name})
 			}
