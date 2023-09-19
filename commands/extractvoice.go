@@ -31,20 +31,14 @@ func (ExtractVoiceCommand) Description() string {
 }
 
 const (
-	cmdSeparateSongStart = "start"
-	cmdSeparateSongMusic = "music"
-	cmdSeparateSongVoice = "voice"
+	cmdExtractVoiceStart = "start"
 )
 
 func (c *ExtractVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
-	case cmdSeparateSongStart:
+	case cmdExtractVoiceStart:
 		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
-	case cmdSeparateSongMusic:
-	// c.getMusic(ctx, pl, safeGetInt64(args, 1))
-	case cmdSeparateSongVoice:
-	// c.getVoice(ctx, pl, safeGetInt64(args, 1))
 	default:
 		pl.ResultChan <- Result{Text: "Sure! Send me the song or YouTube link!", State: c.downloadSong}
 	}
@@ -90,7 +84,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	res := Result{Text: fmt.Sprintf("📂 %s\n", blob.OriginalName)}
-	res.AddKeyboardButton("Start Processing", commandf(c, cmdSeparateSongStart, blob.ID))
+	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, blob.ID))
 	pl.ResultChan <- res
 }
 
@@ -133,7 +127,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	err = cmd.Run()
 	if err != nil {
 		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdSeparateSongStart, songBlob.ID))
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, songBlob.ID))
 		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
 		return
