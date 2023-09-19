@@ -1,5 +1,7 @@
 package utils
 
+import "context"
+
 type Queue struct {
 	queueChan chan int
 	execChan  chan int
@@ -12,11 +14,15 @@ func NewQueue(queueBuffer, execBuffer int) *Queue {
 	}
 }
 
-func (q *Queue) Lock() bool {
+func (q *Queue) Lock(ctx context.Context) bool {
 	select {
 	case q.queueChan <- 0:
-		q.execChan <- 0
-		return true
+		select {
+		case q.execChan <- 0:
+			return true
+		case <-ctx.Done():
+			return false
+		}
 	default:
 		return false
 	}

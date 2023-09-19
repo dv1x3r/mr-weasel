@@ -89,7 +89,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 }
 
 func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, blobID int64) {
-	if c.queue.Lock() {
+	if c.queue.Lock(ctx) {
 		defer c.queue.Unlock()
 		c.processFile(ctx, pl, blobID)
 	} else {
