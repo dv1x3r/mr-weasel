@@ -104,7 +104,3 @@ func (b *Blob) DownloadBlob(ctx context.Context, userID int64, blobPayload *Blob
 func (b *Blob) DownloadYouTube(ctx context.Context, userID int64, link string) (BlobBase, error) {
 	return BlobBase{}, errors.New("not implemented")
 }
-
-func (b *Blob) UploadFile(ctx context.Context, userID int64, path string) (int64, error) {
-	return 0, nil
-}
