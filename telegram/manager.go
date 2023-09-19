@@ -135,9 +135,24 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
 		}
 
-		// if both previous and new response contain a keyboard, then it is update
-		if result.Keyboard != nil && previousResponse.ReplyMarkup != nil {
-			// in case of update we can both only change states
+		if result.Audio != nil {
+			form := Form{}
+			media := []InputMedia{}
+
+			for name, path := range result.Audio {
+				form[name] = FormFile{Name: name, Path: path}
+				media = append(media, &InputMediaAudio{Media: "attach://" + name})
+			}
+
+			_, err = m.tgClient.SendMediaGroup(ctx, SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, form)
+			if err != nil {
+				log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			}
+
+		} else if result.Keyboard != nil && previousResponse.ReplyMarkup != nil {
+			// if both previous and new response contain a keyboard, then it is update
+
+			// in case of update we can change states only
 			if result.State != nil {
 				m.states[pl.UserID] = result.State
 			}
@@ -159,6 +174,8 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			}
 
 		} else if result.Text != "" {
+			// otherwise it is just a new message
+
 			// in case of new reponse message we can both change and escape states
 			if result.State != nil {
 				m.states[pl.UserID] = result.State
@@ -189,10 +206,12 @@ func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFun
 			return handler.Execute, true
 		}
 	}
+
 	fn, ok := m.states[userID] // Stateful command
 	if ok {
 		log.Printf("[VERB] %d: %s\n", userID, utils.GetFunctionName(fn))
 	}
+
 	return fn, ok
 }
 
