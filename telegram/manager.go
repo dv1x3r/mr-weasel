@@ -167,7 +167,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			media := []InputMedia{}
 
 			for name, path := range result.Audio {
-				form[name] = FormFile{Name: name, Path: path}
+				form[name] = FormFile{Name: name, Path: path, Delete: result.DeleteFiles}
 				media = append(media, &InputMediaAudio{Media: "attach://" + name})
 			}
 
