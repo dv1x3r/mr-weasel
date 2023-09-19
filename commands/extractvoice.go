@@ -158,5 +158,6 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 			musicName: musicPath,
 			voiceName: voicePath,
 		},
+		DeleteFiles: true,
 	}
 }

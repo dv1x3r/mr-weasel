@@ -36,8 +36,9 @@ func (e *APIError) Error() string {
 type Form = map[string]FormFile
 
 type FormFile struct {
-	Name string
-	Path string
+	Name   string
+	Path   string
+	Delete bool
 }
 
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
