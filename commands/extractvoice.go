@@ -40,7 +40,8 @@ func (c *ExtractVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	case cmdExtractVoiceStart:
 		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
 	default:
-		pl.ResultChan <- Result{Text: "Sure! Send me the song or YouTube link!", State: c.downloadSong}
+		// pl.ResultChan <- Result{Text: "Sure! Send me the song file or YouTube link!", State: c.downloadSong}
+		pl.ResultChan <- Result{Text: "Sure! Send me the song audio file!", State: c.downloadSong}
 	}
 }
 
@@ -126,11 +127,16 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
+	model := "UVR-MDX-NET-Voc_FT"
+	// model := "UVR-MDX-NET-Inst_HQ_3"
+	// model := "Kim_Vocal_2"
+
 	cmd := exec.CommandContext(
 		ctx,
 		"/home/dx/source/audio-separator/.venv/bin/python",
 		"/home/dx/source/audio-separator/cli.py",
 		songBlob.GetAbsolutePath(),
+		"--model_name="+model,
 		"--model_file_dir=/home/dx/source/audio-separator/models/",
 		"--output_dir=/home/dx/source/audio-separator/output/",
 		"--use_cuda",
@@ -146,6 +152,8 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 		return
 	}
 
+	os.Remove(songBlob.GetAbsolutePath())
+
 	res = Result{}
 	res.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
@@ -153,13 +161,13 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	musicName := "Instrumental_" + songBlob.OriginalName
 	musicPath := filepath.Join(
 		"/home/dx/source/audio-separator/output/",
-		fmt.Sprintf("%d%s", songBlob.ID, "_(Instrumental)_UVR-MDX-NET-Voc_FT.mp3"),
+		fmt.Sprintf("%d_%s_%s.mp3", songBlob.ID, "(Instrumental)", model),
 	)
 
 	voiceName := "Vocals_" + songBlob.OriginalName
 	voicePath := filepath.Join(
 		"/home/dx/source/audio-separator/output/",
-		fmt.Sprintf("%d%s", songBlob.ID, "_(Vocals)_UVR-MDX-NET-Voc_FT.mp3"),
+		fmt.Sprintf("%d_%s_%s.mp3", songBlob.ID, "(Vocals)", model),
 	)
 
 	pl.ResultChan <- Result{
