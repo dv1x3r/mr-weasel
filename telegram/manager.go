@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 
@@ -13,6 +14,7 @@ type Manager struct {
 	tgClient *Client                        // Telegram API Client
 	handlers map[string]commands.Handler    // Map of registered command handlers.
 	states   map[int64]commands.ExecuteFunc // Map of active user states.
+	tokens   map[string]context.CancelFunc  // Map of cancellation tokens.
 }
 
 func NewManager(tgClient *Client) *Manager {
@@ -97,9 +99,15 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		ResultChan:  make(chan commands.Result),
 	}
 
+	contextID := fmt.Sprint(&pl, pl.UserID)
+	ctx = context.WithValue(ctx, "contextID", contextID)
+	ctx, cancel := context.WithCancel(ctx)
+	m.tokens[contextID] = cancel
+
 	go func() {
 		fn(ctx, pl)
 		close(pl.ResultChan)
+		delete(m.tokens, contextID)
 	}()
 
 	go m.processResults(ctx, pl, message)
@@ -118,9 +126,15 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		ResultChan: make(chan commands.Result),
 	}
 
+	// contextID := fmt.Sprint(&pl, pl.UserID)
+	// ctx = context.WithValue(ctx, "contextID", contextID)
+	// ctx, cancel := context.WithCancel(ctx)
+	// m.tokens[contextID] = cancel
+
 	go func() {
 		fn(ctx, pl)
 		close(pl.ResultChan)
+		// delete(m.tokens, contextID)
 	}()
 
 	go m.processResults(ctx, pl, *callbackQuery.Message)
@@ -214,6 +228,10 @@ func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFun
 
 	return fn, ok
 }
+
+// func (m *Manager) createToken() context.Context {
+
+// }
 
 func (m *Manager) commandKeyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
 	markup := &InlineKeyboardMarkup{InlineKeyboard: make([][]InlineKeyboardButton, len(keyboard))}
