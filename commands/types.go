@@ -10,7 +10,7 @@ import (
 	"mr-weasel/utils"
 )
 
-const cmdCancel = "cancel"
+const CmdCancel = "/cancel"
 
 type ExecuteFunc = func(context.Context, Payload)
 
@@ -150,6 +150,10 @@ func commandf(h Handler, args ...any) string {
 		cmd = fmt.Sprintf("%s %v", cmd, arg)
 	}
 	return cmd
+}
+
+func cancelf(ctx context.Context) string {
+	return fmt.Sprintf("%s %s", CmdCancel, ctx.Value("contextID"))
 }
 
 func safeGet(args []string, n int) string {

@@ -22,6 +22,7 @@ func NewManager(tgClient *Client) *Manager {
 		tgClient: tgClient,
 		handlers: make(map[string]commands.Handler),
 		states:   make(map[int64]commands.ExecuteFunc),
+		tokens:   make(map[string]context.CancelFunc),
 	}
 }
 
@@ -59,9 +60,9 @@ func (m *Manager) Start(ctx context.Context) {
 	updates := m.tgClient.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
 		if update.Message != nil && update.Message.From != nil {
-			m.processMessage(ctx, *update.Message)
+			m.onMessage(ctx, *update.Message)
 		} else if update.CallbackQuery != nil {
-			m.processCallbackQuery(ctx, *update.CallbackQuery)
+			m.onCallbackQuery(ctx, *update.CallbackQuery)
 			// Answer to the callback query just to dismiss "Loading..." prompt on the top
 			_, err := m.tgClient.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
 			if err != nil {
@@ -71,9 +72,10 @@ func (m *Manager) Start(ctx context.Context) {
 	}
 }
 
-func (m *Manager) processMessage(ctx context.Context, message Message) {
+func (m *Manager) onMessage(ctx context.Context, message Message) {
 	const op = "telegram.Manager.processMessage"
-	fn, ok := m.getExecuteFunc(message.From.ID, message.Text)
+
+	execFn, ok := m.getExecuteFunc(message.From.ID, message.Text)
 	if !ok {
 		return
 	}
@@ -99,23 +101,33 @@ func (m *Manager) processMessage(ctx context.Context, message Message) {
 		ResultChan:  make(chan commands.Result),
 	}
 
-	contextID := fmt.Sprint(&pl, pl.UserID)
-	ctx = context.WithValue(ctx, "contextID", contextID)
-	ctx, cancel := context.WithCancel(ctx)
-	m.tokens[contextID] = cancel
-
 	go func() {
-		fn(ctx, pl)
-		close(pl.ResultChan)
-		delete(m.tokens, contextID)
+		ctx := context.WithValue(ctx, "contextID", fmt.Sprintf("%p", &pl))
+		ctx, cancel := context.WithCancel(ctx)
+		tokenKey := fmt.Sprintf("%d:%p", pl.UserID, &pl)
+		m.tokens[tokenKey] = cancel
+
+		defer close(pl.ResultChan)
+		defer delete(m.tokens, tokenKey)
+
+		execFn(ctx, pl)
 	}()
 
 	go m.processResults(ctx, pl, message)
 }
 
-func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
+func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
-	fn, ok := m.getExecuteFunc(callbackQuery.From.ID, callbackQuery.Data)
+
+	if strings.HasPrefix(callbackQuery.Data, commands.CmdCancel) {
+		cancelFn, ok := m.getCancelFunc(callbackQuery.From.ID, callbackQuery.Data)
+		if ok {
+			cancelFn()
+		}
+		return
+	}
+
+	execFn, ok := m.getExecuteFunc(callbackQuery.From.ID, callbackQuery.Data)
 	if !ok {
 		return
 	}
@@ -126,15 +138,16 @@ func (m *Manager) processCallbackQuery(ctx context.Context, callbackQuery Callba
 		ResultChan: make(chan commands.Result),
 	}
 
-	// contextID := fmt.Sprint(&pl, pl.UserID)
-	// ctx = context.WithValue(ctx, "contextID", contextID)
-	// ctx, cancel := context.WithCancel(ctx)
-	// m.tokens[contextID] = cancel
-
 	go func() {
-		fn(ctx, pl)
-		close(pl.ResultChan)
-		// delete(m.tokens, contextID)
+		ctx := context.WithValue(ctx, "contextID", fmt.Sprintf("%p", &pl))
+		ctx, cancel := context.WithCancel(ctx)
+		tokenKey := fmt.Sprintf("%d:%p", pl.UserID, &pl)
+		m.tokens[tokenKey] = cancel
+
+		defer close(pl.ResultChan)
+		defer delete(m.tokens, tokenKey)
+
+		execFn(ctx, pl)
 	}()
 
 	go m.processResults(ctx, pl, *callbackQuery.Message)
@@ -223,15 +236,26 @@ func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFun
 
 	fn, ok := m.states[userID] // Stateful command
 	if ok {
-		log.Printf("[VERB] %d: %s\n", userID, utils.GetFunctionName(fn))
+		log.Printf("[VERB] %d (exec): %s\n", userID, utils.GetFunctionName(fn))
 	}
 
 	return fn, ok
 }
 
-// func (m *Manager) createToken() context.Context {
+func (m *Manager) getCancelFunc(userID int64, text string) (context.CancelFunc, bool) {
+	split := strings.SplitN(text, " ", 2)
+	if len(split) != 2 {
+		return nil, false
+	}
 
-// }
+	tokenKey := fmt.Sprintf("%d:%s", userID, split[1])
+	cancel, ok := m.tokens[tokenKey]
+	if ok {
+		log.Printf("[VERB] %d (cancel): %s\n", userID, text)
+	}
+
+	return cancel, ok
+}
 
 func (m *Manager) commandKeyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
 	markup := &InlineKeyboardMarkup{InlineKeyboard: make([][]InlineKeyboardButton, len(keyboard))}

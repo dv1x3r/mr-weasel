@@ -51,6 +51,8 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	if pl.BlobPayload != nil {
 		res := Result{Text: "📂 " + pl.BlobPayload.FileName}
 		res.AddKeyboardButton("Downloading...", "-")
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Cancel", cancelf(ctx))
 		pl.ResultChan <- res
 
 		blob, err = c.blob.DownloadBlob(ctx, pl.UserID, pl.BlobPayload)
@@ -68,6 +70,8 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	} else {
 		res := Result{Text: "🌐 Please wait..."}
 		res.AddKeyboardButton("Downloading...", "-")
+		res.AddKeyboardRow()
+		res.AddKeyboardButton("Cancel", cancelf(ctx))
 		pl.ResultChan <- res
 
 		blob, err = c.blob.DownloadYouTube(ctx, pl.UserID, pl.Command)
@@ -110,7 +114,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	res := Result{}
 	res.AddKeyboardButton("Python goes brrr...", "-")
 	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", commandf(c, "cancel"))
+	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
 	cmd := exec.CommandContext(
