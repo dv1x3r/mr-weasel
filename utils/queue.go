@@ -21,6 +21,7 @@ func (q *Queue) Lock(ctx context.Context) bool {
 		case q.execChan <- 0:
 			return true
 		case <-ctx.Done():
+			<-q.queueChan
 			return false
 		}
 	default:
