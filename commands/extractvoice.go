@@ -6,20 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"mr-weasel/utils"
 )
 
 type ExtractVoiceCommand struct {
-	blob  *utils.Blob
 	queue *utils.Queue
 }
 
-func NewExtractVoiceCommand(blob *utils.Blob, queue *utils.Queue) *ExtractVoiceCommand {
-	return &ExtractVoiceCommand{
-		blob:  blob,
-		queue: queue,
-	}
+func NewExtractVoiceCommand(queue *utils.Queue) *ExtractVoiceCommand {
+	return &ExtractVoiceCommand{queue: queue}
 }
 
 func (ExtractVoiceCommand) Prefix() string {
@@ -38,61 +35,53 @@ func (c *ExtractVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
 	case cmdExtractVoiceStart:
-		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
+		c.startProcessing(ctx, pl, strings.Join(args[1:], " "))
 	default:
 		pl.ResultChan <- Result{Text: "Sure! Send me the song file or YouTube link!", State: c.downloadSong}
 	}
 }
 
 func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
-	var blob utils.BlobBase
+	res := Result{Text: "🌐 Please wait..."}
+	res.AddKeyboardButton("Downloading...", "-")
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Cancel", cancelf(ctx))
+	pl.ResultChan <- res
+
+	var filePath string
 	var err error
 
-	if pl.BlobPayload != nil {
-		res := Result{Text: "📂 " + pl.BlobPayload.FileName}
-		res.AddKeyboardButton("Downloading...", "-")
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Cancel", cancelf(ctx))
-		pl.ResultChan <- res
-
-		blob, err = c.blob.DownloadBlob(ctx, pl.UserID, pl.BlobPayload)
-		if err != nil {
-			res = Result{
-				Text:  "Whoops, download failed, try again :c",
-				State: c.downloadSong,
-				Error: err,
-			}
-			res.AddKeyboardRow()
-			pl.ResultChan <- res
-			return
-		}
-
+	if pl.FileURL != "" {
+		filePath, err = utils.Download(ctx, pl.FileURL, pl.Command)
 	} else {
-		res := Result{Text: "🌐 Please wait..."}
-		res.AddKeyboardButton("Downloading...", "-")
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Cancel", cancelf(ctx))
-		pl.ResultChan <- res
-
-		blob, err = c.blob.DownloadYouTube(ctx, pl.UserID, pl.Command)
-		if err != nil {
-			res = Result{
-				Text:  "Whoops, please try another link :c",
-				State: c.downloadSong,
-				Error: err,
-			}
-			res.AddKeyboardRow()
-			pl.ResultChan <- res
-			return
-		}
+		filePath, err = utils.Download(ctx, pl.Command, "")
 	}
 
-	res := Result{Text: fmt.Sprintf("📂 %s\n", blob.OriginalName)}
-	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, blob.ID))
+	if err != nil {
+		res = Result{
+			Text:  "Whoops, download failed, try again :c",
+			State: c.downloadSong,
+			Error: err,
+		}
+		res.AddKeyboardRow()
+		pl.ResultChan <- res
+		return
+	}
+
+	fileBase := filepath.Base(filePath)
+	originalName := fileBase
+
+	split := strings.SplitN(fileBase, ".", 2)
+	if len(split) == 2 {
+		originalName = split[1]
+	}
+
+	res = Result{Text: fmt.Sprintf("📂 %s\n", originalName)}
+	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, fileBase))
 	pl.ResultChan <- res
 }
 
-func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, blobID int64) {
+func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, fileBase string) {
 	res := Result{}
 	res.AddKeyboardButton("Queued...", "-")
 	res.AddKeyboardRow()
@@ -101,30 +90,23 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, b
 
 	if c.queue.Lock(ctx) {
 		defer c.queue.Unlock()
-		c.processFile(ctx, pl, blobID)
+		c.processFile(ctx, pl, fileBase)
 	} else {
 		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, blobID))
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
 		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
 	}
 }
 
-func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobID int64) {
-	songBlob, err := c.blob.GetBlobFromDB(ctx, pl.UserID, blobID)
-	if err != nil {
-		pl.ResultChan <- Result{
-			Text:  "File not found, can you please forward it to me?",
-			State: c.downloadSong,
-		}
-		return
-	}
-
+func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileBase string) {
 	res := Result{}
 	res.AddKeyboardButton("Python goes brrr...", "-")
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
+
+	fileAbsolutePath, _ := filepath.Abs(filepath.Join(utils.DownloadDir, fileBase))
 
 	model := "UVR-MDX-NET-Voc_FT" // best for vocal
 	// model := "UVR-MDX-NET-Inst_HQ_3" // best for music
@@ -133,7 +115,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 		ctx,
 		"/home/dx/source/audio-separator/.venv/bin/python",
 		"/home/dx/source/audio-separator/cli.py",
-		songBlob.GetAbsolutePath(),
+		fileAbsolutePath,
 		"--model_name="+model,
 		"--model_file_dir=/home/dx/source/audio-separator/models/",
 		"--output_dir=/home/dx/source/audio-separator/output/",
@@ -141,31 +123,38 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, blobID))
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
 		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
 		return
 	}
 
-	os.Remove(songBlob.GetAbsolutePath())
+	os.Remove(fileAbsolutePath)
 
 	res = Result{}
 	res.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
-	musicName := "Instrumental_" + songBlob.OriginalName
+	originalName := fileBase
+
+	split := strings.SplitN(fileBase, ".", 2)
+	if len(split) == 2 {
+		originalName = split[1]
+	}
+
+	musicName := "Instrumental_" + originalName
 	musicPath := filepath.Join(
 		"/home/dx/source/audio-separator/output/",
-		fmt.Sprintf("%d_%s_%s.mp3", songBlob.ID, "(Instrumental)", model),
+		fmt.Sprintf("%s_%s_%s.mp3", strings.TrimSuffix(fileBase, filepath.Ext(fileBase)), "(Instrumental)", model),
 	)
 
-	voiceName := "Vocals_" + songBlob.OriginalName
+	voiceName := "Vocals_" + originalName
 	voicePath := filepath.Join(
 		"/home/dx/source/audio-separator/output/",
-		fmt.Sprintf("%d_%s_%s.mp3", songBlob.ID, "(Vocals)", model),
+		fmt.Sprintf("%s_%s_%s.mp3", strings.TrimSuffix(fileBase, filepath.Ext(fileBase)), "(Vocals)", model),
 	)
 
 	pl.ResultChan <- Result{

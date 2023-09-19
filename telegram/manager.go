@@ -81,25 +81,20 @@ func (m *Manager) onMessage(ctx context.Context, message Message) {
 		return
 	}
 
-	var blobPayload *utils.BlobPayload
+	pl := commands.Payload{
+		UserID:     message.From.ID,
+		Command:    message.Text,
+		ResultChan: make(chan commands.Result),
+	}
+
 	if message.Audio != nil {
-		URL, err := m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
+		fileURL, err := m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			return
 		}
-		blobPayload = &utils.BlobPayload{
-			FileID:   message.Audio.FileID,
-			FileName: message.Audio.FileName,
-			URL:      URL,
-		}
-	}
-
-	pl := commands.Payload{
-		UserID:      message.From.ID,
-		Command:     message.Text,
-		BlobPayload: blobPayload,
-		ResultChan:  make(chan commands.Result),
+		pl.FileURL = fileURL
+		pl.Command = message.Audio.FileName
 	}
 
 	go func() {

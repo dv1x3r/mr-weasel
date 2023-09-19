@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"mr-weasel/utils"
 )
 
 const CmdCancel = "/cancel"
@@ -21,10 +19,10 @@ type Handler interface {
 }
 
 type Payload struct {
-	UserID      int64
-	Command     string
-	BlobPayload *utils.BlobPayload
-	ResultChan  chan Result
+	UserID     int64
+	Command    string
+	FileURL    string
+	ResultChan chan Result
 }
 
 type Result struct {

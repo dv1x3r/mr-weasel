@@ -22,7 +22,6 @@ func main() {
 	}
 	db := sqlx.MustConnect(dbDriver, dbString)
 
-	blob := utils.NewBlob(db)
 	queue := utils.NewQueue(8, 2)
 
 	tgClient := telegram.MustConnect(os.Getenv("TG_TOKEN"), false)
@@ -30,7 +29,7 @@ func main() {
 
 	if os.Getenv("RTX_MODE") == "on" {
 		tgManager.AddCommands(
-			commands.NewExtractVoiceCommand(blob, queue),
+			commands.NewExtractVoiceCommand(queue),
 		)
 	} else {
 		tgManager.AddCommands(
