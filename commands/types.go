@@ -10,7 +10,7 @@ import (
 	"mr-weasel/utils"
 )
 
-const cmdCancel = "/cancel"
+const cmdCancel = "cancel"
 
 type ExecuteFunc = func(context.Context, Payload)
 
