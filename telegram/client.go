@@ -26,30 +26,28 @@ type Client struct {
 	debug      bool
 }
 
-func NewClient(token string, debug bool) *Client {
-	return &Client{
+func Connect(token string, debug bool) (*Client, error) {
+	const op = "telegram.Client.Connect"
+	client := &Client{
 		httpClient: &http.Client{Timeout: 100 * time.Second},
 		token:      token,
 		debug:      debug,
 	}
-}
-
-func (c *Client) Connect() (*Client, error) {
-	const op = "telegram.Client.Connect"
-	me, err := c.GetMe(context.Background(), GetMeConfig{})
+	me, err := client.GetMe(context.Background(), GetMeConfig{})
 	if err != nil {
 		log.Println("[ERROR] Failed to start the bot")
 	} else {
 		log.Printf("[INFO] Logged in as [%s]\n", me.Username)
 	}
-	return c, utils.WrapIfErr(op, err)
+	return client, utils.WrapIfErr(op, err)
 }
 
-func (c *Client) MustConnect() *Client {
-	if _, err := c.Connect(); err != nil {
+func MustConnect(token string, debug bool) *Client {
+	client, err := Connect(token, debug)
+	if err != nil {
 		panic(err)
 	}
-	return c
+	return client
 }
 
 // A simple method for testing your bot's authentication token. Requires no parameters. Returns basic information about the bot in form of a User object.
