@@ -40,8 +40,7 @@ func (c *ExtractVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	case cmdExtractVoiceStart:
 		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
 	default:
-		// pl.ResultChan <- Result{Text: "Sure! Send me the song file or YouTube link!", State: c.downloadSong}
-		pl.ResultChan <- Result{Text: "Sure! Send me the song audio file!", State: c.downloadSong}
+		pl.ResultChan <- Result{Text: "Sure! Send me the song file or YouTube link!", State: c.downloadSong}
 	}
 }
 
@@ -127,9 +126,8 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	model := "UVR-MDX-NET-Voc_FT"
-	// model := "UVR-MDX-NET-Inst_HQ_3"
-	// model := "Kim_Vocal_2"
+	model := "UVR-MDX-NET-Voc_FT" // best for vocal
+	// model := "UVR-MDX-NET-Inst_HQ_3" // best for music
 
 	cmd := exec.CommandContext(
 		ctx,
@@ -175,6 +173,5 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 			musicName: musicPath,
 			voiceName: voicePath,
 		},
-		DeleteFiles: true,
 	}
 }

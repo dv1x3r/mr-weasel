@@ -188,9 +188,7 @@ func writeMultipart(body *bytes.Buffer, cfg Config, media Form) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		if partFile.Delete {
-			defer os.Remove(partFile.Path)
-		}
+		defer os.Remove(partFile.Path)
 		defer file.Close()
 
 		part, err := writer.CreateFormFile(partName, partFile.Name)

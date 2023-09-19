@@ -28,12 +28,11 @@ type Payload struct {
 }
 
 type Result struct {
-	Text        string
-	State       ExecuteFunc
-	Keyboard    [][]Button
-	Audio       map[string]string
-	DeleteFiles bool
-	Error       error
+	Text     string
+	State    ExecuteFunc
+	Keyboard [][]Button
+	Audio    map[string]string
+	Error    error
 }
 
 type Button struct {
