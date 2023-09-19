@@ -140,42 +140,25 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	}
 
 	res = Result{}
-	res.AddKeyboardButton("Uploading results...", "-")
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", cmdCancel)
+	res.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
+	musicName := "Instrumental_" + songBlob.OriginalName
 	musicPath := filepath.Join(
 		"/home/dx/source/audio-separator/output/",
 		fmt.Sprintf("%d%s", songBlob.ID, "_(Instrumental)_UVR-MDX-NET-Voc_FT.mp3"),
 	)
 
+	voiceName := "Vocals_" + songBlob.OriginalName
 	voicePath := filepath.Join(
 		"/home/dx/source/audio-separator/output/",
 		fmt.Sprintf("%d%s", songBlob.ID, "_(Vocals)_UVR-MDX-NET-Voc_FT.mp3"),
 	)
 
-	musicBlobID, err := c.blob.UploadFile(ctx, pl.UserID, musicPath)
-	if err != nil {
-		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdSeparateSongStart, songBlob.ID))
-		pl.ResultChan <- res
-		pl.ResultChan <- Result{Text: "Whoops, upload failed, try again :c", Error: err}
-		return
+	pl.ResultChan <- Result{
+		Audio: map[string]string{
+			musicName: musicPath,
+			voiceName: voicePath,
+		},
 	}
-
-	voiceBlobID, err := c.blob.UploadFile(ctx, pl.UserID, voicePath)
-	if err != nil {
-		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdSeparateSongStart, songBlob.ID))
-		pl.ResultChan <- res
-		pl.ResultChan <- Result{Text: "Whoops, upload failed, try again :c", Error: err}
-		return
-	}
-
-	res = Result{}
-	res.AddKeyboardButton("Get Music", commandf(c, "music", musicBlobID))
-	res.AddKeyboardButton("Get Voice", commandf(c, "voice", voiceBlobID))
-	pl.ResultChan <- res
-	pl.ResultChan <- Result{Text: "Song has been successfully processed!"}
 }

@@ -31,6 +31,7 @@ type Result struct {
 	Text     string
 	State    ExecuteFunc
 	Keyboard [][]Button
+	Audio    map[string]string
 	Error    error
 }
 
