@@ -93,10 +93,19 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 }
 
 func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, blobID int64) {
+	res := Result{}
+	res.AddKeyboardButton("Queued...", "-")
+	res.AddKeyboardRow()
+	res.AddKeyboardButton("Cancel", cancelf(ctx))
+	pl.ResultChan <- res
+
 	if c.queue.Lock(ctx) {
 		defer c.queue.Unlock()
 		c.processFile(ctx, pl, blobID)
 	} else {
+		res := Result{}
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, blobID))
+		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
 	}
 }
@@ -131,7 +140,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, blobI
 	err = cmd.Run()
 	if err != nil {
 		res := Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, songBlob.ID))
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, blobID))
 		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
 		return
