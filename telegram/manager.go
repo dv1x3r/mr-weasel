@@ -239,7 +239,7 @@ func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFun
 
 	fn, ok := m.states[userID] // Stateful command
 	if ok {
-		log.Printf("[VERB] %d (exec): %s\n", userID, utils.GetFunctionName(fn))
+		log.Printf("[VERB] %d: %s\n", userID, utils.GetFunctionName(fn))
 	}
 
 	return fn, ok
@@ -254,7 +254,7 @@ func (m *Manager) getCancelFunc(userID int64, text string) (context.CancelFunc, 
 	tokenKey := fmt.Sprintf("%d:%s", userID, split[1])
 	cancel, ok := m.tokens[tokenKey]
 	if ok {
-		log.Printf("[VERB] %d (cancel): %s\n", userID, text)
+		log.Printf("[VERB] %d: %s\n", userID, text)
 	}
 
 	return cancel, ok
