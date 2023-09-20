@@ -36,16 +36,18 @@ func main() {
 	tgManager := telegram.NewManager(tgClient)
 
 	if os.Getenv("RTX_MODE") == "on" {
-		tgManager.AddCommands(
+		commands := tgManager.AddCommands(
 			commands.NewExtractVoiceCommand(queue),
 		)
+		tgManager.PublishCommands(commands)
 	} else {
-		tgManager.AddCommands(
+		commands := tgManager.AddCommands(
 			commands.NewPingCommand(),
 			commands.NewCarCommand(storage.NewCarStorage(db)),
 			commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
 			commands.NewExtractVoiceCommand(queue),
 		)
+		tgManager.PublishCommands(commands)
 	}
 
 	tgManager.Start(mainContext())

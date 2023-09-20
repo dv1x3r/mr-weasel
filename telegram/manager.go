@@ -27,27 +27,29 @@ func NewManager(tgClient *Client) *Manager {
 	}
 }
 
-func (m *Manager) AddCommands(handlers ...commands.Handler) {
-	const op = "telegram.Manager.AddCommands"
+func (m *Manager) AddCommands(handlers ...commands.Handler) []BotCommand {
+	botCommands := make([]BotCommand, 0, len(handlers))
 
 	for _, handler := range handlers {
 		prefix := handler.Prefix()
 		m.handlers[prefix] = handler
-		log.Printf("[INFO] %s registered \n", prefix)
-	}
 
-	botCommands := make([]BotCommand, 0, len(handlers))
-	for _, handler := range m.handlers {
 		botCommands = append(botCommands, BotCommand{
 			Command:     handler.Prefix(),
 			Description: handler.Description(),
 		})
+
+		log.Printf("[INFO] %s registered \n", prefix)
 	}
 
+	return botCommands
+}
+
+func (m *Manager) PublishCommands(botCommands []BotCommand) {
 	cfg := SetMyCommandsConfig{Commands: botCommands}
 	_, err := m.tgClient.SetMyCommands(context.Background(), cfg)
 	if err != nil {
-		log.Println("[ERROR]", utils.WrapIfErr(op, err))
+		log.Println("[ERROR]", err)
 	}
 }
 
