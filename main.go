@@ -48,7 +48,6 @@ func main() {
 		)
 	}
 
-	tgManager.PublishCommands()
 	tgManager.Start(mainContext())
 }
 

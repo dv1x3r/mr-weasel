@@ -28,16 +28,15 @@ func NewManager(tgClient *Client) *Manager {
 }
 
 func (m *Manager) AddCommands(handlers ...commands.Handler) {
+	const op = "telegram.Manager.AddCommands"
+
 	for _, handler := range handlers {
 		prefix := handler.Prefix()
 		m.handlers[prefix] = handler
 		log.Printf("[INFO] %s registered \n", prefix)
 	}
-}
 
-func (m *Manager) PublishCommands() {
-	const op = "telegram.Manager.PublishCommands"
-	botCommands := make([]BotCommand, 0, len(m.handlers))
+	botCommands := make([]BotCommand, 0, len(handlers))
 	for _, handler := range m.handlers {
 		botCommands = append(botCommands, BotCommand{
 			Command:     handler.Prefix(),
