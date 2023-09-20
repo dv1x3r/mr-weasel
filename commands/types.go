@@ -112,8 +112,10 @@ func (r *Result) UpdateKeyboardCalendar(input string) bool {
 func (r *Result) AddKeyboardPagination(offset int64, countRows int64, command string) {
 	if offset >= 5 {
 		r.AddKeyboardButton("«5", fmt.Sprintf("%s %d", command, offset-5))
-	} else {
+	} else if offset == 0 {
 		r.AddKeyboardButton(" ", "-")
+	} else {
+		r.AddKeyboardButton(fmt.Sprintf("«%d", offset), fmt.Sprintf("%s %d", command, 0))
 	}
 	if offset >= 1 {
 		r.AddKeyboardButton("«1", fmt.Sprintf("%s %d", command, offset-1))
@@ -128,8 +130,10 @@ func (r *Result) AddKeyboardPagination(offset int64, countRows int64, command st
 	}
 	if offset+1 < countRows-4 {
 		r.AddKeyboardButton("5»", fmt.Sprintf("%s %d", command, offset+5))
-	} else {
+	} else if offset == countRows-1 {
 		r.AddKeyboardButton(" ", "-")
+	} else {
+		r.AddKeyboardButton(fmt.Sprintf("%d»", countRows-1-offset), fmt.Sprintf("%s %d", command, countRows-1))
 	}
 }
 
