@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -58,10 +59,9 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	if err != nil {
-		res = Result{
-			Text:  "Whoops, download failed, try again :c",
-			State: c.downloadSong,
-			Error: err,
+		res = Result{State: c.downloadSong, Error: err}
+		if !errors.Is(err, context.Canceled) {
+			res.Text = "Whoops, download failed, try again :c"
 		}
 		res.AddKeyboardRow()
 		pl.ResultChan <- res
@@ -69,12 +69,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	fileBase := filepath.Base(filePath)
-	originalName := fileBase
-
-	split := strings.SplitN(fileBase, ".", 2)
-	if len(split) == 2 {
-		originalName = split[1]
-	}
+	originalName := utils.GetDownloadOriginalName(fileBase)
 
 	res = Result{Text: fmt.Sprintf("📂 %s\n", originalName)}
 	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, fileBase))
@@ -92,7 +87,7 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, f
 		defer c.queue.Unlock()
 		c.processFile(ctx, pl, fileBase)
 	} else {
-		res := Result{}
+		res = Result{}
 		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
 		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
@@ -106,56 +101,64 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileB
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	fileAbsolutePath, _ := filepath.Abs(filepath.Join(utils.DownloadDir, fileBase))
-
+	dir := utils.GetExecutablePath()
 	model := "UVR-MDX-NET-Voc_FT" // best for vocal
 	// model := "UVR-MDX-NET-Inst_HQ_3" // best for music
 
-	cmd := exec.CommandContext(
-		ctx,
-		"/home/dx/source/audio-separator/.venv/bin/python",
-		"/home/dx/source/audio-separator/cli.py",
-		fileAbsolutePath,
-		"--model_name="+model,
-		"--model_file_dir=/home/dx/source/audio-separator/models/",
-		"--output_dir=/home/dx/source/audio-separator/output/",
-		"--use_cuda",
-	)
+	execPath := filepath.Join(dir, "audio-separator", "bin", "audio-separator")
+	modelsPath := filepath.Join(dir, "audio-separator", "models")
+	outputPath := filepath.Join(dir, "audio-separator", "output")
+	sourcePath := filepath.Join(utils.GetDownloadFolderPath(), fileBase)
+
+	var cmd *exec.Cmd
+
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		cmd = exec.CommandContext(ctx, execPath, sourcePath,
+			"--log_level=DEBUG",
+			"--model_name="+model,
+			"--model_file_dir="+modelsPath,
+			"--output_dir="+outputPath,
+			"--output_format=MP3",
+			"--use_cuda",
+		)
+	} else {
+		cmd = exec.CommandContext(ctx, execPath, sourcePath,
+			"--log_level=DEBUG",
+			"--model_name="+model,
+			"--model_file_dir="+modelsPath,
+			"--output_dir="+outputPath,
+			"--output_format=MP3",
+		)
+	}
+
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
-		res := Result{}
+		res = Result{}
 		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
 		pl.ResultChan <- res
-		pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
+		if err.Error() != "signal: killed" {
+			pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
+		}
 		return
 	}
 
-	os.Remove(fileAbsolutePath)
+	os.Remove(sourcePath)
 
 	res = Result{}
 	res.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
-	originalName := fileBase
-
-	split := strings.SplitN(fileBase, ".", 2)
-	if len(split) == 2 {
-		originalName = split[1]
-	}
+	originalName := utils.GetDownloadOriginalName(fileBase)
+	originalNameTrim := strings.TrimSuffix(fileBase, filepath.Ext(fileBase))
 
 	musicName := "Instrumental_" + originalName
-	musicPath := filepath.Join(
-		"/home/dx/source/audio-separator/output/",
-		fmt.Sprintf("%s_%s_%s.mp3", strings.TrimSuffix(fileBase, filepath.Ext(fileBase)), "(Instrumental)", model),
-	)
+	musicPath := filepath.Join(outputPath, fmt.Sprintf("%s_%s_%s.mp3", originalNameTrim, "(Instrumental)", model))
 
 	voiceName := "Vocals_" + originalName
-	voicePath := filepath.Join(
-		"/home/dx/source/audio-separator/output/",
-		fmt.Sprintf("%s_%s_%s.mp3", strings.TrimSuffix(fileBase, filepath.Ext(fileBase)), "(Vocals)", model),
-	)
+	voicePath := filepath.Join(outputPath,
+		fmt.Sprintf("%s_%s_%s.mp3", originalNameTrim, "(Vocals)", model))
 
 	pl.ResultChan <- Result{
 		Audio: map[string]string{

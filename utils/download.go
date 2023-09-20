@@ -9,9 +9,26 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-const DownloadDir = "downloads"
+func GetExecutablePath() string {
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	return dir
+}
+
+func GetDownloadFolderPath() string {
+	return filepath.Join(GetExecutablePath(), "temp")
+}
+
+func GetDownloadOriginalName(fileBase string) string {
+	split := strings.SplitN(fileBase, ".", 2)
+	if len(split) == 2 {
+		return split[1]
+	} else {
+		return fileBase
+	}
+}
 
 func Download(ctx context.Context, rawURL string, name string) (string, error) {
 	parsedURL, err := url.Parse(rawURL)
@@ -32,13 +49,15 @@ func Download(ctx context.Context, rawURL string, name string) (string, error) {
 		}
 		defer res.Body.Close()
 
-		file, err := os.CreateTemp(DownloadDir, fmt.Sprintf("*.%s", name))
+		folderPath := GetDownloadFolderPath()
+
+		file, err := os.CreateTemp(folderPath, fmt.Sprintf("*.%s", name))
 		if err != nil {
 			return "", err
 		}
 		defer file.Close()
 
 		_, err = io.Copy(file, res.Body)
-		return filepath.Join("downloads", file.Name()), err
+		return filepath.Join(folderPath, file.Name()), err
 	}
 }
