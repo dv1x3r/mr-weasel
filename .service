@@ -13,6 +13,7 @@ ExecStart = /home/weasel/app/mr-weasel/mr-weasel
 StandardOutput=append:/var/log/mr-weasel/out.log
 StandardError=append:/var/log/mr-weasel/err.log
 
+KillSignal=SIGINT
 Restart=on-failure
 RestartSec=5s
 
