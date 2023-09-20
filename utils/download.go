@@ -51,6 +51,8 @@ func Download(ctx context.Context, rawURL string, name string) (string, error) {
 
 		folderPath := GetDownloadFolderPath()
 
+		os.MkdirAll(GetDownloadFolderPath(), os.ModePerm)
+
 		file, err := os.CreateTemp(folderPath, fmt.Sprintf("*.%s", name))
 		if err != nil {
 			return "", err
