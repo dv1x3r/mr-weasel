@@ -90,7 +90,9 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, f
 		res = Result{}
 		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
 		pl.ResultChan <- res
-		pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
+		}
 	}
 }
 
