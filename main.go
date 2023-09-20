@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"mr-weasel/commands"
 	"mr-weasel/storage"
@@ -22,7 +24,13 @@ func main() {
 	}
 	db := sqlx.MustConnect(dbDriver, dbString)
 
-	queue := utils.NewQueue(8, 2)
+	queuePool, err1 := strconv.Atoi(os.Getenv("QUEUE_POOL"))
+	queueParallel, err2 := strconv.Atoi(os.Getenv("QUEUE_PARALLEL"))
+	if errors.Join(err1, err2) != nil {
+		panic("Invalid QUEUE_POOL or QUEUE_PARALLEL values")
+	}
+
+	queue := utils.NewQueue(queuePool, queueParallel)
 
 	tgClient := telegram.MustConnect(os.Getenv("TG_TOKEN"), false)
 	tgManager := telegram.NewManager(tgClient)
@@ -36,6 +44,7 @@ func main() {
 			commands.NewPingCommand(),
 			commands.NewCarCommand(storage.NewCarStorage(db)),
 			commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
+			commands.NewExtractVoiceCommand(queue),
 		)
 	}
 
