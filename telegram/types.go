@@ -33,6 +33,14 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("telegram.APIError: %d %s", e.Code, e.Message)
 }
 
+type Form = map[string]FormFile
+
+type FormFile struct {
+	Name   string
+	Path   string
+	Delete bool
+}
+
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
 type Update struct {
 	// The update's unique identifier
@@ -93,6 +101,8 @@ type Message struct {
 	ReplyToMessage *Message `json:"reply_to_message,omitempty"`
 	// Optional. For text messages, the actual UTF-8 text of the message.
 	Text string `json:"text,omitempty"`
+	// Optional. Message is an audio file, information about the file.
+	Audio *Audio `json:"audio,omitempty"`
 	// Optional. Inline keyboard attached to the message. login_url buttons are represented as ordinary url buttons.
 	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
@@ -114,6 +124,59 @@ type MessageEntity struct {
 	Language string `json:"language,omitempty"`
 	// Optional. For “custom_emoji” only, unique identifier of the custom emoji. Use getCustomEmojiStickers to get full information about the sticker.
 	CustomEmojiId string `json:"custom_emoji_id,omitempty"`
+}
+
+// This object represents one size of a photo or a file / sticker thumbnail.
+type PhotoSize struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Photo width.
+	Width int64 `json:"width"`
+	// Photo height.
+	Height int64 `json:"height"`
+	// Optional. File size in bytes.
+	FileSize int64 `json:"file_size,omitempty"`
+}
+
+// This object represents an audio file to be treated as music by the Telegram clients.
+type Audio struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Duration of the audio in seconds as defined by sender
+	Duration int64 `json:"duration"`
+	// Optional. Performer of the audio as defined by sender or by audio tags.
+	Performer string `json:"performer,omitempty"`
+	// Optional. Title of the audio as defined by sender or by audio tags.
+	Title string `json:"title,omitempty"`
+	// Optional. Original filename as defined by sender.
+	FileName string `json:"file_name,omitempty"`
+	// Optional. MIME type of the file as defined by sender.
+	MimeType string `json:"mime_type,omitempty"`
+	// Optional. File size in bytes. It can be bigger than 2^31 and some programming languages may have difficulty/silent defects in interpreting it.
+	// But it has at most 52 significant bits, so a signed 64-bit integer or double-precision float type are safe for storing this value.
+	FileSize int64 `json:"file_size,omitempty"`
+	// Optional. Thumbnail of the album cover to which the music file belongs.
+	Thumbnail *PhotoSize `json:"thumbnail,omitempty"`
+}
+
+// This object represents a file ready to be downloaded.
+// The file can be downloaded via the link https://api.telegram.org/file/bot<token>/<file_path>.
+// It is guaranteed that the link will be valid for at least 1 hour.
+// When the link expires, a new one can be requested by calling getFile.
+type File struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Optional. File size in bytes. It can be bigger than 2^31 and some programming languages may have difficulty/silent defects in interpreting it.
+	// But it has at most 52 significant bits, so a signed 64-bit integer or double-precision float type are safe for storing this value.
+	FileSize int64 `json:"file_size,omitempty"`
+	// Optional. File path. Use https://api.telegram.org/file/bot<token>/<file_path> to get the file.
+	FilePath string `json:"file_path,omitempty"`
 }
 
 // This object represents an inline keyboard that appears right next to the message it belongs to.
@@ -161,4 +224,40 @@ type BotCommandScope struct {
 	Type   string `json:"type"`
 	ChatID int64  `json:"chat_id,omitempty"`
 	UserID int64  `json:"user_id,omitempty"`
+}
+
+// This object represents the content of a media message to be sent.
+// It should be one of: InputMediaAnimation, InputMediaDocument, InputMediaAudio, InputMediaPhoto, InputMediaVideo.
+type InputMedia interface {
+	SetInputMediaType()
+}
+
+// Represents an audio file to be treated as music to be sent.
+type InputMediaAudio struct {
+	// Type of the result, must be audio.
+	Type string `json:"type"`
+	// File to send. Pass a file_id to send a file that exists on the Telegram servers (recommended),
+	// pass an HTTP URL for Telegram to get a file from the Internet,
+	// or pass “attach://<file_attach_name>” to upload a new one using multipart/form-data under <file_attach_name> name.
+	Media string `json:"media"`
+	// Optional. Thumbnail of the file sent.
+	// Thumbnails can't be reused and can be only uploaded as a new file,
+	// so you can pass “attach://<file_attach_name>” if the thumbnail was uploaded using multipart/form-data under <file_attach_name>.
+	Thumbnail string `json:"thumbnail,omitempty"`
+	// Optional. Caption of the audio to be sent, 0-1024 characters after entities parsing.
+	Caption string `json:"caption,omitempty"`
+	// Optional. Mode for parsing entities in the audio caption. See formatting options for more details.
+	ParseMode string `json:"parse_mode,omitempty"`
+	// Optional. List of special entities that appear in the caption, which can be specified instead of parse_mode.
+	CaptionEntities []MessageEntity `json:"caption_entities,omitempty"`
+	// Optional. Duration of the audio in seconds.
+	Duration int64 `json:"duration,omitempty"`
+	// Optional. Performer of the audio.
+	Performer string `json:"performer,omitempty"`
+	// Optional. Title of the audio.
+	Title string `json:"title,omitempty"`
+}
+
+func (im *InputMediaAudio) SetInputMediaType() {
+	im.Type = "audio"
 }

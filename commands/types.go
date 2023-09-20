@@ -8,24 +8,29 @@ import (
 	"time"
 )
 
+const CmdCancel = "/cancel"
+
+type ExecuteFunc = func(context.Context, Payload)
+
 type Handler interface {
 	Prefix() string
 	Description() string
-	Execute(context.Context, Payload) (Result, error)
+	Execute(context.Context, Payload)
 }
 
-type HandlerFunc = func(context.Context, Payload) (Result, error)
-
 type Payload struct {
-	UserID  int64
-	Command string
+	UserID     int64
+	Command    string
+	FileURL    string
+	ResultChan chan Result
 }
 
 type Result struct {
-	Text       string
-	State      HandlerFunc
-	Keyboard   [][]Button
-	ResultChan chan Result
+	Text     string
+	State    ExecuteFunc
+	Keyboard [][]Button
+	Audio    map[string]string
+	Error    error
 }
 
 type Button struct {
@@ -92,7 +97,7 @@ func (r *Result) AddKeyboardCalendar(year int, month time.Month) {
 
 	r.AddKeyboardRow()
 	r.AddKeyboardButton("«", fmt.Sprintf("%d %d", dtPrev.Year(), dtPrev.Month()))
-	r.AddKeyboardButton("Pick Today", fmt.Sprint(time.Now().Unix()))
+	// r.AddKeyboardButton("Pick Today", fmt.Sprint(time.Now().Unix()))
 	r.AddKeyboardButton("»", fmt.Sprintf("%d %d", dtNext.Year(), dtNext.Month()))
 }
 
@@ -143,6 +148,10 @@ func commandf(h Handler, args ...any) string {
 		cmd = fmt.Sprintf("%s %v", cmd, arg)
 	}
 	return cmd
+}
+
+func cancelf(ctx context.Context) string {
+	return fmt.Sprintf("%s %s", CmdCancel, ctx.Value("contextID"))
 }
 
 func safeGet(args []string, n int) string {

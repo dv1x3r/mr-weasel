@@ -1,26 +1,29 @@
 package utils
 
+import "context"
+
 type Queue struct {
-	maxQueue    int
-	maxParallel int
-	queueChan   chan int
-	execChan    chan int
+	queueChan chan int
+	execChan  chan int
 }
 
-func NewQueue(maxQueue int, maxParallel int) *Queue {
+func NewQueue(queueBuffer, execBuffer int) *Queue {
 	return &Queue{
-		maxQueue:    maxQueue,
-		maxParallel: maxParallel,
-		queueChan:   make(chan int, maxQueue),
-		execChan:    make(chan int, maxParallel),
+		queueChan: make(chan int, queueBuffer),
+		execChan:  make(chan int, execBuffer),
 	}
 }
 
-func (q *Queue) Lock() bool {
+func (q *Queue) Lock(ctx context.Context) bool {
 	select {
 	case q.queueChan <- 0:
-		q.execChan <- 0
-		return true
+		select {
+		case q.execChan <- 0:
+			return true
+		case <-ctx.Done():
+			<-q.queueChan
+			return false
+		}
 	default:
 		return false
 	}
