@@ -23,5 +23,4 @@ go.work
 
 # Environment files
 .env
-/downloads
 
