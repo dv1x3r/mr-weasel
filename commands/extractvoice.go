@@ -157,14 +157,13 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	res.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
-	originalNameTrim := strings.TrimSuffix(downloadedFile.Name, filepath.Ext(downloadedFile.Name))
+	baseName := strings.TrimSuffix(filepath.Base(downloadedFile.Path), filepath.Ext(downloadedFile.Name))
 
 	musicName := "Instrumental_" + downloadedFile.Name
-	musicPath := filepath.Join(outputPath, fmt.Sprintf("%s_%s_%s.mp3", originalNameTrim, "(Instrumental)", model))
+	musicPath := filepath.Join(outputPath, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, model))
 
 	voiceName := "Vocals_" + downloadedFile.Name
-	voicePath := filepath.Join(outputPath,
-		fmt.Sprintf("%s_%s_%s.mp3", originalNameTrim, "(Vocals)", model))
+	voicePath := filepath.Join(outputPath, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, model))
 
 	pl.ResultChan <- Result{
 		Audio: map[string]string{
