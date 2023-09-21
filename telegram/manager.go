@@ -39,7 +39,7 @@ func (m *Manager) AddCommands(handlers ...commands.Handler) []BotCommand {
 			Description: handler.Description(),
 		})
 
-		log.Printf("[INFO] %s registered \n", prefix)
+		log.Printf("[INFO] Registered %s\n", prefix)
 	}
 
 	return botCommands
