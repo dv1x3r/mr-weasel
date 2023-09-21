@@ -30,7 +30,7 @@ func (ExtractVoiceCommand) Prefix() string {
 }
 
 func (c *ExtractVoiceCommand) Description() string {
-	return fmt.Sprintf("separate voice from music (%s)", c.mode)
+	return "separate voice and music"
 }
 
 const (
@@ -74,7 +74,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
+	res.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
 	pl.ResultChan <- res
 }
 
