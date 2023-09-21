@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -21,45 +23,108 @@ func GetDownloadFolderPath() string {
 	return filepath.Join(GetExecutablePath(), "temp")
 }
 
-func GetDownloadOriginalName(fileBase string) string {
-	split := strings.SplitN(fileBase, ".", 2)
-	if len(split) == 2 {
-		return split[1]
-	} else {
-		return fileBase
-	}
+type DownloadedFile struct {
+	UniqueID string
+	Name     string
+	Path     string
 }
 
-func Download(ctx context.Context, rawURL string, name string) (string, error) {
-	parsedURL, err := url.Parse(rawURL)
+func GetDownloadedFile(uniqueID string) (DownloadedFile, error) {
+	folderPath := GetDownloadFolderPath()
+
+	dir, err := os.Open(folderPath)
 	if err != nil {
-		return "", err
+		return DownloadedFile{}, err
 	}
+	defer dir.Close()
+
+	files, err := dir.ReadDir(-1)
+	if err != nil {
+		return DownloadedFile{}, err
+	}
+
+	for _, file := range files {
+		fileName := filepath.Base(file.Name())
+		split := strings.SplitN(fileName, ".", 2)
+		if len(split) == 2 && split[0] == uniqueID {
+			return DownloadedFile{
+				UniqueID: split[0],
+				Name:     split[1],
+				Path:     filepath.Join(folderPath, fileName),
+			}, nil
+		}
+	}
+
+	return DownloadedFile{}, errors.New("downloaded file not found")
+}
+
+func Download(ctx context.Context, rawURL string, providedName string) (DownloadedFile, error) {
+	parsedURL, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return DownloadedFile{}, err
+	}
+
+	downloadFolderPath := GetDownloadFolderPath()
+	os.MkdirAll(downloadFolderPath, os.ModePerm)
+
 	if parsedURL.Hostname() != "api.telegram.org" {
-		return "", errors.New("not api.telegram.org blob")
+		uniqueID := fmt.Sprint(ctx.Value("contextID"))
+
+		dlp, err := exec.LookPath("yt-dlp")
+		if err != nil {
+			return DownloadedFile{}, err
+		}
+
+		cmd := exec.CommandContext(ctx, dlp, rawURL,
+			"-x",
+			"--audio-format=mp3",
+			"--max-filesize=15M",
+			"--paths="+downloadFolderPath,
+			"--output="+uniqueID+".%(title)s.mp3",
+			"--print=after_move:title",
+		)
+		cmd.Stdout, cmd.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
+
+		err = cmd.Run()
+		if err != nil {
+			return DownloadedFile{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
+		}
+
+		title := strings.TrimSpace(fmt.Sprint(cmd.Stdout))
+		if title == "" {
+			return DownloadedFile{}, errors.New("yt-dlp outputed an empty video title")
+		}
+
+		return DownloadedFile{
+			UniqueID: uniqueID,
+			Name:     title,
+			Path:     filepath.Join(downloadFolderPath, fmt.Sprintf("%s.%s.mp3", uniqueID, title)),
+		}, nil
+
 	} else {
+
 		req, err := http.NewRequestWithContext(ctx, "GET", parsedURL.String(), nil)
 		if err != nil {
-			return "", err
+			return DownloadedFile{}, err
 		}
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return "", err
+			return DownloadedFile{}, err
 		}
 		defer res.Body.Close()
 
-		folderPath := GetDownloadFolderPath()
-
-		os.MkdirAll(GetDownloadFolderPath(), os.ModePerm)
-
-		file, err := os.CreateTemp(folderPath, fmt.Sprintf("*.%s", name))
+		file, err := os.CreateTemp(downloadFolderPath, fmt.Sprintf("*.%s", providedName))
 		if err != nil {
-			return "", err
+			return DownloadedFile{}, err
 		}
 		defer file.Close()
 
 		_, err = io.Copy(file, res.Body)
-		return filepath.Join(folderPath, file.Name()), err
+		return DownloadedFile{
+			UniqueID: strings.SplitN(filepath.Base(file.Name()), ".", 2)[0],
+			Name:     providedName,
+			Path:     filepath.Join(downloadFolderPath, file.Name()),
+		}, err
 	}
 }

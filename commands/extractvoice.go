@@ -49,13 +49,13 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	var filePath string
+	var downloadedFile utils.DownloadedFile
 	var err error
 
 	if pl.FileURL != "" {
-		filePath, err = utils.Download(ctx, pl.FileURL, pl.Command)
+		downloadedFile, err = utils.Download(ctx, pl.FileURL, pl.Command)
 	} else {
-		filePath, err = utils.Download(ctx, pl.Command, "")
+		downloadedFile, err = utils.Download(ctx, pl.Command, "")
 	}
 
 	if err != nil {
@@ -68,27 +68,30 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 		return
 	}
 
-	fileBase := filepath.Base(filePath)
-	originalName := utils.GetDownloadOriginalName(fileBase)
-
-	res = Result{Text: fmt.Sprintf("📂 %s\n", originalName)}
-	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, fileBase))
+	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
+	res.AddKeyboardButton("Start Processing", commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
 	pl.ResultChan <- res
 }
 
-func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, fileBase string) {
+func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, uniqueID string) {
 	res := Result{}
 	res.AddKeyboardButton("Queued...", "-")
 	res.AddKeyboardRow()
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
+	downloadedFile, err := utils.GetDownloadedFile(uniqueID)
+	if err != nil {
+		pl.ResultChan <- Result{Text: "Whoops, file not available, try uploading again? :c", State: c.downloadSong, Error: err}
+		return
+	}
+
 	if c.queue.Lock(ctx) {
 		defer c.queue.Unlock()
-		c.processFile(ctx, pl, fileBase)
+		c.processFile(ctx, pl, downloadedFile)
 	} else {
 		res = Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, uniqueID))
 		pl.ResultChan <- res
 		if !errors.Is(ctx.Err(), context.Canceled) {
 			pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
@@ -96,7 +99,7 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, f
 	}
 }
 
-func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileBase string) {
+func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downloadedFile utils.DownloadedFile) {
 	res := Result{}
 	res.AddKeyboardButton("Python goes brrr...", "-")
 	res.AddKeyboardRow()
@@ -110,12 +113,11 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileB
 	execPath := filepath.Join(dir, "audio-separator", "bin", "audio-separator")
 	modelsPath := filepath.Join(dir, "audio-separator", "models")
 	outputPath := filepath.Join(dir, "audio-separator", "output")
-	sourcePath := filepath.Join(utils.GetDownloadFolderPath(), fileBase)
 
 	var cmd *exec.Cmd
 
 	if _, err := exec.LookPath("nvidia-smi"); err == nil {
-		cmd = exec.CommandContext(ctx, execPath, sourcePath,
+		cmd = exec.CommandContext(ctx, execPath, downloadedFile.Path,
 			"--log_level=DEBUG",
 			"--model_name="+model,
 			"--model_file_dir="+modelsPath,
@@ -124,7 +126,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileB
 			"--use_cuda",
 		)
 	} else {
-		cmd = exec.CommandContext(ctx, execPath, sourcePath,
+		cmd = exec.CommandContext(ctx, execPath, downloadedFile.Path,
 			"--log_level=DEBUG",
 			"--model_name="+model,
 			"--model_file_dir="+modelsPath,
@@ -138,7 +140,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileB
 	err := cmd.Run()
 	if err != nil {
 		res = Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, fileBase))
+		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
 		pl.ResultChan <- res
 		if err.Error() != "signal: killed" {
 			pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
@@ -146,19 +148,18 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, fileB
 		return
 	}
 
-	os.Remove(sourcePath)
+	os.Remove(downloadedFile.Path)
 
 	res = Result{}
 	res.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
-	originalName := utils.GetDownloadOriginalName(fileBase)
-	originalNameTrim := strings.TrimSuffix(fileBase, filepath.Ext(fileBase))
+	originalNameTrim := strings.TrimSuffix(downloadedFile.Name, filepath.Ext(downloadedFile.Name))
 
-	musicName := "Instrumental_" + originalName
+	musicName := "Instrumental_" + downloadedFile.Name
 	musicPath := filepath.Join(outputPath, fmt.Sprintf("%s_%s_%s.mp3", originalNameTrim, "(Instrumental)", model))
 
-	voiceName := "Vocals_" + originalName
+	voiceName := "Vocals_" + downloadedFile.Name
 	voicePath := filepath.Join(outputPath,
 		fmt.Sprintf("%s_%s_%s.mp3", originalNameTrim, "(Vocals)", model))
 
