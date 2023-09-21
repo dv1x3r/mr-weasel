@@ -82,6 +82,9 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, u
 
 	downloadedFile, err := utils.GetDownloadedFile(uniqueID)
 	if err != nil {
+		res := Result{}
+		res.AddKeyboardButton("Error", "-")
+		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "Whoops, file not available, try uploading again? :c", State: c.downloadSong, Error: err}
 		return
 	}
