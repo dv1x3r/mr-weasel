@@ -37,6 +37,7 @@ func main() {
 
 	if os.Getenv("RTX_MODE") == "on" {
 		commands := tgManager.AddCommands(
+			commands.NewYTMP3Command(),
 			commands.NewExtractVoiceCommand(queue),
 		)
 		tgManager.PublishCommands(commands)
@@ -45,6 +46,7 @@ func main() {
 			commands.NewPingCommand(),
 			commands.NewCarCommand(storage.NewCarStorage(db)),
 			commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
+			commands.NewYTMP3Command(),
 			commands.NewExtractVoiceCommand(queue),
 		)
 		tgManager.PublishCommands(commands)
