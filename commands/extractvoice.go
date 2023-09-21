@@ -14,18 +14,23 @@ import (
 
 type ExtractVoiceCommand struct {
 	queue *utils.Queue
+	mode  string
 }
 
 func NewExtractVoiceCommand(queue *utils.Queue) *ExtractVoiceCommand {
-	return &ExtractVoiceCommand{queue: queue}
+	mode := "CPU"
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		mode = "CUDA"
+	}
+	return &ExtractVoiceCommand{queue: queue, mode: mode}
 }
 
 func (ExtractVoiceCommand) Prefix() string {
 	return "/extractvoice"
 }
 
-func (ExtractVoiceCommand) Description() string {
-	return "separate voice from music"
+func (c *ExtractVoiceCommand) Description() string {
+	return fmt.Sprintf("separate voice from music (%s)", c.mode)
 }
 
 const (
@@ -119,7 +124,8 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 
 	var cmd *exec.Cmd
 
-	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+	switch c.mode {
+	case "CUDA":
 		cmd = exec.CommandContext(ctx, execPath, downloadedFile.Path,
 			"--log_level=DEBUG",
 			"--model_name="+model,
@@ -128,7 +134,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 			"--output_format=MP3",
 			"--use_cuda",
 		)
-	} else {
+	default:
 		cmd = exec.CommandContext(ctx, execPath, downloadedFile.Path,
 			"--log_level=DEBUG",
 			"--model_name="+model,

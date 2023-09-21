@@ -20,7 +20,7 @@ func (YTMP3Command) Prefix() string {
 }
 
 func (YTMP3Command) Description() string {
-	return "download mp3 audio from YouTube"
+	return "youtube to mp3"
 }
 
 func (c *YTMP3Command) Execute(ctx context.Context, pl Payload) {
