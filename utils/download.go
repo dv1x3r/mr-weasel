@@ -80,7 +80,7 @@ func Download(ctx context.Context, rawURL string, providedName string) (Download
 			"--audio-format=mp3",
 			"--audio-quality=0",
 			"--max-filesize=50M",
-			"--max-downloads=2", // on =1 it exits with error code 1
+			"--playlist-items=1",
 			"--paths="+downloadFolderPath,
 			"--output="+uniqueID+".%(title)s.mp3",
 			"--print=after_move:title",
