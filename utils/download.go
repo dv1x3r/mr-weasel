@@ -116,7 +116,7 @@ func Download(ctx context.Context, rawURL string, providedName string) (Download
 		}
 		defer res.Body.Close()
 
-		file, err := os.CreateTemp(downloadFolderPath, fmt.Sprintf("*.%s", providedName))
+		file, err := os.CreateTemp(downloadFolderPath, fmt.Sprintf("*.%s.mp3", providedName))
 		if err != nil {
 			return DownloadedFile{}, err
 		}
