@@ -13,23 +13,38 @@ import (
 )
 
 type ExtractVoiceCommand struct {
-	queue *utils.Queue
-	mode  string
+	queue      *utils.Queue
+	mode       string
+	pathCLI    string
+	pathModels string
+	pathOutput string
 }
 
 func NewExtractVoiceCommand(queue *utils.Queue) *ExtractVoiceCommand {
-	mode := "CPU"
 	if _, err := exec.LookPath("nvidia-smi"); err == nil {
-		mode = "CUDA"
+		return &ExtractVoiceCommand{
+			queue:      queue,
+			mode:       "CUDA",
+			pathCLI:    filepath.Join(utils.GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
+			pathModels: filepath.Join(utils.GetExecutablePath(), "audio-separator", "models"),
+			pathOutput: filepath.Join(utils.GetExecutablePath(), "audio-separator", "output"),
+		}
+	} else {
+		return &ExtractVoiceCommand{
+			queue:      queue,
+			mode:       "CPU",
+			pathCLI:    filepath.Join(utils.GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
+			pathModels: filepath.Join(utils.GetExecutablePath(), "audio-separator", "models"),
+			pathOutput: filepath.Join(utils.GetExecutablePath(), "audio-separator", "output"),
+		}
 	}
-	return &ExtractVoiceCommand{queue: queue, mode: mode}
 }
 
 func (ExtractVoiceCommand) Prefix() string {
 	return "/extractvoice"
 }
 
-func (c *ExtractVoiceCommand) Description() string {
+func (ExtractVoiceCommand) Description() string {
 	return "separate voice and music"
 }
 
@@ -114,33 +129,30 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	res.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	dir := utils.GetExecutablePath()
 	model := "UVR-MDX-NET-Voc_FT" // best for vocal
 	// model := "UVR-MDX-NET-Inst_HQ_3" // best for music
 
-	execPath := filepath.Join(dir, "audio-separator", "bin", "audio-separator")
-	modelsPath := filepath.Join(dir, "audio-separator", "models")
-	outputPath := filepath.Join(dir, "audio-separator", "output")
+	// execPath := filepath.Join(dir, "audio-separator", "bin", "audio-separator")
 
 	var cmd *exec.Cmd
 
 	switch c.mode {
 	case "CUDA":
-		cmd = exec.CommandContext(ctx, execPath, downloadedFile.Path,
-			"--log_level=DEBUG",
-			"--model_name="+model,
-			"--model_file_dir="+modelsPath,
-			"--output_dir="+outputPath,
+		cmd = exec.CommandContext(ctx, c.pathCLI, downloadedFile.Path,
+			"--model_name", model,
+			"--model_file_dir", c.pathModels,
+			"--output_dir", c.pathOutput,
 			"--output_format=MP3",
+			"--log_level=DEBUG",
 			"--use_cuda",
 		)
 	default:
-		cmd = exec.CommandContext(ctx, execPath, downloadedFile.Path,
-			"--log_level=DEBUG",
-			"--model_name="+model,
-			"--model_file_dir="+modelsPath,
-			"--output_dir="+outputPath,
+		cmd = exec.CommandContext(ctx, c.pathCLI, downloadedFile.Path,
+			"--model_name", model,
+			"--model_file_dir", c.pathModels,
+			"--output_dir", c.pathOutput,
 			"--output_format=MP3",
+			"--log_level=DEBUG",
 		)
 	}
 
@@ -166,10 +178,10 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	baseName := strings.TrimSuffix(filepath.Base(downloadedFile.Path), filepath.Ext(downloadedFile.Name))
 
 	musicName := "Instrumental_" + downloadedFile.Name
-	musicPath := filepath.Join(outputPath, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, model))
+	musicPath := filepath.Join(c.pathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, model))
 
 	voiceName := "Vocals_" + downloadedFile.Name
-	voicePath := filepath.Join(outputPath, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, model))
+	voicePath := filepath.Join(c.pathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, model))
 
 	pl.ResultChan <- Result{
 		Audio: map[string]string{
