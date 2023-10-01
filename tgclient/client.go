@@ -1,4 +1,4 @@
-package telegram
+package tgclient
 
 import (
 	"bytes"
@@ -188,7 +188,6 @@ func writeMultipart(body *bytes.Buffer, cfg Config, media Form) (string, error) 
 		if err != nil {
 			return "", err
 		}
-		defer os.Remove(partFile.Path)
 		defer file.Close()
 
 		part, err := writer.CreateFormFile(partName, partFile.Name)

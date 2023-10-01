@@ -40,6 +40,7 @@ func main() {
 			commands.NewPingCommand(),
 			commands.NewYTMP3Command(),
 			commands.NewExtractVoiceCommand(queue),
+			commands.NewChangeVoiceCommand(queue),
 		)
 		tgManager.PublishCommands(commands)
 	} else {

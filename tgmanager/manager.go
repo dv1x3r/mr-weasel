@@ -1,4 +1,4 @@
-package telegram
+package tgmanager
 
 import (
 	"context"
@@ -8,17 +8,18 @@ import (
 	"strings"
 
 	"mr-weasel/commands"
+	"mr-weasel/tgclient"
 	"mr-weasel/utils"
 )
 
 type Manager struct {
-	tgClient *Client                        // Telegram API Client
+	tgClient *tgclient.Client               // Telegram API Client
 	handlers map[string]commands.Handler    // Map of registered command handlers.
 	states   map[int64]commands.ExecuteFunc // Map of active user states.
 	tokens   map[string]context.CancelFunc  // Map of cancellation tokens.
 }
 
-func NewManager(tgClient *Client) *Manager {
+func NewManager(tgClient *tgclient.Client) *Manager {
 	return &Manager{
 		tgClient: tgClient,
 		handlers: make(map[string]commands.Handler),
@@ -27,14 +28,14 @@ func NewManager(tgClient *Client) *Manager {
 	}
 }
 
-func (m *Manager) AddCommands(handlers ...commands.Handler) []BotCommand {
-	botCommands := make([]BotCommand, 0, len(handlers))
+func (m *Manager) AddCommands(handlers ...commands.Handler) []tgclient.BotCommand {
+	botCommands := make([]tgclient.BotCommand, 0, len(handlers))
 
 	for _, handler := range handlers {
 		prefix := handler.Prefix()
 		m.handlers[prefix] = handler
 
-		botCommands = append(botCommands, BotCommand{
+		botCommands = append(botCommands, tgclient.BotCommand{
 			Command:     handler.Prefix(),
 			Description: handler.Description(),
 		})
@@ -45,8 +46,8 @@ func (m *Manager) AddCommands(handlers ...commands.Handler) []BotCommand {
 	return botCommands
 }
 
-func (m *Manager) PublishCommands(botCommands []BotCommand) {
-	cfg := SetMyCommandsConfig{Commands: botCommands}
+func (m *Manager) PublishCommands(botCommands []tgclient.BotCommand) {
+	cfg := tgclient.SetMyCommandsConfig{Commands: botCommands}
 	_, err := m.tgClient.SetMyCommands(context.Background(), cfg)
 	if err != nil {
 		log.Println("[ERROR]", err)
@@ -54,7 +55,7 @@ func (m *Manager) PublishCommands(botCommands []BotCommand) {
 }
 
 func (m *Manager) Start(ctx context.Context) {
-	cfg := GetUpdatesConfig{
+	cfg := tgclient.GetUpdatesConfig{
 		Offset:         -1,
 		Timeout:        60,
 		AllowedUpdates: []string{"message", "callback_query"},
@@ -66,7 +67,7 @@ func (m *Manager) Start(ctx context.Context) {
 		} else if update.CallbackQuery != nil {
 			m.onCallbackQuery(ctx, *update.CallbackQuery)
 			// Answer to the callback query just to dismiss "Loading..." prompt on the top
-			_, err := m.tgClient.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
+			_, err := m.tgClient.AnswerCallbackQuery(ctx, tgclient.AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
 			if err != nil {
 				log.Println("[ERROR]", err)
 			}
@@ -74,7 +75,7 @@ func (m *Manager) Start(ctx context.Context) {
 	}
 }
 
-func (m *Manager) onMessage(ctx context.Context, message Message) {
+func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 	const op = "telegram.Manager.processMessage"
 
 	execFn, ok := m.getExecuteFunc(message.From.ID, message.Text)
@@ -89,7 +90,7 @@ func (m *Manager) onMessage(ctx context.Context, message Message) {
 	}
 
 	if message.Audio != nil {
-		fileURL, err := m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
+		fileURL, err := m.tgClient.GetFileURL(ctx, tgclient.GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			return
@@ -113,7 +114,7 @@ func (m *Manager) onMessage(ctx context.Context, message Message) {
 	go m.processResults(ctx, pl, message)
 }
 
-func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
+func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
 
 	if strings.HasPrefix(callbackQuery.Data, commands.CmdCancel) {
@@ -150,7 +151,7 @@ func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery CallbackQue
 	go m.processResults(ctx, pl, *callbackQuery.Message)
 }
 
-func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse Message) {
+func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse tgclient.Message) {
 	const op = "telegram.Manager.processResults"
 	var err error
 
@@ -160,8 +161,8 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 		}
 
 		if result.Audio != nil {
-			form := Form{}
-			media := []InputMedia{}
+			form := tgclient.Form{}
+			media := []tgclient.InputMedia{}
 
 			keys := make([]string, 0, len(result.Audio))
 			for k := range result.Audio {
@@ -171,11 +172,11 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 
 			for _, name := range keys {
 				path := result.Audio[name]
-				form[name] = FormFile{Name: name, Path: path}
-				media = append(media, &InputMediaAudio{Media: "attach://" + name})
+				form[name] = tgclient.FormFile{Name: name, Path: path}
+				media = append(media, &tgclient.InputMediaAudio{Media: "attach://" + name})
 			}
 
-			_, err = m.tgClient.SendMediaGroup(ctx, SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, form)
+			_, err = m.tgClient.SendMediaGroup(ctx, tgclient.SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, form)
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			}
@@ -193,7 +194,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = previousResponse.Text
 			}
 
-			previousResponse, err = m.tgClient.EditMessageText(ctx, EditMessageTextConfig{
+			previousResponse, err = m.tgClient.EditMessageText(ctx, tgclient.EditMessageTextConfig{
 				ChatID:      previousResponse.Chat.ID,
 				MessageID:   previousResponse.MessageID,
 				Text:        result.Text,
@@ -214,7 +215,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				delete(m.states, pl.UserID)
 			}
 
-			previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
+			previousResponse, err = m.tgClient.SendMessage(ctx, tgclient.SendMessageConfig{
 				ChatID:      previousResponse.Chat.ID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
@@ -259,15 +260,4 @@ func (m *Manager) getCancelFunc(userID int64, text string) (context.CancelFunc, 
 	}
 
 	return cancel, ok
-}
-
-func (m *Manager) commandKeyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
-	markup := &InlineKeyboardMarkup{InlineKeyboard: make([][]InlineKeyboardButton, len(keyboard))}
-	for r, row := range keyboard {
-		markup.InlineKeyboard[r] = make([]InlineKeyboardButton, len(row))
-		for b, btn := range row {
-			markup.InlineKeyboard[r][b] = InlineKeyboardButton{Text: btn.Label, CallbackData: btn.Data}
-		}
-	}
-	return markup
 }

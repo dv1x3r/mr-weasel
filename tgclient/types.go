@@ -1,4 +1,4 @@
-package telegram
+package tgclient
 
 import (
 	"encoding/json"
@@ -36,9 +36,8 @@ func (e *APIError) Error() string {
 type Form = map[string]FormFile
 
 type FormFile struct {
-	Name   string
-	Path   string
-	Delete bool
+	Name string
+	Path string
 }
 
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
@@ -179,11 +178,96 @@ type File struct {
 	FilePath string `json:"file_path,omitempty"`
 }
 
+// Describes a Web App.
+type WebAppInfo struct {
+	// An HTTPS URL of a Web App to be opened with additional data as specified in Initializing Web Apps.
+	URL string `json:"url"`
+}
+
+// Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
+type ReplyMarkup interface {
+	ReplyMarkuper()
+}
+
+// This object represents a custom keyboard with reply options (see Introduction to bots for details and examples).
+type ReplyKeyboardMarkup struct {
+	// Array of button rows, each represented by an Array of KeyboardButton objects
+	Keyboard [][]KeyboardButton `json:"keyboard"`
+	// Optional. Requests clients to always show the keyboard when the regular keyboard is hidden. Defaults to false, in which case the custom keyboard can be hidden and opened with a keyboard icon.
+	IsPersistent bool `json:"is_persistent,omitempty"`
+	// Optional. Requests clients to resize the keyboard vertically for optimal fit (e.g., make the keyboard smaller if there are just two rows of buttons). Defaults to false, in which case the custom keyboard is always of the same height as the app's standard keyboard.
+	ResizeKeyboard bool `json:"resize_keyboard,omitempty"`
+	// Optional. Requests clients to hide the keyboard as soon as it's been used. The keyboard will still be available, but clients will automatically display the usual letter-keyboard in the chat - the user can press a special button in the input field to see the custom keyboard again. Defaults to false.
+	OneTimeKeyboard bool `json:"one_time_keyboard,omitempty"`
+	// Optional. The placeholder to be shown in the input field when the keyboard is active; 1-64 characters.
+	InputFieldPlaceholder string `json:"input_field_placeholder,omitempty"`
+	// Optional. Use this parameter if you want to show the keyboard to specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
+	Selective bool `json:"selective,omitempty"`
+}
+
+func (ReplyKeyboardMarkup) ReplyMarkuper() {}
+
+// This object represents one button of the reply keyboard. For simple text buttons, String can be used instead of this object to specify the button text.
+type KeyboardButton struct {
+	// Text of the button. If none of the optional fields are used, it will be sent as a message when the button is pressed.
+	Text string `json:"text"`
+	// Optional. If specified, pressing the button will open a list of suitable users. Tapping on any user will send their identifier to the bot in a “user_shared” service message. Available in private chats only.
+	RequestUser *KeyboardButtonRequestUser `json:"request_user,omitempty"`
+	// Optional. If specified, pressing the button will open a list of suitable chats. Tapping on a chat will send its identifier to the bot in a “chat_shared” service message. Available in private chats only.
+	RequestChat *KeyboardButtonRequestChat `json:"request_chat,omitempty"`
+	// Optional. If True, the user's phone number will be sent as a contact when the button is pressed. Available in private chats only.
+	RequestContact bool `json:"request_contact,omitempty"`
+	// Optional. If True, the user's current location will be sent when the button is pressed. Available in private chats only.
+	RequestLocation bool `json:"request_location,omitempty"`
+	// Optional. If specified, the user will be asked to create a poll and send it to the bot when the button is pressed. Available in private chats only.
+	RequestPoll *KeyboardButtonPollType `json:"request_poll,omitempty"`
+	// Optional. If specified, the described Web App will be launched when the button is pressed. The Web App will be able to send a “web_app_data” service message. Available in private chats only.
+	WebApp *WebAppInfo `json:"web_app,omitempty"`
+}
+
+// This object defines the criteria used to request a suitable user. The identifier of the selected user will be shared with the bot when the corresponding button is pressed.
+type KeyboardButtonRequestUser struct {
+	// Signed 32-bit identifier of the request, which will be received back in the UserShared object. Must be unique within the message.
+	RequestID int64 `json:"request_id"`
+	// Optional. Pass True to request a bot, pass False to request a regular user. If not specified, no additional restrictions are applied.
+	UserIsBot *bool `json:"user_is_bot,omitempty"`
+	// Optional. Pass True to request a premium user, pass False to request a non-premium user. If not specified, no additional restrictions are applied.
+	UserIsPremium *bool `json:"user_is_premium,omitempty"`
+}
+
+// This object defines the criteria used to request a suitable chat. The identifier of the selected chat will be shared with the bot when the corresponding button is pressed.
+type KeyboardButtonRequestChat struct {
+	// Signed 32-bit identifier of the request, which will be received back in the ChatShared object. Must be unique within the message.
+	RequestID int64 `json:"request_id"`
+	// Pass True to request a channel chat, pass False to request a group or a supergroup chat.
+	ChatIsChannel bool `json:"chat_is_channel"`
+	// Optional. Pass True to request a forum supergroup, pass False to request a non-forum chat. If not specified, no additional restrictions are applied.
+	ChatIsForum *bool `json:"chat_is_forum,omitempty"`
+	// Optional. Pass True to request a supergroup or a channel with a username, pass False to request a chat without a username. If not specified, no additional restrictions are applied.
+	ChatHasUsername *bool `json:"chat_has_username,omitempty"`
+	// Optional. Pass True to request a chat owned by the user. Otherwise, no additional restrictions are applied.
+	ChatIsCreated bool `json:"chat_is_created,omitempty"`
+	// Optional. A JSON-serialized object listing the required administrator rights of the user in the chat. The rights must be a superset of bot_administrator_rights. If not specified, no additional restrictions are applied.
+	UserAdministratorRights *ChatAdministratorRights `json:"user_administrator_rights,omitempty"`
+	// Optional. A JSON-serialized object listing the required administrator rights of the bot in the chat. The rights must be a subset of user_administrator_rights. If not specified, no additional restrictions are applied.
+	BotAdministratorRights *ChatAdministratorRights `json:"bot_administrator_rights,omitempty"`
+	// Optional. Pass True to request a chat with the bot as a member. Otherwise, no additional restrictions are applied.
+	BotIsMember bool `json:"bot_is_member,omitempty"`
+}
+
+// This object represents type of a poll, which is allowed to be created and sent when the corresponding button is pressed.
+type KeyboardButtonPollType struct {
+	// Optional. If quiz is passed, the user will be allowed to create only polls in the quiz mode. If regular is passed, only regular polls will be allowed. Otherwise, the user will be allowed to create a poll of any type.
+	Type string `json:"type,omitempty"`
+}
+
 // This object represents an inline keyboard that appears right next to the message it belongs to.
 type InlineKeyboardMarkup struct {
 	// Array of button rows, each represented by an Array of InlineKeyboardButton objects.
 	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
 }
+
+func (InlineKeyboardMarkup) ReplyMarkuper() {}
 
 // This object represents one button of an inline keyboard. You must use exactly one of the optional fields.
 type InlineKeyboardButton struct {
@@ -209,6 +293,40 @@ type CallbackQuery struct {
 	ChatInstance string `json:"chat_instance"`
 	// Optional. Data associated with the callback button. Be aware that the message originated the query can contain no callback buttons with this data.
 	Data string `json:"data,omitempty"`
+}
+
+// Represents the rights of an administrator in a chat.
+type ChatAdministratorRights struct {
+	// True, if the user's presence in the chat is hidden
+	IsAnonymous bool `json:"is_anonymous"`
+	// True, if the administrator can access the chat event log, boost list in channels, see channel members, report spam messages, see anonymous administrators in supergroups and ignore slow mode. Implied by any other administrator privilege
+	CanManageChat bool `json:"can_manage_chat"`
+	// True, if the administrator can delete messages of other users
+	CanDeleteMessages bool `json:"can_delete_messages"`
+	// True, if the administrator can manage video chats
+	CanManageVideoChats bool `json:"can_manage_video_chats"`
+	// True, if the administrator can restrict, ban or unban chat members, or access supergroup statistics
+	CanRestrictMembers bool `json:"can_restrict_members"`
+	// True, if the administrator can add new administrators with a subset of their own privileges or demote administrators that they have promoted, directly or indirectly (promoted by administrators that were appointed by the user)
+	CanPromoteMembers bool `json:"can_promote_members"`
+	// True, if the user is allowed to change the chat title, photo and other settings
+	CanChangeInfo bool `json:"can_change_info"`
+	// True, if the user is allowed to invite new users to the chat
+	CanInviteUsers *bool `json:"can_invite_users,omitempty"`
+	// Optional. True, if the administrator can post messages in the channel, or access channel statistics; channels only
+	CanPostMessages *bool `json:"can_post_messages,omitempty"`
+	// Optional. True, if the administrator can edit messages of other users and can pin messages; channels only
+	CanEditMessages *bool `json:"can_edit_messages,omitempty"`
+	// Optional. True, if the user is allowed to pin messages; groups and supergroups only
+	CanPinMessages *bool `json:"can_pin_messages,omitempty"`
+	// Optional. True, if the administrator can post stories in the channel; channels only
+	CanPostStories *bool `json:"can_post_stories,omitempty"`
+	// Optional. True, if the administrator can edit stories posted by other users; channels only
+	CanEditStories *bool `json:"can_edit_stories,omitempty"`
+	// Optional. True, if the administrator can delete stories posted by other users; channels only
+	CanDeleteStories *bool `json:"can_delete_stories,omitempty"`
+	// Optional. True, if the user is allowed to create, rename, close, and reopen forum topics; supergroups only
+	CanManageTopics *bool `json:"can_manage_topics,omitempty"`
 }
 
 // This object represents a bot command.
