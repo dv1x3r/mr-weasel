@@ -72,19 +72,19 @@ func (c *Client) SendMessage(ctx context.Context, cfg SendMessageConfig) (Messag
 }
 
 // Use this method to send audio files, if you want Telegram clients to display them in the music player.
-func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, media Form) (Message, error) {
+func (c *Client) SendAudio(ctx context.Context, cfg SendAudioConfig, attach map[string]string) (Message, error) {
 	const op = "telegram.Client.SendAudio"
-	value, err := executeMethod[Message](ctx, c, cfg, media)
+	value, err := executeMethod[Message](ctx, c, cfg, attach)
 	return value, utils.WrapIfErr(op, err)
 }
 
 // Use this method to send a group of photos, videos, documents or audios as an album. Documents and audio files can be only grouped in an album with messages of the same type. On success, an array of Messages that were sent is returned.
-func (c *Client) SendMediaGroup(ctx context.Context, cfg SendMediaGroupConfig, media Form) ([]Message, error) {
+func (c *Client) SendMediaGroup(ctx context.Context, cfg SendMediaGroupConfig, attach map[string]string) ([]Message, error) {
 	const op = "telegram.Client.SendMediaGroup"
 	for _, media := range cfg.Media {
 		media.SetInputMediaType()
 	}
-	value, err := executeMethod[[]Message](ctx, c, cfg, media)
+	value, err := executeMethod[[]Message](ctx, c, cfg, attach)
 	return value, utils.WrapIfErr(op, err)
 }
 
@@ -164,7 +164,7 @@ func (c *Client) GetUpdatesChan(ctx context.Context, cfg GetUpdatesConfig, chanS
 	return ch
 }
 
-func writeMultipart(body *bytes.Buffer, cfg Config, media Form) (string, error) {
+func writeMultipart(body *bytes.Buffer, cfg Config, attach map[string]string) (string, error) {
 	writer := multipart.NewWriter(body)
 	defer writer.Close()
 
@@ -183,14 +183,14 @@ func writeMultipart(body *bytes.Buffer, cfg Config, media Form) (string, error) 
 		writer.WriteField(fieldName, string(fieldValue))
 	}
 
-	for partName, partFile := range media {
-		file, err := os.Open(partFile.Path)
+	for partName, partPath := range attach {
+		file, err := os.Open(partPath)
 		if err != nil {
 			return "", err
 		}
 		defer file.Close()
 
-		part, err := writer.CreateFormFile(partName, partFile.Name)
+		part, err := writer.CreateFormFile(partName, partName)
 		if err != nil {
 			return "", err
 		}
@@ -201,29 +201,29 @@ func writeMultipart(body *bytes.Buffer, cfg Config, media Form) (string, error) 
 	return writer.FormDataContentType(), nil
 }
 
-func executeMethod[T any](ctx context.Context, client *Client, cfg Config, media Form) (T, error) {
+func executeMethod[T any](ctx context.Context, client *Client, cfg Config, attach map[string]string) (T, error) {
 	var value T
 	var err error
 
 	body := new(bytes.Buffer)
 	contentType := "application/json"
 
-	if cfg != nil && media == nil {
+	if cfg != nil && attach == nil {
 		// application/json response
 		err = json.NewEncoder(body).Encode(cfg)
 		if err != nil {
 			return value, err
 		}
-	} else if cfg != nil && media != nil {
+	} else if cfg != nil && attach != nil {
 		// multitype/form-data response
-		contentType, err = writeMultipart(body, cfg, media)
+		contentType, err = writeMultipart(body, cfg, attach)
 		if err != nil {
 			return value, err
 		}
 	}
 
 	if client.debug {
-		log.Printf("[DEBUG] Request %s %s %+v %+v\b", contentType, cfg.Method(), cfg, media)
+		log.Printf("[DEBUG] Request %s %s %+v %+v\b", contentType, cfg.Method(), cfg, attach)
 	}
 
 	url := fmt.Sprintf(apiEndpoint, client.token, cfg.Method())

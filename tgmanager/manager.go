@@ -160,8 +160,12 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
 		}
 
+		var replyMarkup tgclient.ReplyMarkup
+		if result.InlineMarkup.InlineKeyboard != nil {
+			replyMarkup = result.InlineMarkup
+		}
+
 		if result.Audio != nil {
-			form := tgclient.Form{}
 			media := []tgclient.InputMedia{}
 
 			keys := make([]string, 0, len(result.Audio))
@@ -171,17 +175,15 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			sort.Strings(keys)
 
 			for _, name := range keys {
-				path := result.Audio[name]
-				form[name] = tgclient.FormFile{Name: name, Path: path}
 				media = append(media, &tgclient.InputMediaAudio{Media: "attach://" + name})
 			}
 
-			_, err = m.tgClient.SendMediaGroup(ctx, tgclient.SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, form)
+			_, err = m.tgClient.SendMediaGroup(ctx, tgclient.SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, result.Audio)
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			}
 
-		} else if result.Keyboard != nil && previousResponse.ReplyMarkup != nil {
+		} else if result.InlineMarkup.InlineKeyboard != nil && previousResponse.ReplyMarkup != nil {
 			// if both previous and new response contain a keyboard, then it is update
 
 			// in case of update we can change states only
@@ -199,7 +201,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				MessageID:   previousResponse.MessageID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
-				ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+				ReplyMarkup: &result.InlineMarkup,
 			})
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
@@ -219,7 +221,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				ChatID:      previousResponse.Chat.ID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
-				ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+				ReplyMarkup: replyMarkup,
 			})
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))

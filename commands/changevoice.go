@@ -66,15 +66,15 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 
 func (c *ChangeVoiceCommand) showMainMenu(ctx context.Context, pl Payload) {
 	res := Result{Text: "Experinemt info..."}
-	res.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel))
-	res.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12))
-	res.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1))
-	res.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1))
-	res.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer))
+	res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel))
+	res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12))
+	res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1))
+	res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1))
+	res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer))
 	pl.ResultChan <- res
 }
 

@@ -64,9 +64,9 @@ func (c *ExtractVoiceCommand) Execute(ctx context.Context, pl Payload) {
 
 func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	res := Result{Text: "🌐 Please wait..."}
-	res.AddKeyboardButton("Downloading...", "-")
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", cancelf(ctx))
+	res.InlineMarkup.AddKeyboardButton("Downloading...", "-")
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
 	var downloadedFile utils.DownloadedFile
@@ -83,27 +83,27 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 		if !errors.Is(err, context.Canceled) {
 			res.Text = "Whoops, download failed, try again :c"
 		}
-		res.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
 		return
 	}
 
 	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-	res.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
 	pl.ResultChan <- res
 }
 
 func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, uniqueID string) {
 	res := Result{}
-	res.AddKeyboardButton("Queued...", "-")
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", cancelf(ctx))
+	res.InlineMarkup.AddKeyboardButton("Queued...", "-")
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
 	downloadedFile, err := utils.GetDownloadedFile(uniqueID)
 	if err != nil {
 		res := Result{}
-		res.AddKeyboardButton("Error", "-")
+		res.InlineMarkup.AddKeyboardButton("Error", "-")
 		pl.ResultChan <- res
 		pl.ResultChan <- Result{Text: "Whoops, file not available, try uploading again? :c", State: c.downloadSong, Error: err}
 		return
@@ -114,7 +114,7 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, u
 		c.processFile(ctx, pl, downloadedFile)
 	} else {
 		res = Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, uniqueID))
+		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, uniqueID))
 		pl.ResultChan <- res
 		if !errors.Is(ctx.Err(), context.Canceled) {
 			pl.ResultChan <- Result{Text: "There are too many queued jobs, please wait."}
@@ -124,9 +124,9 @@ func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, u
 
 func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downloadedFile utils.DownloadedFile) {
 	res := Result{}
-	res.AddKeyboardButton("Python goes brrr...", "-")
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", cancelf(ctx))
+	res.InlineMarkup.AddKeyboardButton("Python goes brrr...", "-")
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
 	model := "UVR-MDX-NET-Voc_FT" // best for vocal
@@ -161,7 +161,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	err := cmd.Run()
 	if err != nil {
 		res = Result{}
-		res.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
+		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
 		pl.ResultChan <- res
 		if err.Error() != "signal: killed" {
 			pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
@@ -172,7 +172,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	os.Remove(downloadedFile.Path)
 
 	res = Result{}
-	res.AddKeyboardButton("Done!", "-")
+	res.InlineMarkup.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
 	baseName := strings.TrimSuffix(filepath.Base(downloadedFile.Path), filepath.Ext(downloadedFile.Name))

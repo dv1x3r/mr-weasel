@@ -47,25 +47,3 @@ func TestGetHandlerFunc(t *testing.T) {
 		}
 	})
 }
-
-func TestCommandKeyboardToInlineMarkup(t *testing.T) {
-	keyboard := [][]commands.Button{
-		{
-			{Label: "ABC", Data: "DEF"},
-		},
-		{
-			{Label: "GHI", Data: "JKL"},
-			{Label: "MNO", Data: "PQR"},
-		},
-	}
-	markup := NewManager(nil).commandKeyboardToInlineMarkup(keyboard)
-	for r := 0; r < len(keyboard); r++ {
-		for b := 0; b < len(keyboard[r]); b++ {
-			testLabel, testData := keyboard[r][b].Label, keyboard[r][b].Data
-			markLabel, markData := markup.InlineKeyboard[r][b].Text, markup.InlineKeyboard[r][b].CallbackData
-			if testLabel != markLabel || testData != markData {
-				t.Errorf("expected [%s, %s] button, actual [%s, %s]\n", testLabel, testData, markLabel, markData)
-			}
-		}
-	}
-}

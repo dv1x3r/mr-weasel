@@ -29,9 +29,9 @@ func (c *YTMP3Command) Execute(ctx context.Context, pl Payload) {
 
 func (c *YTMP3Command) downloadSong(ctx context.Context, pl Payload) {
 	res := Result{Text: "🌐 Please wait..."}
-	res.AddKeyboardButton("Downloading...", "-")
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Cancel", cancelf(ctx))
+	res.InlineMarkup.AddKeyboardButton("Downloading...", "-")
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
 	downloadedFile, err := utils.Download(ctx, pl.Command, "")
@@ -41,13 +41,13 @@ func (c *YTMP3Command) downloadSong(ctx context.Context, pl Payload) {
 		if !errors.Is(err, context.Canceled) {
 			res.Text = "Whoops, download failed, try again :c"
 		}
-		res.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
 		return
 	}
 
 	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-	res.AddKeyboardButton("Done!", "-")
+	res.InlineMarkup.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
 	pl.ResultChan <- Result{Audio: map[string]string{downloadedFile.Name: downloadedFile.Path}}

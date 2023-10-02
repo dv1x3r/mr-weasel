@@ -23,10 +23,10 @@ type Payload struct {
 }
 
 type Result struct {
-	Text           string
-	State          ExecuteFunc
-	InlineKeyboard tgclient.InlineKeyboardMarkup
-	ReplyKeyboard  tgclient.ReplyKeyboardMarkup
-	Audio          map[string]string
-	Error          error
+	Text         string
+	State        ExecuteFunc
+	InlineMarkup tgclient.InlineKeyboardMarkup
+	ReplyMarkup  tgclient.ReplyKeyboardMarkup
+	Audio        map[string]string
+	Error        error
 }

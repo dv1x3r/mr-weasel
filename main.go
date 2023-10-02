@@ -9,7 +9,8 @@ import (
 
 	"mr-weasel/commands"
 	"mr-weasel/storage"
-	"mr-weasel/telegram"
+	"mr-weasel/tgclient"
+	"mr-weasel/tgmanager"
 	"mr-weasel/utils"
 
 	"github.com/jmoiron/sqlx"
@@ -32,8 +33,8 @@ func main() {
 
 	queue := utils.NewQueue(queuePool, queueParallel)
 
-	tgClient := telegram.MustConnect(os.Getenv("TG_TOKEN"), false)
-	tgManager := telegram.NewManager(tgClient)
+	tgClient := tgclient.MustConnect(os.Getenv("TG_TOKEN"), false)
+	tgManager := tgmanager.NewManager(tgClient)
 
 	if os.Getenv("RTX_MODE") == "on" {
 		commands := tgManager.AddCommands(

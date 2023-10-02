@@ -44,12 +44,12 @@ func GetDownloadedFile(uniqueID string) (DownloadedFile, error) {
 	}
 
 	for _, file := range files {
-		fileName := filepath.Base(file.Name())
-		split := strings.SplitN(fileName, ".", 2)
-		if len(split) == 2 && split[0] == uniqueID {
+		fileName := file.Name()
+		split := strings.Split(fileName, ".")
+		if len(split) > 1 && split[len(split)-2] == uniqueID {
 			return DownloadedFile{
-				UniqueID: split[0],
-				Name:     split[1],
+				UniqueID: split[len(split)-2],
+				Name:     strings.Join(split[0:len(split)-2], "."),
 				Path:     filepath.Join(folderPath, fileName),
 			}, nil
 		}
@@ -58,7 +58,7 @@ func GetDownloadedFile(uniqueID string) (DownloadedFile, error) {
 	return DownloadedFile{}, errors.New("downloaded file not found")
 }
 
-func Download(ctx context.Context, rawURL string, providedName string) (DownloadedFile, error) {
+func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFile, error) {
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {
 		return DownloadedFile{}, err
@@ -67,7 +67,37 @@ func Download(ctx context.Context, rawURL string, providedName string) (Download
 	downloadFolderPath := GetDownloadFolderPath()
 	os.MkdirAll(downloadFolderPath, os.ModePerm)
 
-	if parsedURL.Hostname() != "api.telegram.org" {
+	if parsedURL.Hostname() == "api.telegram.org" {
+		req, err := http.NewRequestWithContext(ctx, "GET", parsedURL.String(), nil)
+		if err != nil {
+			return DownloadedFile{}, err
+		}
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return DownloadedFile{}, err
+		}
+		defer res.Body.Close()
+
+		file, err := os.CreateTemp(downloadFolderPath, fmt.Sprintf("%s.*.%s", filepath.Base(fileName), filepath.Ext(fileName)))
+		if err != nil {
+			return DownloadedFile{}, err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, res.Body)
+
+		nameSplit := strings.Split(filepath.Base(file.Name()), ".")
+		df := DownloadedFile{
+			UniqueID: nameSplit[len(nameSplit)-1],
+			Name:     fileName,
+			Path:     filepath.Join(downloadFolderPath, file.Name()),
+		}
+
+		return df, err
+
+	} else {
+
 		uniqueID := fmt.Sprint(ctx.Value("contextID"))
 
 		dlp, err := exec.LookPath("yt-dlp")
@@ -81,8 +111,8 @@ func Download(ctx context.Context, rawURL string, providedName string) (Download
 			"--audio-quality=0",
 			"--max-filesize=50M",
 			"--playlist-items=1",
-			"--paths="+downloadFolderPath,
-			"--output="+uniqueID+".%(title)s.mp3",
+			"--paths", downloadFolderPath,
+			"--output=%(title)s."+uniqueID+".mp3",
 			"--print=after_move:title",
 		)
 		cmd.Stdout, cmd.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
@@ -97,36 +127,12 @@ func Download(ctx context.Context, rawURL string, providedName string) (Download
 			return DownloadedFile{}, errors.New("yt-dlp outputed an empty video title")
 		}
 
-		return DownloadedFile{
+		df := DownloadedFile{
 			UniqueID: uniqueID,
-			Name:     title,
-			Path:     filepath.Join(downloadFolderPath, fmt.Sprintf("%s.%s.mp3", uniqueID, title)),
-		}, nil
-
-	} else {
-
-		req, err := http.NewRequestWithContext(ctx, "GET", parsedURL.String(), nil)
-		if err != nil {
-			return DownloadedFile{}, err
+			Name:     fmt.Sprintf("%s.mp3", title),
+			Path:     filepath.Join(downloadFolderPath, fmt.Sprintf("%s.%s.mp3", title, uniqueID)),
 		}
 
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return DownloadedFile{}, err
-		}
-		defer res.Body.Close()
-
-		file, err := os.CreateTemp(downloadFolderPath, fmt.Sprintf("*.%s.mp3", providedName))
-		if err != nil {
-			return DownloadedFile{}, err
-		}
-		defer file.Close()
-
-		_, err = io.Copy(file, res.Body)
-		return DownloadedFile{
-			UniqueID: strings.SplitN(filepath.Base(file.Name()), ".", 2)[0],
-			Name:     providedName,
-			Path:     filepath.Join(downloadFolderPath, file.Name()),
-		}, err
+		return df, nil
 	}
 }
