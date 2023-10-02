@@ -27,7 +27,7 @@ func NewExtractVoiceCommand(queue *utils.Queue) *ExtractVoiceCommand {
 			mode:       "CUDA",
 			pathCLI:    filepath.Join(utils.GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
 			pathModels: filepath.Join(utils.GetExecutablePath(), "audio-separator", "models"),
-			pathOutput: filepath.Join(utils.GetExecutablePath(), "audio-separator", "output"),
+			pathOutput: utils.GetDownloadFolderPath(),
 		}
 	} else {
 		return &ExtractVoiceCommand{
@@ -35,7 +35,7 @@ func NewExtractVoiceCommand(queue *utils.Queue) *ExtractVoiceCommand {
 			mode:       "CPU",
 			pathCLI:    filepath.Join(utils.GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
 			pathModels: filepath.Join(utils.GetExecutablePath(), "audio-separator", "models"),
-			pathOutput: filepath.Join(utils.GetExecutablePath(), "audio-separator", "output"),
+			pathOutput: utils.GetDownloadFolderPath(),
 		}
 	}
 }
