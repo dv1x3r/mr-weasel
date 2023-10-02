@@ -24,12 +24,12 @@ func GetDownloadFolderPath() string {
 }
 
 type DownloadedFile struct {
-	UniqueID string
-	Name     string
-	Path     string
+	ID   string
+	Name string
+	Path string
 }
 
-func GetDownloadedFile(uniqueID string) (DownloadedFile, error) {
+func GetDownloadedFile(fileID string) (DownloadedFile, error) {
 	folderPath := GetDownloadFolderPath()
 
 	dir, err := os.Open(folderPath)
@@ -44,13 +44,12 @@ func GetDownloadedFile(uniqueID string) (DownloadedFile, error) {
 	}
 
 	for _, file := range files {
-		fileName := file.Name()
-		split := strings.Split(fileName, ".")
-		if len(split) > 1 && split[len(split)-2] == uniqueID {
+		split := strings.SplitN(file.Name(), ".", 2)
+		if len(split) == 2 && split[0] == fileID {
 			return DownloadedFile{
-				UniqueID: split[len(split)-2],
-				Name:     strings.Join(split[0:len(split)-2], "."),
-				Path:     filepath.Join(folderPath, fileName),
+				ID:   fileID,
+				Name: split[1],
+				Path: filepath.Join(folderPath, file.Name()),
 			}, nil
 		}
 	}
@@ -64,6 +63,7 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 		return DownloadedFile{}, err
 	}
 
+	fileID := uuid()
 	downloadFolderPath := GetDownloadFolderPath()
 	os.MkdirAll(downloadFolderPath, os.ModePerm)
 
@@ -79,7 +79,7 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 		}
 		defer res.Body.Close()
 
-		file, err := os.CreateTemp(downloadFolderPath, fmt.Sprintf("%s.*.%s", filepath.Base(fileName), filepath.Ext(fileName)))
+		file, err := os.Create(filepath.Join(downloadFolderPath, fmt.Sprintf("%s.%s", fileID, fileName)))
 		if err != nil {
 			return DownloadedFile{}, err
 		}
@@ -87,19 +87,15 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 
 		_, err = io.Copy(file, res.Body)
 
-		nameSplit := strings.Split(filepath.Base(file.Name()), ".")
 		df := DownloadedFile{
-			UniqueID: nameSplit[len(nameSplit)-1],
-			Name:     fileName,
-			Path:     filepath.Join(downloadFolderPath, file.Name()),
+			ID:   fileID,
+			Name: fileName,
+			Path: file.Name(),
 		}
 
 		return df, err
 
 	} else {
-
-		uniqueID := fmt.Sprint(ctx.Value("contextID"))
-
 		dlp, err := exec.LookPath("yt-dlp")
 		if err != nil {
 			return DownloadedFile{}, err
@@ -112,7 +108,7 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 			"--max-filesize=50M",
 			"--playlist-items=1",
 			"--paths", downloadFolderPath,
-			"--output=%(title)s."+uniqueID+".mp3",
+			"--output", fileID+".%(title)s.mp3",
 			"--print=after_move:title",
 		)
 		cmd.Stdout, cmd.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
@@ -128,9 +124,9 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 		}
 
 		df := DownloadedFile{
-			UniqueID: uniqueID,
-			Name:     fmt.Sprintf("%s.mp3", title),
-			Path:     filepath.Join(downloadFolderPath, fmt.Sprintf("%s.%s.mp3", title, uniqueID)),
+			ID:   fileID,
+			Name: fmt.Sprintf("%s.mp3", title),
+			Path: filepath.Join(downloadFolderPath, fmt.Sprintf("%s.%s.mp3", fileID, title)),
 		}
 
 		return df, nil

@@ -89,7 +89,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
 	pl.ResultChan <- res
 }
 
@@ -132,8 +132,6 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	model := "UVR-MDX-NET-Voc_FT" // best for vocal
 	// model := "UVR-MDX-NET-Inst_HQ_3" // best for music
 
-	// execPath := filepath.Join(dir, "audio-separator", "bin", "audio-separator")
-
 	var cmd *exec.Cmd
 
 	switch c.mode {
@@ -161,15 +159,13 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	err := cmd.Run()
 	if err != nil {
 		res = Result{}
-		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
+		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
 		pl.ResultChan <- res
 		if err.Error() != "signal: killed" {
 			pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
 		}
 		return
 	}
-
-	os.Remove(downloadedFile.Path)
 
 	res = Result{}
 	res.InlineMarkup.AddKeyboardButton("Done!", "-")
