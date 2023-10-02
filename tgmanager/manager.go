@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 
 	"mr-weasel/commands"
@@ -99,6 +100,10 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 		pl.Command = message.Audio.FileName
 	}
 
+	if message.UserShared != nil {
+		pl.Command = strconv.FormatInt(message.UserShared.UserID, 10)
+	}
+
 	go func() {
 		ctx := context.WithValue(ctx, "contextID", fmt.Sprintf("%p", &pl))
 		ctx, cancel := context.WithCancel(ctx)
@@ -160,11 +165,6 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
 		}
 
-		var replyMarkup tgclient.ReplyMarkup
-		if result.InlineMarkup.InlineKeyboard != nil {
-			replyMarkup = result.InlineMarkup
-		}
-
 		if result.Audio != nil {
 			media := []tgclient.InputMedia{}
 
@@ -184,7 +184,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			}
 
 		} else if result.InlineMarkup.InlineKeyboard != nil && previousResponse.ReplyMarkup != nil {
-			// if both previous and new response contain a keyboard, then it is update
+			// if both previous and new response contain an inline keyboard, then it is update
 
 			// in case of update we can change states only
 			if result.State != nil {
@@ -215,6 +215,15 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				m.states[pl.UserID] = result.State
 			} else {
 				delete(m.states, pl.UserID)
+			}
+
+			var replyMarkup tgclient.ReplyMarkup
+			if result.InlineMarkup.InlineKeyboard != nil {
+				replyMarkup = result.InlineMarkup
+			} else if result.ReplyMarkup.Keyboard != nil {
+				replyMarkup = result.ReplyMarkup
+			} else if result.RemoveMarkup.RemoveKeyboard {
+				replyMarkup = result.RemoveMarkup
 			}
 
 			previousResponse, err = m.tgClient.SendMessage(ctx, tgclient.SendMessageConfig{

@@ -27,6 +27,7 @@ type Result struct {
 	State        ExecuteFunc
 	InlineMarkup tgclient.InlineKeyboardMarkup
 	ReplyMarkup  tgclient.ReplyKeyboardMarkup
+	RemoveMarkup tgclient.ReplyKeyboardRemove
 	Audio        map[string]string
 	Error        error
 }

@@ -35,7 +35,7 @@ func (e *APIError) Error() string {
 
 // This object represents an incoming update. At most one of the optional parameters can be present in any given update.
 type Update struct {
-	// The update's unique identifier
+	// The update's unique identifier.
 	UpdateID int `json:"update_id"`
 	// Optional. New incoming message of any kind — text, photo, sticker, etc.
 	Message *Message `json:"message,omitempty"`
@@ -45,7 +45,7 @@ type Update struct {
 
 // This object represents a Telegram user or bot.
 type User struct {
-	// Unique identifier for this user or bot
+	// Unique identifier for this user or bot.
 	ID int64 `json:"id"`
 	// True, if this user is a bot.
 	IsBot bool `json:"is_bot"`
@@ -71,7 +71,7 @@ type User struct {
 
 // This object represents a chat.
 type Chat struct {
-	// Unique identifier for this chat
+	// Unique identifier for this chat.
 	ID int64 `json:"id"`
 	// Type of chat, can be either “private”, “group”, “supergroup” or “channel”.
 	Type string `json:"type"`
@@ -81,13 +81,13 @@ type Chat struct {
 
 // This object represents a message.
 type Message struct {
-	// Unique message identifier inside this chat
+	// Unique message identifier inside this chat.
 	MessageID int `json:"message_id"`
 	// Optional. Sender of the message; empty for messages sent to channels. For backward compatibility, the field contains a fake sender user in non-channel chats, if the message was sent on behalf of a chat.
 	From *User `json:"from,omitempty"`
-	// Date the message was sent in Unix time
+	// Date the message was sent in Unix time.
 	Date int `json:"date"`
-	// Conversation the message belongs to
+	// Conversation the message belongs to.
 	Chat *Chat `json:"chat"`
 	// Optional. For replies, the original message. Note that the Message object in this field will not contain further reply_to_message fields even if it itself is a reply.
 	ReplyToMessage *Message `json:"reply_to_message,omitempty"`
@@ -95,6 +95,8 @@ type Message struct {
 	Text string `json:"text,omitempty"`
 	// Optional. Message is an audio file, information about the file.
 	Audio *Audio `json:"audio,omitempty"`
+	// Optional. Service message: a user was shared with the bot.
+	UserShared *UserShared `json:"user_shared,omitempty"`
 	// Optional. Inline keyboard attached to the message. login_url buttons are represented as ordinary url buttons.
 	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
 }
@@ -153,6 +155,14 @@ type Audio struct {
 	FileSize int64 `json:"file_size,omitempty"`
 	// Optional. Thumbnail of the album cover to which the music file belongs.
 	Thumbnail *PhotoSize `json:"thumbnail,omitempty"`
+}
+
+// This object contains information about the user whose identifier was shared with the bot using a KeyboardButtonRequestUser button.
+type UserShared struct {
+	// Identifier of the request.
+	RequestID int64 `json:"request_id"`
+	// Identifier of the shared user.
+	UserID int64 `json:"user_id"`
 }
 
 // This object represents a file ready to be downloaded.
@@ -253,6 +263,16 @@ type KeyboardButtonPollType struct {
 	// Optional. If quiz is passed, the user will be allowed to create only polls in the quiz mode. If regular is passed, only regular polls will be allowed. Otherwise, the user will be allowed to create a poll of any type.
 	Type string `json:"type,omitempty"`
 }
+
+// Upon receiving a message with this object, Telegram clients will remove the current custom keyboard and display the default letter-keyboard. By default, custom keyboards are displayed until a new keyboard is sent by a bot. An exception is made for one-time keyboards that are hidden immediately after the user presses a button.
+type ReplyKeyboardRemove struct {
+	// Requests clients to remove the custom keyboard (user will not be able to summon this keyboard; if you want to hide the keyboard from sight but keep it accessible, use one_time_keyboard in ReplyKeyboardMarkup).
+	RemoveKeyboard bool `json:"remove_keyboard"`
+	// Optional. Use this parameter if you want to remove the keyboard for specific users only. Targets: 1) users that are @mentioned in the text of the Message object; 2) if the bot's message is a reply (has reply_to_message_id), sender of the original message.
+	Selective bool `json:"selective,omitempty"`
+}
+
+func (ReplyKeyboardRemove) ReplyMarkuper() {}
 
 // This object represents an inline keyboard that appears right next to the message it belongs to.
 type InlineKeyboardMarkup struct {
