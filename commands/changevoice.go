@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 
@@ -70,8 +71,23 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func (c *ChangeVoiceCommand) newExperiment(ctx context.Context, pl Payload) {
-	// c.showMainMenu(ctx, pl, experiment)
 	c.showMainMenu(ctx, pl)
+	// c.showMainMenu(ctx, pl, experiment)
+	res := Result{Text: "Press button below to select new model user. /skip", State: c.testUser}
+	res.ReplyMarkup.AddRequestUserButton()
+	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {
+	if pl.Command == "/skip" {
+		res := Result{Text: "skip, keyboard closed"}
+		res.RemoveMarkup.RemoveDefault()
+		pl.ResultChan <- res
+	} else {
+		res := Result{Text: fmt.Sprintf("%s selected, keyboard closed", pl.Command)}
+		res.RemoveMarkup.RemoveDefault()
+		pl.ResultChan <- res
+	}
 }
 
 func (c *ChangeVoiceCommand) showMainMenu(ctx context.Context, pl Payload) {
