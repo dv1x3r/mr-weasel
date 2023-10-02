@@ -41,7 +41,7 @@ func main() {
 			commands.NewPingCommand(),
 			commands.NewYTMP3Command(),
 			commands.NewExtractVoiceCommand(queue),
-			commands.NewChangeVoiceCommand(queue),
+			commands.NewChangeVoiceCommand(storage.NewRvcStorage(db), queue),
 		)
 		tgManager.PublishCommands(commands)
 	} else {

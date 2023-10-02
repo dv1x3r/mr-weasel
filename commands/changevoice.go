@@ -5,10 +5,12 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	st "mr-weasel/storage"
 	"mr-weasel/utils"
 )
 
 type ChangeVoiceCommand struct {
+	storage      *st.RvcStorage
 	queue        *utils.Queue
 	mode         string
 	pathPython   string
@@ -16,9 +18,10 @@ type ChangeVoiceCommand struct {
 	pathTrainCLI string
 }
 
-func NewChangeVoiceCommand(queue *utils.Queue) *ChangeVoiceCommand {
+func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVoiceCommand {
 	if _, err := exec.LookPath("nvidia-smi"); err == nil {
 		return &ChangeVoiceCommand{
+			storage:      storage,
 			queue:        queue,
 			mode:         "CUDA",
 			pathPython:   "/mnt/d/rvc-project/.venv/Scripts/python.exe",
@@ -27,6 +30,7 @@ func NewChangeVoiceCommand(queue *utils.Queue) *ChangeVoiceCommand {
 		}
 	} else {
 		return &ChangeVoiceCommand{
+			storage:      storage,
 			queue:        queue,
 			mode:         "CPU",
 			pathPython:   filepath.Join(utils.GetExecutablePath(), "rvc-project", ".venv", "bin", "python"),
@@ -61,8 +65,13 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	// case cmdExtractVoiceStart:
 	// 	c.startProcessing(ctx, pl, strings.Join(args[1:], " "))
 	default:
-		c.showMainMenu(ctx, pl)
+		c.newExperiment(ctx, pl)
 	}
+}
+
+func (c *ChangeVoiceCommand) newExperiment(ctx context.Context, pl Payload) {
+	// c.showMainMenu(ctx, pl, experiment)
+	c.showMainMenu(ctx, pl)
 }
 
 func (c *ChangeVoiceCommand) showMainMenu(ctx context.Context, pl Payload) {
