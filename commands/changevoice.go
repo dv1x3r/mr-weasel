@@ -49,6 +49,7 @@ const (
 	cmdChangeVoiceSelectAudio = "select_audio"
 	cmdChangeVoiceSetToneM12  = "set_tone_-12"
 	cmdChangeVoiceSetToneM1   = "set_tone_-1"
+	cmdChangeVoiceSetToneS0   = "set_tone_0"
 	cmdChangeVoiceSetToneP1   = "set_tone_+1"
 	cmdChangeVoiceSetToneP12  = "set_tone_+12"
 	cmdChangeVoiceStartInfer  = "start_infer"
@@ -71,6 +72,7 @@ func (c *ChangeVoiceCommand) showMainMenu(ctx context.Context, pl Payload) {
 	res.InlineMarkup.AddKeyboardRow()
 	res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12))
 	res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1))
+	res.InlineMarkup.AddKeyboardButton("0 ♫", commandf(c, cmdChangeVoiceSetToneS0))
 	res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1))
 	res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12))
 	res.InlineMarkup.AddKeyboardRow()
