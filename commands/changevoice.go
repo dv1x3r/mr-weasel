@@ -65,6 +65,8 @@ const (
 func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
+	case cmdChangeVoiceSelectAudio:
+		c.selectAudio(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceSetToneM12:
 		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -12)
 	case cmdChangeVoiceSetToneM1:
@@ -114,7 +116,7 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 }
 
 func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Payload, experimentID int64) {
-	res := Result{}
+	res := Result{ClearState: true}
 	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "Experiment not found."
@@ -167,6 +169,43 @@ func (c *ChangeVoiceCommand) setToneValue(ctx context.Context, pl Payload, exper
 	}
 }
 
+func (c *ChangeVoiceCommand) selectAudio(ctx context.Context, pl Payload, experimentID int64) {
+	res := Result{Text: "Send me the a YouTube link, a song file, or record a new voice message!", State: c.downloadAudio}
+	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c))
+	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload) {
+	res := Result{Text: "🌐 Please wait..."}
+	res.InlineMarkup.AddKeyboardButton("Downloading...", "-")
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
+	pl.ResultChan <- res
+
+	var downloadedFile utils.DownloadedFile
+	var err error
+
+	if pl.FileURL != "" {
+		downloadedFile, err = utils.Download(ctx, pl.FileURL, pl.Command)
+	} else {
+		downloadedFile, err = utils.Download(ctx, pl.Command, "")
+	}
+
+	if err != nil {
+		res = Result{State: c.downloadAudio, Error: err}
+		if !errors.Is(err, context.Canceled) {
+			res.Text = "Whoops, download failed, try again :c"
+		}
+		res.InlineMarkup.AddKeyboardRow()
+		pl.ResultChan <- res
+		return
+	}
+
+	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
+	// res.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
+	pl.ResultChan <- res
+}
+
 // func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {
 // res := Result{Text: "Press button below to select new model user. /skip", State: c.testUser}
 // res.ReplyMarkup.AddRequestUserButton()
@@ -180,37 +219,6 @@ func (c *ChangeVoiceCommand) setToneValue(ctx context.Context, pl Payload, exper
 // 		res.RemoveMarkup.RemoveDefault()
 // 		pl.ResultChan <- res
 // 	}
-// }
-
-// func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
-// 	res := Result{Text: "🌐 Please wait..."}
-// 	res.AddKeyboardButton("Downloading...", "-")
-// 	res.AddKeyboardRow()
-// 	res.AddKeyboardButton("Cancel", cancelf(ctx))
-// 	pl.ResultChan <- res
-
-// 	var downloadedFile utils.DownloadedFile
-// 	var err error
-
-// 	if pl.FileURL != "" {
-// 		downloadedFile, err = utils.Download(ctx, pl.FileURL, pl.Command)
-// 	} else {
-// 		downloadedFile, err = utils.Download(ctx, pl.Command, "")
-// 	}
-
-// 	if err != nil {
-// 		res = Result{State: c.downloadSong, Error: err}
-// 		if !errors.Is(err, context.Canceled) {
-// 			res.Text = "Whoops, download failed, try again :c"
-// 		}
-// 		res.AddKeyboardRow()
-// 		pl.ResultChan <- res
-// 		return
-// 	}
-
-// 	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-// 	res.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
-// 	pl.ResultChan <- res
 // }
 
 // func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, uniqueID string) {

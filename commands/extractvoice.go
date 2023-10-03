@@ -58,7 +58,7 @@ func (c *ExtractVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	case cmdExtractVoiceStart:
 		c.startProcessing(ctx, pl, strings.Join(args[1:], " "))
 	default:
-		pl.ResultChan <- Result{Text: "Sure! Send me the song file or YouTube link!", State: c.downloadSong}
+		pl.ResultChan <- Result{Text: "Sure! Send me a YouTube link or song file!", State: c.downloadSong}
 	}
 }
 
