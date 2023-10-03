@@ -29,5 +29,6 @@ type Result struct {
 	ReplyMarkup  tgclient.ReplyKeyboardMarkup
 	RemoveMarkup tgclient.ReplyKeyboardRemove
 	Audio        map[string]string
+	ClearState   bool
 	Error        error
 }

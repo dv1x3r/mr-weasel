@@ -186,9 +186,11 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 		} else if result.InlineMarkup.InlineKeyboard != nil && previousResponse.ReplyMarkup != nil {
 			// if both previous and new response contain an inline keyboard, then it is update
 
-			// in case of update we can change states only
+			// in case of update we can change states only, or if requested explicitly
 			if result.State != nil {
 				m.states[pl.UserID] = result.State
+			} else if result.ClearState {
+				delete(m.states, pl.UserID)
 			}
 
 			// in case of update, keep original text if not specified explicitly
