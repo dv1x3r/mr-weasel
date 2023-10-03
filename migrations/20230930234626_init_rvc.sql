@@ -6,11 +6,7 @@ create table rvc_model (
     name text not null,
     dataset_folder text,
     model_file text,
-    index_file text,
-    is_trained integer not null,
-    is_deleted integer not null,
-    created_at integer not null,
-    updated_at integer not null
+    index_file text
 ) strict;
 
 create table rvc_access (
@@ -24,9 +20,11 @@ create table rvc_experiment (
     id integer primary key,
     user_id integer not null,
     model_id integer references rvc_model(id),
-    audio_id text,
-    enable_uvr integer not null,
-    transpose integer not null
+    audio_source_id text,
+    audio_voice_file text,
+    audio_music_file text,
+    separate_uvr integer not null default 0,
+    transpose integer not null default 0
 ) strict;
 -- +goose StatementEnd
 

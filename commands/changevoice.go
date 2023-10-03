@@ -57,12 +57,14 @@ const (
 	cmdChangeVoiceSelectAudio   = "select_audio"
 	cmdChangeVoiceEnableUVR     = "enable_uvr"
 	cmdChangeVoiceDisableUVR    = "disable_uvr"
+	cmdChangeVoiceSetModel      = "set_model"
 	cmdChangeVoiceSetToneM12    = "set_tone_-12"
 	cmdChangeVoiceSetToneM1     = "set_tone_-1"
 	cmdChangeVoiceSetToneS0     = "set_tone_0"
 	cmdChangeVoiceSetToneP1     = "set_tone_+1"
 	cmdChangeVoiceSetToneP12    = "set_tone_+12"
-	cmdChangeVoiceStartInfer    = "start_infer"
+	cmdChangeVoiceNewModel      = "new_model"
+	cmdChangeVoiceStart         = "start"
 )
 
 func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
@@ -70,12 +72,16 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	switch safeGet(args, 0) {
 	case cmdChangeVoiceGetExperiment:
 		c.showExperimentDetails(ctx, pl, safeGetInt64(args, 1))
+	case cmdChangeVoiceSelectModel:
+		c.selectModel(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceSelectAudio:
 		c.selectAudio(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceEnableUVR:
-		c.setEnableUVR(ctx, pl, safeGetInt64(args, 1), true)
+		c.setExperimentSeparateUVR(ctx, pl, safeGetInt64(args, 1), true)
 	case cmdChangeVoiceDisableUVR:
-		c.setEnableUVR(ctx, pl, safeGetInt64(args, 1), false)
+		c.setExperimentSeparateUVR(ctx, pl, safeGetInt64(args, 1), false)
+	case cmdChangeVoiceSetModel:
+		c.setModel(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceSetToneM12:
 		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -12)
 	case cmdChangeVoiceSetToneM1:
@@ -86,6 +92,8 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 1)
 	case cmdChangeVoiceSetToneP12:
 		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 12)
+	case cmdChangeVoiceStart:
+		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
 	default:
 		c.newExperiment(ctx, pl)
 	}
@@ -109,12 +117,12 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 		html += fmt.Sprintf("🗣️ <b>Model:</b> 🚫 Not Selected\n")
 	}
 
-	if experiment.AudioID.Valid {
-		audioFile, _ := utils.GetDownloadedFile(experiment.AudioID.String)
-		if experiment.EnableUVR.Int64 == 0 {
-			html += fmt.Sprintf("🎤 <b>Audio Acapella:</b> %s\n", audioFile.Name)
-		} else {
+	if experiment.AudioSourceID.Valid {
+		audioFile, _ := utils.GetDownloadedFile(experiment.AudioSourceID.String)
+		if experiment.SeparateUVR.Bool {
 			html += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", audioFile.Name)
+		} else {
+			html += fmt.Sprintf("🎤 <b>Audio Acapella:</b> %s\n", audioFile.Name)
 		}
 	} else {
 		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
@@ -143,7 +151,7 @@ func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Paylo
 		res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1, experimentID))
 		res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
-		res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer, experimentID))
+		res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStart, experimentID))
 	}
 	pl.ResultChan <- res
 }
@@ -172,7 +180,7 @@ func (c *ChangeVoiceCommand) setToneValue(ctx context.Context, pl Payload, exper
 		return
 	}
 
-	if err := c.storage.SetExperimentToneInDB(ctx, pl.UserID, experimentID, newValue); err != nil {
+	if err := c.storage.SetExperimentTransposeInDB(ctx, pl.UserID, experimentID, newValue); err != nil {
 		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 	} else {
 		c.showExperimentDetails(ctx, pl, experimentID)
@@ -219,7 +227,7 @@ func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload, expe
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
 	} else {
-		err := c.storage.SetExperimentAudioIDInDB(ctx, pl.UserID, experimentID, downloadedFile.ID)
+		err := c.storage.SetExperimentAudioSourceInDB(ctx, pl.UserID, experimentID, downloadedFile.ID)
 		if err != nil {
 			pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 		} else {
@@ -232,12 +240,44 @@ func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload, expe
 	}
 }
 
-func (c *ChangeVoiceCommand) setEnableUVR(ctx context.Context, pl Payload, experimentID int64, value bool) {
-	if err := c.storage.SetExperimentEnableUVRInDB(ctx, pl.UserID, experimentID, value); err != nil {
+func (c *ChangeVoiceCommand) setExperimentSeparateUVR(ctx context.Context, pl Payload, experimentID int64, value bool) {
+	if err := c.storage.SetExperimentSeparateUVRInDB(ctx, pl.UserID, experimentID, value); err != nil {
 		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 	} else {
 		c.showExperimentDetails(ctx, pl, experimentID)
 	}
+}
+
+func (c *ChangeVoiceCommand) selectModel(ctx context.Context, pl Payload, experimentID int64) {
+	models, err := c.storage.SelectModelsFromDB(ctx, pl.UserID)
+	if err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		return
+	}
+
+	res := Result{Text: "Choose a model from the list below:"}
+	for i, v := range models {
+		res.InlineMarkup.AddKeyboardButton(v.Name, commandf(c, cmdChangeVoiceSetModel, experimentID, v.ID))
+		if (i+1)%2 == 0 {
+			res.InlineMarkup.AddKeyboardRow()
+		}
+	}
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceNewModel, experimentID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceGetExperiment, experimentID))
+	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) setModel(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	if err := c.storage.SetExperimentModelInDB(ctx, pl.UserID, experimentID, modelID); err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+	} else {
+		c.showExperimentDetails(ctx, pl, experimentID)
+	}
+}
+
+func (c *ChangeVoiceCommand) startProcessing(ctx context.Context, pl Payload, experimentID int64) {
 }
 
 // func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {
