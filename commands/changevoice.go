@@ -65,15 +65,23 @@ const (
 func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
-	// case cmdExtractVoiceStart:
-	// 	c.startProcessing(ctx, pl, strings.Join(args[1:], " "))
+	case cmdChangeVoiceSetToneM12:
+		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -12)
+	case cmdChangeVoiceSetToneM1:
+		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -1)
+	case cmdChangeVoiceSetToneS0:
+		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 0)
+	case cmdChangeVoiceSetToneP1:
+		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 1)
+	case cmdChangeVoiceSetToneP12:
+		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 12)
 	default:
 		c.newExperiment(ctx, pl)
 	}
 }
 
 func (c *ChangeVoiceCommand) newExperiment(ctx context.Context, pl Payload) {
-	experimentID, err := c.storage.NewExperiment(ctx, pl.UserID)
+	experimentID, err := c.storage.InsertNewExperimentIntoDB(ctx, pl.UserID)
 	if err != nil {
 		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 	} else {
@@ -91,23 +99,23 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 	}
 
 	if experiment.AudioPath.Valid {
-		audioType := "🎤 Acapella"
-		if experiment.EnableUVR.Int64 != 0 {
-			audioType = "🎺 Song (with Music)"
+		if experiment.EnableUVR.Int64 == 0 {
+			html += fmt.Sprintf("🎤 <b>Audio acapella:</b> %s\n", experiment.GetAudioName())
+		} else {
+			html += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", experiment.GetAudioName())
 		}
-		html += fmt.Sprintf("🎧 <b>Audio:</b> %s (%s)\n", experiment.AudioPath.String, audioType)
 	} else {
 		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
 	}
 
-	html += fmt.Sprintf("🎵 <b>Transpose:</b> %+d Semitones\n", experiment.Transpose.Int64)
+	html += fmt.Sprintf("🎼 <b>Transpose:</b> %+d Semitones\n", experiment.Transpose.Int64)
 
 	return html
 }
 
 func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Payload, experimentID int64) {
 	res := Result{}
-	experiment, err := c.storage.GetExperimentDetails(ctx, pl.UserID, experimentID)
+	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "Experiment not found."
 	} else if err != nil {
@@ -126,6 +134,37 @@ func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Paylo
 		res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer, experimentID))
 	}
 	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) setToneValue(ctx context.Context, pl Payload, experimentID int64, delta int64) {
+	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
+	if err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+	}
+
+	var newValue int64
+
+	if delta == 0 {
+		newValue = 0
+	} else {
+		newValue = experiment.Transpose.Int64 + delta
+	}
+
+	if newValue > 24 {
+		newValue = 24
+	} else if newValue < -24 {
+		newValue = -24
+	}
+
+	if experiment.Transpose.Int64 == newValue {
+		return
+	}
+
+	if err := c.storage.SetExperimentToneInDB(ctx, pl.UserID, experimentID, newValue); err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+	} else {
+		c.showExperimentDetails(ctx, pl, experimentID)
+	}
 }
 
 // func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {
