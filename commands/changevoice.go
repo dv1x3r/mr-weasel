@@ -2,7 +2,8 @@ package commands
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
+	"errors"
 	"os/exec"
 	"path/filepath"
 
@@ -71,39 +72,55 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func (c *ChangeVoiceCommand) newExperiment(ctx context.Context, pl Payload) {
-	c.showMainMenu(ctx, pl)
-	// c.showMainMenu(ctx, pl, experiment)
-	res := Result{Text: "Press button below to select new model user. /skip", State: c.testUser}
-	res.ReplyMarkup.AddRequestUserButton()
-	pl.ResultChan <- res
-}
-
-func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {
-	if pl.Command == "/skip" {
-		res := Result{Text: "skip, keyboard closed"}
-		res.RemoveMarkup.RemoveDefault()
-		pl.ResultChan <- res
+	experimentID, err := c.storage.NewExperiment(ctx, pl.UserID)
+	if err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 	} else {
-		res := Result{Text: fmt.Sprintf("%s selected, keyboard closed", pl.Command)}
-		res.RemoveMarkup.RemoveDefault()
-		pl.ResultChan <- res
+		c.showExperimentDetails(ctx, pl, experimentID)
 	}
 }
 
-func (c *ChangeVoiceCommand) showMainMenu(ctx context.Context, pl Payload) {
-	res := Result{Text: "Experinemt info..."}
-	res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel))
-	res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio))
-	res.InlineMarkup.AddKeyboardRow()
-	res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12))
-	res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1))
-	res.InlineMarkup.AddKeyboardButton("0 ♫", commandf(c, cmdChangeVoiceSetToneS0))
-	res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1))
-	res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12))
-	res.InlineMarkup.AddKeyboardRow()
-	res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer))
+func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperimentDetails) string {
+	return "Experiment info..."
+}
+
+func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Payload, experimentID int64) {
+	res := Result{}
+	experiment, err := c.storage.GetExperimentDetails(ctx, pl.UserID, experimentID)
+	if errors.Is(err, sql.ErrNoRows) {
+		res.Text = "Experiment not found."
+	} else if err != nil {
+		res.Text, res.Error = "There is something wrong, please try again.", err
+	} else {
+		res.Text = c.formatExperimentDetails(experiment)
+		res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel))
+		res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12))
+		res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1))
+		res.InlineMarkup.AddKeyboardButton("0 ♫", commandf(c, cmdChangeVoiceSetToneS0))
+		res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1))
+		res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer))
+	}
 	pl.ResultChan <- res
 }
+
+// func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {
+// res := Result{Text: "Press button below to select new model user. /skip", State: c.testUser}
+// res.ReplyMarkup.AddRequestUserButton()
+// pl.ResultChan <- res
+// 	if pl.Command == "/skip" {
+// 		res := Result{Text: "skip, keyboard closed"}
+// 		res.RemoveMarkup.RemoveDefault()
+// 		pl.ResultChan <- res
+// 	} else {
+// 		res := Result{Text: fmt.Sprintf("%s selected, keyboard closed", pl.Command)}
+// 		res.RemoveMarkup.RemoveDefault()
+// 		pl.ResultChan <- res
+// 	}
+// }
 
 // func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 // 	res := Result{Text: "🌐 Please wait..."}
