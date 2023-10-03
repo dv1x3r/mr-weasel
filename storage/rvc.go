@@ -36,7 +36,7 @@ func (s *RvcStorage) NewExperiment(ctx context.Context, userID int64) (int64, er
 func (s *RvcStorage) GetExperimentDetails(ctx context.Context, userID int64, experimentID int64) (RvcExperimentDetails, error) {
 	var experiment RvcExperimentDetails
 	stmt := `
-		select e.user_id, m.name, e.audio_path, e.enable_uvr, e.transpose
+		select e.user_id, m.name as model_name, e.audio_path, e.enable_uvr, e.transpose
 		from rvc_experiment e
 		left join rvc_model m on m.id = e.model_id
 		where e.user_id = ? and e.id = ?;

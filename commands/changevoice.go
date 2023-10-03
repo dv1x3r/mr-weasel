@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 
@@ -81,7 +82,27 @@ func (c *ChangeVoiceCommand) newExperiment(ctx context.Context, pl Payload) {
 }
 
 func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperimentDetails) string {
-	return "Experiment info..."
+	html := ""
+
+	if experiment.ModelName.Valid {
+		html += fmt.Sprintf("🗣️ <b>Model:</b> %s\n", experiment.ModelName.String)
+	} else {
+		html += fmt.Sprintf("🗣️ <b>Model:</b> 🚫 Not Selected\n")
+	}
+
+	if experiment.AudioPath.Valid {
+		audioType := "🎤 Acapella"
+		if experiment.EnableUVR.Int64 != 0 {
+			audioType = "🎺 Song (with Music)"
+		}
+		html += fmt.Sprintf("🎧 <b>Audio:</b> %s (%s)\n", experiment.AudioPath.String, audioType)
+	} else {
+		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
+	}
+
+	html += fmt.Sprintf("🎵 <b>Transpose:</b> %+d Semitones\n", experiment.Transpose.Int64)
+
+	return html
 }
 
 func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Payload, experimentID int64) {
@@ -93,16 +114,16 @@ func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Paylo
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatExperimentDetails(experiment)
-		res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel))
-		res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio))
+		res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel, experimentID))
+		res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
-		res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12))
-		res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1))
-		res.InlineMarkup.AddKeyboardButton("0 ♫", commandf(c, cmdChangeVoiceSetToneS0))
-		res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1))
-		res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12))
+		res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12, experimentID))
+		res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1, experimentID))
+		res.InlineMarkup.AddKeyboardButton("0 ♫", commandf(c, cmdChangeVoiceSetToneS0, experimentID))
+		res.InlineMarkup.AddKeyboardButton("+1 ♫", commandf(c, cmdChangeVoiceSetToneP1, experimentID))
+		res.InlineMarkup.AddKeyboardButton("+12 ♫", commandf(c, cmdChangeVoiceSetToneP12, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
-		res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer))
+		res.InlineMarkup.AddKeyboardButton("Start Processing", commandf(c, cmdChangeVoiceStartInfer, experimentID))
 	}
 	pl.ResultChan <- res
 }
