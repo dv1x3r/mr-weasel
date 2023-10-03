@@ -52,21 +52,30 @@ func (ChangeVoiceCommand) Description() string {
 }
 
 const (
-	cmdChangeVoiceSelectModel = "select_model"
-	cmdChangeVoiceSelectAudio = "select_audio"
-	cmdChangeVoiceSetToneM12  = "set_tone_-12"
-	cmdChangeVoiceSetToneM1   = "set_tone_-1"
-	cmdChangeVoiceSetToneS0   = "set_tone_0"
-	cmdChangeVoiceSetToneP1   = "set_tone_+1"
-	cmdChangeVoiceSetToneP12  = "set_tone_+12"
-	cmdChangeVoiceStartInfer  = "start_infer"
+	cmdChangeVoiceGetExperiment = "get_experiment"
+	cmdChangeVoiceSelectModel   = "select_model"
+	cmdChangeVoiceSelectAudio   = "select_audio"
+	cmdChangeVoiceEnableUVR     = "enable_uvr"
+	cmdChangeVoiceDisableUVR    = "disable_uvr"
+	cmdChangeVoiceSetToneM12    = "set_tone_-12"
+	cmdChangeVoiceSetToneM1     = "set_tone_-1"
+	cmdChangeVoiceSetToneS0     = "set_tone_0"
+	cmdChangeVoiceSetToneP1     = "set_tone_+1"
+	cmdChangeVoiceSetToneP12    = "set_tone_+12"
+	cmdChangeVoiceStartInfer    = "start_infer"
 )
 
 func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
+	case cmdChangeVoiceGetExperiment:
+		c.showExperimentDetails(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceSelectAudio:
 		c.selectAudio(ctx, pl, safeGetInt64(args, 1))
+	case cmdChangeVoiceEnableUVR:
+		c.setEnableUVR(ctx, pl, safeGetInt64(args, 1), true)
+	case cmdChangeVoiceDisableUVR:
+		c.setEnableUVR(ctx, pl, safeGetInt64(args, 1), false)
 	case cmdChangeVoiceSetToneM12:
 		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -12)
 	case cmdChangeVoiceSetToneM1:
@@ -100,11 +109,12 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 		html += fmt.Sprintf("🗣️ <b>Model:</b> 🚫 Not Selected\n")
 	}
 
-	if experiment.AudioPath.Valid {
+	if experiment.AudioID.Valid {
+		audioFile, _ := utils.GetDownloadedFile(experiment.AudioID.String)
 		if experiment.EnableUVR.Int64 == 0 {
-			html += fmt.Sprintf("🎤 <b>Audio acapella:</b> %s\n", experiment.GetAudioName())
+			html += fmt.Sprintf("🎤 <b>Audio Acapella:</b> %s\n", audioFile.Name)
 		} else {
-			html += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", experiment.GetAudioName())
+			html += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", audioFile.Name)
 		}
 	} else {
 		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
@@ -170,12 +180,17 @@ func (c *ChangeVoiceCommand) setToneValue(ctx context.Context, pl Payload, exper
 }
 
 func (c *ChangeVoiceCommand) selectAudio(ctx context.Context, pl Payload, experimentID int64) {
-	res := Result{Text: "Send me the a YouTube link, a song file, or record a new voice message!", State: c.downloadAudio}
-	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c))
+	res := Result{
+		Text: "Send me the a YouTube link, a song file, or record a new voice message!",
+		State: func(ctx context.Context, pl Payload) {
+			c.downloadAudio(ctx, pl, experimentID)
+		},
+	}
+	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceGetExperiment, experimentID))
 	pl.ResultChan <- res
 }
 
-func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload) {
+func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload, experimentID int64) {
 	res := Result{Text: "🌐 Please wait..."}
 	res.InlineMarkup.AddKeyboardButton("Downloading...", "-")
 	res.InlineMarkup.AddKeyboardRow()
@@ -192,18 +207,37 @@ func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload) {
 	}
 
 	if err != nil {
-		res = Result{State: c.downloadAudio, Error: err}
+		res = Result{
+			State: func(ctx context.Context, pl Payload) {
+				c.downloadAudio(ctx, pl, experimentID)
+			},
+			Error: err,
+		}
 		if !errors.Is(err, context.Canceled) {
 			res.Text = "Whoops, download failed, try again :c"
 		}
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
-		return
+	} else {
+		err := c.storage.SetExperimentAudioIDInDB(ctx, pl.UserID, experimentID, downloadedFile.ID)
+		if err != nil {
+			pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+		} else {
+			res = Result{Text: "Does it contain music, or voice only?"}
+			res.InlineMarkup.AddKeyboardButton("Music and Voice", commandf(c, cmdChangeVoiceEnableUVR, experimentID))
+			res.InlineMarkup.AddKeyboardRow()
+			res.InlineMarkup.AddKeyboardButton("Voice only", commandf(c, cmdChangeVoiceDisableUVR, experimentID))
+			pl.ResultChan <- res
+		}
 	}
+}
 
-	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-	// res.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.UniqueID))
-	pl.ResultChan <- res
+func (c *ChangeVoiceCommand) setEnableUVR(ctx context.Context, pl Payload, experimentID int64, value bool) {
+	if err := c.storage.SetExperimentEnableUVRInDB(ctx, pl.UserID, experimentID, value); err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+	} else {
+		c.showExperimentDetails(ctx, pl, experimentID)
+	}
 }
 
 // func (c *ChangeVoiceCommand) testUser(ctx context.Context, pl Payload) {

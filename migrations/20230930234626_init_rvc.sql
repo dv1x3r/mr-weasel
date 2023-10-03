@@ -24,7 +24,7 @@ create table rvc_experiment (
     id integer primary key,
     user_id integer not null,
     model_id integer references rvc_model(id),
-    audio_path text,
+    audio_id text,
     enable_uvr integer not null,
     transpose integer not null
 ) strict;
