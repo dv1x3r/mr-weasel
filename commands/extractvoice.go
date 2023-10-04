@@ -69,15 +69,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	var downloadedFile utils.DownloadedFile
-	var err error
-
-	if pl.FileURL != "" {
-		downloadedFile, err = utils.Download(ctx, pl.FileURL, pl.Command)
-	} else {
-		downloadedFile, err = utils.Download(ctx, pl.Command, "")
-	}
-
+	downloadedFile, err := utils.Download(ctx, pl.FileURL, pl.Command)
 	if errors.Is(err, context.Canceled) {
 		res = Result{Text: "Download cancelled, you can send another song.", State: c.downloadSong, Error: err}
 		res.InlineMarkup.AddKeyboardRow()

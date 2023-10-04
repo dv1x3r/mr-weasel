@@ -57,7 +57,16 @@ func GetDownloadedFile(fileID string) (DownloadedFile, error) {
 	return DownloadedFile{}, errors.New("downloaded file not found")
 }
 
-func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFile, error) {
+func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, error) {
+	var rawURL, fileName string
+
+	if arg1 == "" {
+		rawURL = arg1
+		fileName = arg2
+	} else {
+		rawURL = arg2
+	}
+
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {
 		return DownloadedFile{}, err

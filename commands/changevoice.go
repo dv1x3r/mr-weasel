@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -19,6 +20,7 @@ type ChangeVoiceCommand struct {
 	pathPython   string
 	pathInferCLI string
 	pathTrainCLI string
+	pathDatasets string
 }
 
 func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVoiceCommand {
@@ -30,6 +32,7 @@ func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVo
 			pathPython:   "/mnt/d/rvc-project/.venv/Scripts/python.exe",
 			pathInferCLI: "/mnt/d/rvc-project/infer-cli.py",
 			pathTrainCLI: "/mnt/d/rvc-project/train-cli.py",
+			pathDatasets: "/mnt/d/rvc-project/assets/datasets",
 		}
 	} else {
 		return &ChangeVoiceCommand{
@@ -39,6 +42,7 @@ func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVo
 			pathPython:   filepath.Join(utils.GetExecutablePath(), "rvc-project", ".venv", "bin", "python"),
 			pathInferCLI: filepath.Join(utils.GetExecutablePath(), "rvc-project", "infer-cli.py"),
 			pathTrainCLI: filepath.Join(utils.GetExecutablePath(), "rvc-project", "train-cli.py"),
+			pathDatasets: filepath.Join(utils.GetExecutablePath(), "rvc-project", "assets", "datasets"),
 		}
 	}
 }
@@ -121,28 +125,24 @@ func (c *ChangeVoiceCommand) newExperiment(ctx context.Context, pl Payload) {
 }
 
 func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperimentDetails) string {
-	html := ""
-
+	str := ""
 	if experiment.ModelName.Valid {
-		html += fmt.Sprintf("🗣️ <b>Model:</b> %s\n", experiment.ModelName.String)
+		str += fmt.Sprintf("🗣️ <b>Model:</b> %s\n", _es(experiment.ModelName.String))
 	} else {
-		html += fmt.Sprintf("🗣️ <b>Model:</b> 🚫 Not Selected\n")
+		str += fmt.Sprintf("🗣️ <b>Model:</b> 🚫 Not Selected\n")
 	}
-
 	if experiment.AudioSourceID.Valid {
 		audioFile, _ := utils.GetDownloadedFile(experiment.AudioSourceID.String)
 		if experiment.SeparateUVR.Bool {
-			html += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", audioFile.Name)
+			str += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", _es(audioFile.Name))
 		} else {
-			html += fmt.Sprintf("🎤 <b>Audio acapella:</b> %s\n", audioFile.Name)
+			str += fmt.Sprintf("🎤 <b>Audio acapella:</b> %s\n", _es(audioFile.Name))
 		}
 	} else {
-		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
+		str += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
 	}
-
-	html += fmt.Sprintf("🎼 <b>Transpose:</b> %+d semitones\n", experiment.Transpose.Int64)
-
-	return html
+	str += fmt.Sprintf("🎼 <b>Transpose:</b> %+d semitones\n", experiment.Transpose.Int64)
+	return str
 }
 
 func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Payload, experimentID int64) {
@@ -169,14 +169,14 @@ func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Paylo
 }
 
 func (c *ChangeVoiceCommand) formatModelDetails(model st.RvcModelDetails) string {
-	html := fmt.Sprintf("🗣️ <b>Model:</b> %s\n", model.Name)
+	str := fmt.Sprintf("🗣️ <b>Model:</b> %s\n", _es(model.Name))
 	if model.IsOwner {
-		html += fmt.Sprintf("🔑 <b>Access:</b> Full access\n")
-		html += fmt.Sprintf("🌐 <b>Shared with:</b> %d contacts\n", model.Shares)
+		str += fmt.Sprintf("🔑 <b>Access:</b> Full access\n")
+		str += fmt.Sprintf("🌐 <b>Shared with:</b> %d contacts\n", model.Shares)
 	} else {
-		html += fmt.Sprintf("🔑 <b>Access:</b> Shared with you\n")
+		str += fmt.Sprintf("🔑 <b>Access:</b> Shared with you\n")
 	}
-	return html
+	return str
 }
 
 func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, experimentID int64, offset int64) {
@@ -223,15 +223,7 @@ func (c *ChangeVoiceCommand) setExperimentAudioSource(ctx context.Context, pl Pa
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	var downloadedFile utils.DownloadedFile
-	var err error
-
-	if pl.FileURL != "" {
-		downloadedFile, err = utils.Download(ctx, pl.FileURL, pl.Command)
-	} else {
-		downloadedFile, err = utils.Download(ctx, pl.Command, "")
-	}
-
+	downloadedFile, err := utils.Download(ctx, pl.FileURL, pl.Command)
 	if errors.Is(err, context.Canceled) {
 		res = Result{
 			Text:  "Download cancelled, you can send another audio.",
@@ -336,11 +328,10 @@ func (c *ChangeVoiceCommand) addModelNameAndSave(ctx context.Context, pl Payload
 func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
 	if pl.Command == "/done" {
 		c.setExperimentModel(ctx, pl, experimentID, modelID)
-		c.showExperimentDetails(ctx, pl, experimentID)
 		return
 	}
 
-	dataset_folder, err := c.storage.GetOrCreateModelDatasetInDB(ctx, pl.UserID, modelID)
+	datasetFolder, err := c.storage.GetOrCreateModelDatasetInDB(ctx, pl.UserID, modelID)
 	if err != nil {
 		c.storage.DeleteModelFromDB(ctx, pl.UserID, modelID)
 		res := Result{Text: "There is something wrong with dataset folder, please try to create another model.", Error: err}
@@ -349,11 +340,22 @@ func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload
 		return
 	}
 
-	pl.ResultChan <- Result{
-		Text:  dataset_folder + " - " + pl.Command,
-		State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
+	downloadedFile, err := utils.Download(ctx, pl.FileURL, pl.Command)
+	if err != nil {
+		pl.ResultChan <- Result{
+			Text:  "Whoops, download failed, try again :c",
+			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
+			Error: err,
+		}
+	} else {
+		// Move downloaded file to the datasets directory
+		os.MkdirAll(filepath.Join(c.pathDatasets, datasetFolder), os.ModePerm)
+		os.Rename(downloadedFile.Path, filepath.Join(c.pathDatasets, datasetFolder, filepath.Base(downloadedFile.Path)))
+		pl.ResultChan <- Result{
+			Text:  _es(fmt.Sprintf("%s has been imported!", downloadedFile.Name)),
+			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
+		}
 	}
-
 }
 
 func (c *ChangeVoiceCommand) deleteModelAsk(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
@@ -372,7 +374,6 @@ func (c *ChangeVoiceCommand) deleteModelConfirm(ctx context.Context, pl Payload,
 	if err != nil || affected != 1 {
 		res.Text, res.Error = "Model not found.", err
 	} else {
-		// TODO: os.delete
 		res.Text = "Model has been successfully deleted!"
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))

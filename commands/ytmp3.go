@@ -35,7 +35,6 @@ func (c *YTMP3Command) downloadSong(ctx context.Context, pl Payload) {
 	pl.ResultChan <- res
 
 	downloadedFile, err := utils.Download(ctx, pl.Command, "")
-
 	if err != nil {
 		res = Result{State: c.downloadSong, Error: err}
 		if !errors.Is(err, context.Canceled) {
