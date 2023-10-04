@@ -63,7 +63,7 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 		return DownloadedFile{}, err
 	}
 
-	fileID := uuid()
+	fileID := UUID()
 	downloadFolderPath := GetDownloadFolderPath()
 	os.MkdirAll(downloadFolderPath, os.ModePerm)
 
