@@ -102,18 +102,35 @@ func (s *RvcStorage) SetExperimentTransposeInDB(ctx context.Context, userID int6
 }
 
 type RvcModelDetails struct {
-	ID   int64  `db:"id"`
-	Name string `db:"name"`
+	ID        int64  `db:"id"`
+	Name      string `db:"name"`
+	IsOwner   bool   `db:"is_owner"`
+	Shares    int64  `db:"shares"`
+	CountRows int64  `db:"countrows"`
 }
 
-func (s *RvcStorage) SelectModelsFromDB(ctx context.Context, userID int64) ([]RvcModelDetails, error) {
-	var models []RvcModelDetails
+func (s *RvcStorage) GetModelFromDB(ctx context.Context, userID int64, offset int64) (RvcModelDetails, error) {
+	var model RvcModelDetails
 	stmt := `
-		select id, name
-		from rvc_model
-		where user_id = ?
-		order by name, id;
+		select
+			m.id
+			,m.name
+			,iif(a.id is null, 1, 0) as is_owner
+			,coalesce(ac.shares, 0) as shares
+			,count(*) over () as countrows
+		from rvc_model m
+		left join rvc_access a on a.model_id = m.id
+		left join (
+			select
+				model_id,
+				count(*) as shares
+			from rvc_access
+			group by model_id
+		) ac on ac.model_id = m.id
+		where m.user_id = ? or a.user_id = ?
+		order by m.name, m.id
+		limit 1 offset ?;
 	`
-	err := s.db.SelectContext(ctx, &models, stmt, userID)
-	return models, err
+	err := s.db.GetContext(ctx, &model, stmt, userID, userID, offset)
+	return model, err
 }

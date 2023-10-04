@@ -52,7 +52,7 @@ func (ChangeVoiceCommand) Description() string {
 }
 
 const (
-	cmdChangeVoiceGetExperiment = "get_experiment"
+	cmdChangeVoiceExperimentGet = "experiment_get"
 	cmdChangeVoiceSelectModel   = "select_model"
 	cmdChangeVoiceSelectAudio   = "select_audio"
 	cmdChangeVoiceEnableUVR     = "enable_uvr"
@@ -70,10 +70,10 @@ const (
 func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	args := splitCommand(pl.Command, c.Prefix())
 	switch safeGet(args, 0) {
-	case cmdChangeVoiceGetExperiment:
+	case cmdChangeVoiceExperimentGet:
 		c.showExperimentDetails(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceSelectModel:
-		c.selectModel(ctx, pl, safeGetInt64(args, 1))
+		c.showModelDetails(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceSelectAudio:
 		c.selectAudio(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceEnableUVR:
@@ -81,17 +81,17 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	case cmdChangeVoiceDisableUVR:
 		c.setExperimentSeparateUVR(ctx, pl, safeGetInt64(args, 1), false)
 	case cmdChangeVoiceSetModel:
-		c.setModel(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
+		c.setExperimentModel(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceSetToneM12:
-		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -12)
+		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), -12)
 	case cmdChangeVoiceSetToneM1:
-		c.setToneValue(ctx, pl, safeGetInt64(args, 1), -1)
+		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), -1)
 	case cmdChangeVoiceSetToneS0:
-		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 0)
+		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 0)
 	case cmdChangeVoiceSetToneP1:
-		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 1)
+		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 1)
 	case cmdChangeVoiceSetToneP12:
-		c.setToneValue(ctx, pl, safeGetInt64(args, 1), 12)
+		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 12)
 	case cmdChangeVoiceStart:
 		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
 	default:
@@ -122,7 +122,7 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 		if experiment.SeparateUVR.Bool {
 			html += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", audioFile.Name)
 		} else {
-			html += fmt.Sprintf("🎤 <b>Audio Acapella:</b> %s\n", audioFile.Name)
+			html += fmt.Sprintf("🎤 <b>Audio acapella:</b> %s\n", audioFile.Name)
 		}
 	} else {
 		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
@@ -156,49 +156,53 @@ func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Paylo
 	pl.ResultChan <- res
 }
 
-func (c *ChangeVoiceCommand) setToneValue(ctx context.Context, pl Payload, experimentID int64, delta int64) {
-	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
-	if err != nil {
-		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
-	}
-
-	var newValue int64
-
-	if delta == 0 {
-		newValue = 0
+func (c *ChangeVoiceCommand) formatModelDetails(model st.RvcModelDetails) string {
+	html := fmt.Sprintf("🗣️ <b>Model:</b> %s\n", model.Name)
+	if model.IsOwner {
+		html += fmt.Sprintf("🔑 <b>Access:</b> Full access\n")
+		html += fmt.Sprintf("🌐 <b>Shared with:</b> %d contacts\n", model.Shares)
 	} else {
-		newValue = experiment.Transpose.Int64 + delta
+		html += fmt.Sprintf("🔑 <b>Access:</b> Shared with you\n")
 	}
+	return html
+}
 
-	if newValue > 24 {
-		newValue = 24
-	} else if newValue < -24 {
-		newValue = -24
-	}
-
-	if experiment.Transpose.Int64 == newValue {
-		return
-	}
-
-	if err := c.storage.SetExperimentTransposeInDB(ctx, pl.UserID, experimentID, newValue); err != nil {
-		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, experimentID int64, offset int64) {
+	res := Result{}
+	model, err := c.storage.GetModelFromDB(ctx, pl.UserID, offset)
+	if errors.Is(err, sql.ErrNoRows) {
+		res.Text = "No models found."
+	} else if err != nil {
+		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
-		c.showExperimentDetails(ctx, pl, experimentID)
+		res.Text = c.formatModelDetails(model)
+		res.InlineMarkup.AddKeyboardPagination(offset, model.CountRows, commandf(c, cmdChangeVoiceSelectModel, experimentID))
+		res.InlineMarkup.AddKeyboardRow()
+		// res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdChangeVoiceModelDelAsk, experimentID, model.ID))
+		if model.IsOwner {
+			// res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceModelShare, experimentID, model.ID))
+		}
+		res.InlineMarkup.AddKeyboardButton("Select", commandf(c, cmdChangeVoiceSetModel, experimentID, model.ID))
 	}
+	res.InlineMarkup.AddKeyboardRow()
+	// res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
+	pl.ResultChan <- res
 }
 
 func (c *ChangeVoiceCommand) selectAudio(ctx context.Context, pl Payload, experimentID int64) {
 	res := Result{
 		Text: "Send me the a YouTube link, a song file, or record a new voice message!",
 		State: func(ctx context.Context, pl Payload) {
-			c.downloadAudio(ctx, pl, experimentID)
+			c.setExperimentAudioSource(ctx, pl, experimentID)
 		},
 	}
-	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceGetExperiment, experimentID))
+	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	pl.ResultChan <- res
 }
 
-func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload, experimentID int64) {
+func (c *ChangeVoiceCommand) setExperimentAudioSource(ctx context.Context, pl Payload, experimentID int64) {
 	res := Result{Text: "🌐 Please wait..."}
 	res.InlineMarkup.AddKeyboardButton("Downloading...", "-")
 	res.InlineMarkup.AddKeyboardRow()
@@ -214,15 +218,18 @@ func (c *ChangeVoiceCommand) downloadAudio(ctx context.Context, pl Payload, expe
 		downloadedFile, err = utils.Download(ctx, pl.Command, "")
 	}
 
-	if err != nil {
+	if errors.Is(err, context.Canceled) {
 		res = Result{
-			State: func(ctx context.Context, pl Payload) {
-				c.downloadAudio(ctx, pl, experimentID)
-			},
+			State: func(ctx context.Context, pl Payload) { c.setExperimentAudioSource(ctx, pl, experimentID) },
 			Error: err,
 		}
-		if !errors.Is(err, context.Canceled) {
-			res.Text = "Whoops, download failed, try again :c"
+		res.InlineMarkup.AddKeyboardRow()
+		pl.ResultChan <- res
+	} else if err != nil {
+		res = Result{
+			Text:  "Whoops, download failed, try again :c",
+			State: func(ctx context.Context, pl Payload) { c.setExperimentAudioSource(ctx, pl, experimentID) },
+			Error: err,
 		}
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
@@ -248,29 +255,39 @@ func (c *ChangeVoiceCommand) setExperimentSeparateUVR(ctx context.Context, pl Pa
 	}
 }
 
-func (c *ChangeVoiceCommand) selectModel(ctx context.Context, pl Payload, experimentID int64) {
-	models, err := c.storage.SelectModelsFromDB(ctx, pl.UserID)
+func (c *ChangeVoiceCommand) setExperimentModel(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	if err := c.storage.SetExperimentModelInDB(ctx, pl.UserID, experimentID, modelID); err != nil {
+		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+	} else {
+		c.showExperimentDetails(ctx, pl, experimentID)
+	}
+}
+
+func (c *ChangeVoiceCommand) setExperimentTranspose(ctx context.Context, pl Payload, experimentID int64, delta int64) {
+	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
 	if err != nil {
 		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
+	}
+
+	var newValue int64
+
+	if delta == 0 {
+		newValue = 0
+	} else {
+		newValue = experiment.Transpose.Int64 + delta
+	}
+
+	if newValue > 24 {
+		newValue = 24
+	} else if newValue < -24 {
+		newValue = -24
+	}
+
+	if experiment.Transpose.Int64 == newValue {
 		return
 	}
 
-	res := Result{Text: "Choose a model from the list below:"}
-	for i, v := range models {
-		res.InlineMarkup.AddKeyboardButton(v.Name, commandf(c, cmdChangeVoiceSetModel, experimentID, v.ID))
-		if (i+1)%2 == 0 {
-			res.InlineMarkup.AddKeyboardRow()
-		}
-	}
-	res.InlineMarkup.AddKeyboardRow()
-	res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceNewModel, experimentID))
-	res.InlineMarkup.AddKeyboardRow()
-	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceGetExperiment, experimentID))
-	pl.ResultChan <- res
-}
-
-func (c *ChangeVoiceCommand) setModel(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
-	if err := c.storage.SetExperimentModelInDB(ctx, pl.UserID, experimentID, modelID); err != nil {
+	if err := c.storage.SetExperimentTransposeInDB(ctx, pl.UserID, experimentID, newValue); err != nil {
 		pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 	} else {
 		c.showExperimentDetails(ctx, pl, experimentID)

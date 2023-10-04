@@ -12,8 +12,7 @@ create table rvc_model (
 create table rvc_access (
     id integer primary key,
     model_id integer not null references rvc_model(id),
-    user_id integer not null,
-    user_name text not null
+    user_id integer not null
 ) strict;
 
 create table rvc_experiment (
