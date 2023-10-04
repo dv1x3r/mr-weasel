@@ -114,7 +114,9 @@ func Download(ctx context.Context, rawURL string, fileName string) (DownloadedFi
 		cmd.Stdout, cmd.Stderr = &bytes.Buffer{}, &bytes.Buffer{}
 
 		err = cmd.Run()
-		if err != nil {
+		if err != nil && err.Error() == "signal: killed" {
+			return DownloadedFile{}, context.Canceled
+		} else if err != nil {
 			return DownloadedFile{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
 		}
 

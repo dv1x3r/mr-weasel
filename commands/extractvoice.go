@@ -79,7 +79,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 	}
 
 	if errors.Is(err, context.Canceled) {
-		res = Result{State: c.downloadSong, Error: err}
+		res = Result{Text: "Download cancelled, you can send another song.", State: c.downloadSong, Error: err}
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
 	} else if err != nil {

@@ -220,6 +220,7 @@ func (c *ChangeVoiceCommand) setExperimentAudioSource(ctx context.Context, pl Pa
 
 	if errors.Is(err, context.Canceled) {
 		res = Result{
+			Text:  "Download cancelled, you can send another audio.",
 			State: func(ctx context.Context, pl Payload) { c.setExperimentAudioSource(ctx, pl, experimentID) },
 			Error: err,
 		}
