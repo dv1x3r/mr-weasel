@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 
 	"mr-weasel/utils"
 )
@@ -47,8 +46,7 @@ func (c *YTMP3Command) downloadSong(ctx context.Context, pl Payload) {
 		return
 	}
 
-	_s := html.EscapeString
-	res = Result{Text: fmt.Sprintf("📂 %s\n", _s(downloadedFile.Name))}
+	res = Result{Text: fmt.Sprintf("📂 %s\n", _es(downloadedFile.Name))}
 	res.InlineMarkup.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 

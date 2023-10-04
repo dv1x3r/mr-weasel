@@ -2,8 +2,11 @@ package commands
 
 import (
 	"context"
+	"html"
 	"mr-weasel/tgclient"
 )
+
+var _es = html.EscapeString
 
 const CmdCancel = "/cancel"
 

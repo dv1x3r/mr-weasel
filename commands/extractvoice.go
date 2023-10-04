@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,8 +87,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
 	} else {
-		_s := html.EscapeString
-		res = Result{Text: fmt.Sprintf("📂 %s\n", _s(downloadedFile.Name))}
+		res = Result{Text: fmt.Sprintf("📂 %s\n", _es(downloadedFile.Name))}
 		res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
 		pl.ResultChan <- res
 	}
