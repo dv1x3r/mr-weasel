@@ -63,7 +63,12 @@ const (
 	cmdChangeVoiceSetToneS0     = "set_tone_0"
 	cmdChangeVoiceSetToneP1     = "set_tone_+1"
 	cmdChangeVoiceSetToneP12    = "set_tone_+12"
-	cmdChangeVoiceNewModel      = "new_model"
+	cmdChangeVoiceModelAdd      = "model_add"
+	cmdChangeVoiceModelDelAsk   = "model_del"
+	cmdChangeVoiceModelDelYes   = "model_del_yes"
+	cmdChangeVoiceShareAdd      = "share_add"
+	cmdChangeVoiceShareDelAsk   = "share_del"
+	cmdChangeVoiceShareDelYes   = "share_del_yes"
 	cmdChangeVoiceStart         = "start"
 )
 
@@ -178,14 +183,18 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 		res.Text = c.formatModelDetails(model)
 		res.InlineMarkup.AddKeyboardPagination(offset, model.CountRows, commandf(c, cmdChangeVoiceSelectModel, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
-		// res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdChangeVoiceModelDelAsk, experimentID, model.ID))
+		res.InlineMarkup.AddKeyboardButton("Delete Model", commandf(c, cmdChangeVoiceModelDelAsk, experimentID, model.ID))
 		if model.IsOwner {
-			// res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceModelShare, experimentID, model.ID))
+			res.InlineMarkup.AddKeyboardRow()
+			res.InlineMarkup.AddKeyboardButton("Disable Sharing", commandf(c, cmdChangeVoiceShareDelAsk, experimentID, model.ID))
+			res.InlineMarkup.AddKeyboardRow()
+			res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceShareAdd, experimentID, model.ID))
+			res.InlineMarkup.AddKeyboardRow()
 		}
 		res.InlineMarkup.AddKeyboardButton("Select", commandf(c, cmdChangeVoiceSetModel, experimentID, model.ID))
 	}
 	res.InlineMarkup.AddKeyboardRow()
-	// res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+	res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
 	res.InlineMarkup.AddKeyboardRow()
 	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	pl.ResultChan <- res
