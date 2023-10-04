@@ -78,19 +78,19 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 		downloadedFile, err = utils.Download(ctx, pl.Command, "")
 	}
 
-	if err != nil {
+	if errors.Is(err, context.Canceled) {
 		res = Result{State: c.downloadSong, Error: err}
-		if !errors.Is(err, context.Canceled) {
-			res.Text = "Whoops, download failed, try again :c"
-		}
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
-		return
+	} else if err != nil {
+		res = Result{Text: "Whoops, download failed, try again :c", State: c.downloadSong, Error: err}
+		res.InlineMarkup.AddKeyboardRow()
+		pl.ResultChan <- res
+	} else {
+		res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
+		res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
+		pl.ResultChan <- res
 	}
-
-	res = Result{Text: fmt.Sprintf("📂 %s\n", downloadedFile.Name)}
-	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
-	pl.ResultChan <- res
 }
 
 func (c *ExtractVoiceCommand) startProcessing(ctx context.Context, pl Payload, uniqueID string) {
