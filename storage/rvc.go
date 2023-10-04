@@ -119,7 +119,9 @@ func (s *RvcStorage) GetModelFromDB(ctx context.Context, userID int64, offset in
 			,coalesce(ac.shares, 0) as shares
 			,count(*) over () as countrows
 		from rvc_model m
-		left join rvc_access a on a.model_id = m.id
+		left join rvc_access a
+			on a.model_id = m.id
+			and a.user_id = ?
 		left join (
 			select
 				model_id,
@@ -127,10 +129,31 @@ func (s *RvcStorage) GetModelFromDB(ctx context.Context, userID int64, offset in
 			from rvc_access
 			group by model_id
 		) ac on ac.model_id = m.id
-		where m.user_id = ? or a.user_id = ?
+		where m.user_id = ? or a.id is not null
 		order by m.name, m.id
 		limit 1 offset ?;
 	`
 	err := s.db.GetContext(ctx, &model, stmt, userID, userID, offset)
 	return model, err
+}
+
+func (s *RvcStorage) DeleteModelFromDB(ctx context.Context, userID int64, modelID int64) (int64, error) {
+	stmt := `delete from rvc_model where id = ? and user_id = ?;`
+	res, err := s.db.ExecContext(ctx, stmt, modelID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func (s *RvcStorage) DeleteAccessFromDB(ctx context.Context, userID int64, modelID int64) (int64, error) {
+	stmt := `
+		delete from rvc_access where model_id = ?
+			and model_id in (select id from rvc_model where user_id = ?);
+	`
+	res, err := s.db.ExecContext(ctx, stmt, modelID, userID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }

@@ -11,14 +11,14 @@ create table rvc_model (
 
 create table rvc_access (
     id integer primary key,
-    model_id integer not null references rvc_model(id),
+    model_id integer not null references rvc_model(id) on delete cascade,
     user_id integer not null
 ) strict;
 
 create table rvc_experiment (
     id integer primary key,
     user_id integer not null,
-    model_id integer references rvc_model(id),
+    model_id integer references rvc_model(id) on delete set null,
     audio_source_id text,
     audio_voice_file text,
     audio_music_file text,

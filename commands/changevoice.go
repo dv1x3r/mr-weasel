@@ -53,8 +53,8 @@ func (ChangeVoiceCommand) Description() string {
 
 const (
 	cmdChangeVoiceExperimentGet = "experiment_get"
-	cmdChangeVoiceSelectModel   = "select_model"
-	cmdChangeVoiceSelectAudio   = "select_audio"
+	cmdChangeVoiceModelGet      = "model_get"
+	cmdChangeVoiceUploadAudio   = "upload_audio"
 	cmdChangeVoiceEnableUVR     = "enable_uvr"
 	cmdChangeVoiceDisableUVR    = "disable_uvr"
 	cmdChangeVoiceSetModel      = "set_model"
@@ -66,9 +66,8 @@ const (
 	cmdChangeVoiceModelAdd      = "model_add"
 	cmdChangeVoiceModelDelAsk   = "model_del"
 	cmdChangeVoiceModelDelYes   = "model_del_yes"
-	cmdChangeVoiceShareAdd      = "share_add"
-	cmdChangeVoiceShareDelAsk   = "share_del"
-	cmdChangeVoiceShareDelYes   = "share_del_yes"
+	cmdChangeVoiceAccessDelYes  = "access_del_yes"
+	cmdChangeVoiceAccessAdd     = "access_add"
 	cmdChangeVoiceStart         = "start"
 )
 
@@ -77,9 +76,9 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 	switch safeGet(args, 0) {
 	case cmdChangeVoiceExperimentGet:
 		c.showExperimentDetails(ctx, pl, safeGetInt64(args, 1))
-	case cmdChangeVoiceSelectModel:
+	case cmdChangeVoiceModelGet:
 		c.showModelDetails(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
-	case cmdChangeVoiceSelectAudio:
+	case cmdChangeVoiceUploadAudio:
 		c.selectAudio(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceEnableUVR:
 		c.setExperimentSeparateUVR(ctx, pl, safeGetInt64(args, 1), true)
@@ -97,6 +96,12 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 1)
 	case cmdChangeVoiceSetToneP12:
 		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 12)
+	case cmdChangeVoiceModelDelAsk:
+		c.deleteModelAsk(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdChangeVoiceModelDelYes:
+		c.deleteModelConfirm(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
+	case cmdChangeVoiceAccessDelYes:
+		c.deleteAccessConfirm(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceStart:
 		c.startProcessing(ctx, pl, safeGetInt64(args, 1))
 	default:
@@ -147,8 +152,8 @@ func (c *ChangeVoiceCommand) showExperimentDetails(ctx context.Context, pl Paylo
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatExperimentDetails(experiment)
-		res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceSelectModel, experimentID))
-		res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceSelectAudio, experimentID))
+		res.InlineMarkup.AddKeyboardButton("Select Model", commandf(c, cmdChangeVoiceModelGet, experimentID))
+		res.InlineMarkup.AddKeyboardButton("Select Audio", commandf(c, cmdChangeVoiceUploadAudio, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
 		res.InlineMarkup.AddKeyboardButton("-12 ♫", commandf(c, cmdChangeVoiceSetToneM12, experimentID))
 		res.InlineMarkup.AddKeyboardButton("-1 ♫", commandf(c, cmdChangeVoiceSetToneM1, experimentID))
@@ -177,26 +182,26 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 	model, err := c.storage.GetModelFromDB(ctx, pl.UserID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "No models found."
+		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	} else if err != nil {
 		res.Text, res.Error = "There is something wrong, please try again.", err
+		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	} else {
 		res.Text = c.formatModelDetails(model)
-		res.InlineMarkup.AddKeyboardPagination(offset, model.CountRows, commandf(c, cmdChangeVoiceSelectModel, experimentID))
+		res.InlineMarkup.AddKeyboardPagination(offset, model.CountRows, commandf(c, cmdChangeVoiceModelGet, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
-		res.InlineMarkup.AddKeyboardButton("Delete Model", commandf(c, cmdChangeVoiceModelDelAsk, experimentID, model.ID))
 		if model.IsOwner {
-			res.InlineMarkup.AddKeyboardRow()
-			res.InlineMarkup.AddKeyboardButton("Disable Sharing", commandf(c, cmdChangeVoiceShareDelAsk, experimentID, model.ID))
-			res.InlineMarkup.AddKeyboardRow()
-			res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceShareAdd, experimentID, model.ID))
+			res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdChangeVoiceModelDelAsk, experimentID, model.ID))
+			res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceAccessAdd, experimentID, model.ID))
 			res.InlineMarkup.AddKeyboardRow()
 		}
+		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 		res.InlineMarkup.AddKeyboardButton("Select", commandf(c, cmdChangeVoiceSetModel, experimentID, model.ID))
 	}
-	res.InlineMarkup.AddKeyboardRow()
-	res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
-	res.InlineMarkup.AddKeyboardRow()
-	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	pl.ResultChan <- res
 }
 
@@ -285,12 +290,11 @@ func (c *ChangeVoiceCommand) setExperimentTranspose(ctx context.Context, pl Payl
 		newValue = 0
 	} else {
 		newValue = experiment.Transpose.Int64 + delta
-	}
-
-	if newValue > 24 {
-		newValue = 24
-	} else if newValue < -24 {
-		newValue = -24
+		if newValue > 24 {
+			newValue = 24
+		} else if newValue < -24 {
+			newValue = -24
+		}
 	}
 
 	if experiment.Transpose.Int64 == newValue {
@@ -302,6 +306,41 @@ func (c *ChangeVoiceCommand) setExperimentTranspose(ctx context.Context, pl Payl
 	} else {
 		c.showExperimentDetails(ctx, pl, experimentID)
 	}
+}
+
+func (c *ChangeVoiceCommand) deleteModelAsk(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	res := Result{Text: "Are you sure you want to delete the selected model, or reset access?"}
+	res.InlineMarkup.AddKeyboardButton("Yes, delete the model", commandf(c, cmdChangeVoiceModelDelYes, experimentID, modelID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Reset access", commandf(c, cmdChangeVoiceAccessDelYes, experimentID, modelID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Nope, nevermind", commandf(c, cmdChangeVoiceModelGet, experimentID))
+	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) deleteModelConfirm(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	res := Result{}
+	affected, err := c.storage.DeleteModelFromDB(ctx, pl.UserID, modelID)
+	if err != nil || affected != 1 {
+		res.Text, res.Error = "Model not found.", err
+	} else {
+		// TODO: os.delete
+		res.Text = "Model has been successfully deleted!"
+	}
+	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
+	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) deleteAccessConfirm(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	res := Result{}
+	_, err := c.storage.DeleteAccessFromDB(ctx, pl.UserID, modelID)
+	if err != nil {
+		res.Text, res.Error = "Model not found.", err
+	} else {
+		res.Text = "Permisions has been resetted, now only you can access this model."
+	}
+	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
+	pl.ResultChan <- res
 }
 
 func (c *ChangeVoiceCommand) startProcessing(ctx context.Context, pl Payload, experimentID int64) {
