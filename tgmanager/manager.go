@@ -198,12 +198,17 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = previousResponse.Text
 			}
 
+			var replyMarkup *tgclient.InlineKeyboardMarkup
+			if len(result.InlineMarkup.InlineKeyboard[0]) != 0 {
+				replyMarkup = &result.InlineMarkup
+			}
+
 			previousResponse, err = m.tgClient.EditMessageText(ctx, tgclient.EditMessageTextConfig{
 				ChatID:      previousResponse.Chat.ID,
 				MessageID:   previousResponse.MessageID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
-				ReplyMarkup: &result.InlineMarkup,
+				ReplyMarkup: replyMarkup,
 			})
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
