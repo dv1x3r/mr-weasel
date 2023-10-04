@@ -93,6 +93,8 @@ type Message struct {
 	ReplyToMessage *Message `json:"reply_to_message,omitempty"`
 	// Optional. For text messages, the actual UTF-8 text of the message.
 	Text string `json:"text,omitempty"`
+	// Optional. For text messages, special entities like usernames, URLs, bot commands, etc. that appear in the text.
+	Entities []MessageEntity `json:"entities,omitempty"`
 	// Optional. Message is an audio file, information about the file.
 	Audio *Audio `json:"audio,omitempty"`
 	// Optional. Service message: a user was shared with the bot.

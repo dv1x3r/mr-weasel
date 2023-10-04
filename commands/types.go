@@ -20,6 +20,8 @@ type Handler interface {
 
 type Payload struct {
 	UserID     int64
+	UserName   string
+	IsPrivate  bool
 	Command    string
 	FileURL    string
 	ResultChan chan Result

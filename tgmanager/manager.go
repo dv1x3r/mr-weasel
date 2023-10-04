@@ -84,8 +84,15 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 		return
 	}
 
+	userName := "@" + message.From.Username
+	if userName == "@" {
+		userName = message.From.FirstName
+	}
+
 	pl := commands.Payload{
 		UserID:     message.From.ID,
+		UserName:   userName,
+		IsPrivate:  message.Chat.Type == "private",
 		Command:    message.Text,
 		ResultChan: make(chan commands.Result),
 	}
@@ -122,6 +129,9 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
 
+	// TODO: check if chat user is message owner
+	// fmt.Printf("\n%+v\n", callbackQuery.Message.Entities)
+
 	if strings.HasPrefix(callbackQuery.Data, commands.CmdCancel) {
 		cancelFn, ok := m.getCancelFunc(callbackQuery.From.ID, callbackQuery.Data)
 		if ok {
@@ -135,8 +145,15 @@ func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.Ca
 		return
 	}
 
+	userName := "@" + callbackQuery.From.Username
+	if userName == "@" {
+		userName = callbackQuery.From.FirstName
+	}
+
 	pl := commands.Payload{
 		UserID:     callbackQuery.From.ID,
+		UserName:   userName,
+		IsPrivate:  callbackQuery.Message.Chat.Type == "private",
 		Command:    callbackQuery.Data,
 		ResultChan: make(chan commands.Result),
 	}
@@ -198,6 +215,10 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = previousResponse.Text
 			}
 
+			if !pl.IsPrivate {
+				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
+			}
+
 			var replyMarkup *tgclient.InlineKeyboardMarkup
 			if len(result.InlineMarkup.InlineKeyboard[0]) != 0 {
 				replyMarkup = &result.InlineMarkup
@@ -231,6 +252,10 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				replyMarkup = result.ReplyMarkup
 			} else if result.RemoveMarkup.RemoveKeyboard {
 				replyMarkup = result.RemoveMarkup
+			}
+
+			if !pl.IsPrivate {
+				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
 			}
 
 			previousResponse, err = m.tgClient.SendMessage(ctx, tgclient.SendMessageConfig{
