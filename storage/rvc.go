@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 
-	"mr-weasel/utils"
-
 	"github.com/jmoiron/sqlx"
 )
 
@@ -20,9 +18,6 @@ func NewRvcStorage(db *sqlx.DB) *RvcStorage {
 type RvcExperimentDetails struct {
 	UserID         int64          `db:"user_id"`
 	ModelName      sql.NullString `db:"model_name"`
-	DatasetFolder  sql.NullString `db:"dataset_folder"`
-	ModelFile      sql.NullString `db:"model_file"`
-	IndexFile      sql.NullString `db:"index_file"`
 	AudioSourceID  sql.NullString `db:"audio_source_id"`
 	AudioVoiceFile sql.NullString `db:"audio_voice_file"`
 	AudioMusicFile sql.NullString `db:"audio_music_file"`
@@ -45,9 +40,6 @@ func (s *RvcStorage) GetExperimentDetailsFromDB(ctx context.Context, userID int6
 		select
 			e.user_id,
 			m.name as model_name,
-			m.dataset_folder,
-			m.model_file,
-			m.index_file,
 			e.audio_source_id,
 			e.audio_voice_file,
 			e.audio_music_file,
@@ -159,26 +151,6 @@ func (s *RvcStorage) InsertNewModelIntoDB(ctx context.Context, userID int64, nam
 	}
 	return res.LastInsertId()
 
-}
-
-func (s *RvcStorage) GetOrCreateModelDatasetInDB(ctx context.Context, userID int64, modelID int64) (string, error) {
-	var existing_uuid sql.NullString
-	err := s.db.GetContext(ctx, &existing_uuid, "select dataset_folder from rvc_model where id = ? and user_id = ?;", modelID, userID)
-	if err != nil {
-		return "", err
-	}
-
-	if existing_uuid.Valid {
-		return existing_uuid.String, nil
-	}
-
-	new_uuid := utils.UUID()
-	_, err = s.db.ExecContext(ctx, "update rvc_model set dataset_folder = ? where id = ? and user_id = ?;", new_uuid, modelID, userID)
-	if err != nil {
-		return "", err
-	}
-
-	return new_uuid, nil
 }
 
 func (s *RvcStorage) DeleteModelFromDB(ctx context.Context, userID int64, modelID int64) (int64, error) {

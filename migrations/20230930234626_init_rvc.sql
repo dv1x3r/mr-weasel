@@ -3,10 +3,7 @@
 create table rvc_model (
     id integer primary key,
     user_id integer not null,
-    name text not null,
-    dataset_folder text,
-    model_file text,
-    index_file text
+    name text not null
 ) strict;
 
 create table rvc_access (

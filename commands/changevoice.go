@@ -199,9 +199,9 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 			res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceAccessAdd, experimentID, model.ID))
 			res.InlineMarkup.AddKeyboardRow()
 		}
-		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
-		res.InlineMarkup.AddKeyboardRow()
+		// res.InlineMarkup.AddKeyboardRow()
 		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
+		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
 		res.InlineMarkup.AddKeyboardButton("Select", commandf(c, cmdChangeVoiceSetModel, experimentID, model.ID))
 	}
 	pl.ResultChan <- res
@@ -331,15 +331,6 @@ func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload
 		return
 	}
 
-	datasetFolder, err := c.storage.GetOrCreateModelDatasetInDB(ctx, pl.UserID, modelID)
-	if err != nil {
-		c.storage.DeleteModelFromDB(ctx, pl.UserID, modelID)
-		res := Result{Text: "There is something wrong with dataset folder, please try to create another model.", Error: err}
-		res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
-		pl.ResultChan <- res
-		return
-	}
-
 	downloadedFile, err := utils.Download(ctx, pl.FileURL, pl.Command)
 	if err != nil {
 		pl.ResultChan <- Result{
@@ -349,8 +340,8 @@ func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload
 		}
 	} else {
 		// Move downloaded file to the datasets directory
-		os.MkdirAll(filepath.Join(c.pathDatasets, datasetFolder), os.ModePerm)
-		os.Rename(downloadedFile.Path, filepath.Join(c.pathDatasets, datasetFolder, filepath.Base(downloadedFile.Path)))
+		os.MkdirAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID)), os.ModePerm)
+		os.Rename(downloadedFile.Path, filepath.Join(c.pathDatasets, fmt.Sprint(modelID), filepath.Base(downloadedFile.Path)))
 		pl.ResultChan <- Result{
 			Text:  _es(fmt.Sprintf("%s has been imported!", downloadedFile.Name)),
 			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
@@ -375,6 +366,9 @@ func (c *ChangeVoiceCommand) deleteModelConfirm(ctx context.Context, pl Payload,
 		res.Text, res.Error = "Model not found.", err
 	} else {
 		res.Text = "Model has been successfully deleted!"
+		os.RemoveAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID))) // delete datasets
+		// TODO: delete weights
+		// TODO: delete indexes
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
 	pl.ResultChan <- res
@@ -386,7 +380,7 @@ func (c *ChangeVoiceCommand) deleteAccessConfirm(ctx context.Context, pl Payload
 	if err != nil {
 		res.Text, res.Error = "Model not found.", err
 	} else {
-		res.Text = "Permisions has been resetted, now only you can access this model."
+		res.Text = "Permisions has been revoked, now only you can access this model."
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
 	pl.ResultChan <- res
