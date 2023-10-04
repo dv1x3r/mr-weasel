@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"mr-weasel/utils"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -113,28 +115,70 @@ func (s *RvcStorage) GetModelFromDB(ctx context.Context, userID int64, offset in
 	var model RvcModelDetails
 	stmt := `
 		select
-			m.id
-			,m.name
-			,iif(a.id is null, 1, 0) as is_owner
-			,coalesce(ac.shares, 0) as shares
-			,count(*) over () as countrows
-		from rvc_model m
-		left join rvc_access a
-			on a.model_id = m.id
-			and a.user_id = ?
+			t.id,
+			t.name,
+			t.is_owner,
+			coalesce(s.shares, 0) as shares,
+			count(*) over() as countrows
+		from (
+			select
+				m.id,
+				m.user_id,
+				m.name,
+				1 as is_owner
+			from rvc_model m
+			union
+			select
+				m.id,
+				a.user_id,
+				m.name,
+				0 as is_owner
+			from rvc_model m
+			join rvc_access a on a.model_id = m.id
+		) t
 		left join (
 			select
 				model_id,
 				count(*) as shares
 			from rvc_access
 			group by model_id
-		) ac on ac.model_id = m.id
-		where m.user_id = ? or a.id is not null
-		order by m.name, m.id
+		) s on s.model_id = t.id
+		where t.user_id = ?
+		order by t.name, t.id
 		limit 1 offset ?;
 	`
-	err := s.db.GetContext(ctx, &model, stmt, userID, userID, offset)
+	err := s.db.GetContext(ctx, &model, stmt, userID, offset)
 	return model, err
+}
+
+func (s *RvcStorage) InsertNewModelIntoDB(ctx context.Context, userID int64, name string) (int64, error) {
+	stmt := `insert into rvc_model (user_id, name) values (?,?);`
+	res, err := s.db.ExecContext(ctx, stmt, userID, name)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+
+}
+
+func (s *RvcStorage) GetOrCreateModelDatasetInDB(ctx context.Context, userID int64, modelID int64) (string, error) {
+	var existing_uuid sql.NullString
+	err := s.db.GetContext(ctx, &existing_uuid, "select dataset_folder from rvc_model where id = ? and user_id = ?;", modelID, userID)
+	if err != nil {
+		return "", err
+	}
+
+	if existing_uuid.Valid {
+		return existing_uuid.String, nil
+	}
+
+	new_uuid := utils.UUID()
+	_, err = s.db.ExecContext(ctx, "update rvc_model set dataset_folder = ? where id = ? and user_id = ?;", new_uuid, modelID, userID)
+	if err != nil {
+		return "", err
+	}
+
+	return new_uuid, nil
 }
 
 func (s *RvcStorage) DeleteModelFromDB(ctx context.Context, userID int64, modelID int64) (int64, error) {

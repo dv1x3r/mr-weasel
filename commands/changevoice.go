@@ -96,6 +96,8 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 1)
 	case cmdChangeVoiceSetToneP12:
 		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 12)
+	case cmdChangeVoiceModelAdd:
+		c.addModelStart(ctx, pl, safeGetInt64(args, 1))
 	case cmdChangeVoiceModelDelAsk:
 		c.deleteModelAsk(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceModelDelYes:
@@ -138,7 +140,7 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 		html += fmt.Sprintf("🎧 <b>Audio:</b> 🚫 Not Selected\n")
 	}
 
-	html += fmt.Sprintf("🎼 <b>Transpose:</b> %+d Semitones\n", experiment.Transpose.Int64)
+	html += fmt.Sprintf("🎼 <b>Transpose:</b> %+d semitones\n", experiment.Transpose.Int64)
 
 	return html
 }
@@ -207,10 +209,8 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 
 func (c *ChangeVoiceCommand) selectAudio(ctx context.Context, pl Payload, experimentID int64) {
 	res := Result{
-		Text: "Send me the a YouTube link, a song file, or record a new voice message!",
-		State: func(ctx context.Context, pl Payload) {
-			c.setExperimentAudioSource(ctx, pl, experimentID)
-		},
+		Text:  "Send me the a YouTube link, a song file, or record a new voice message!",
+		State: func(ctx context.Context, pl Payload) { c.setExperimentAudioSource(ctx, pl, experimentID) },
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	pl.ResultChan <- res
@@ -306,6 +306,54 @@ func (c *ChangeVoiceCommand) setExperimentTranspose(ctx context.Context, pl Payl
 	} else {
 		c.showExperimentDetails(ctx, pl, experimentID)
 	}
+}
+
+func (c *ChangeVoiceCommand) addModelStart(ctx context.Context, pl Payload, experimentID int64) {
+	pl.ResultChan <- Result{
+		Text:  "Let's create a new voice model. How should we name it?",
+		State: func(ctx context.Context, pl Payload) { c.addModelNameAndSave(ctx, pl, experimentID) },
+	}
+}
+
+func (c *ChangeVoiceCommand) addModelNameAndSave(ctx context.Context, pl Payload, experimentID int64) {
+	modelID, err := c.storage.InsertNewModelIntoDB(ctx, pl.UserID, pl.Command)
+	if err != nil {
+		res := Result{Text: "There is something wrong, please try again.", Error: err}
+		res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
+		pl.ResultChan <- res
+	} else {
+		msg := fmt.Sprintf("Ok! Now send me voice samples with audio files or voice messages.\n\n")
+		msg += fmt.Sprintf("They should be without any background music, and with as little noise as possible. ")
+		msg += fmt.Sprintf("For simple models even 10 seconds of audio is enough. For better quality we need 40-60 seconds in total.\n\n")
+		msg += fmt.Sprintf("When you are ready, just send /done command!")
+		pl.ResultChan <- Result{
+			Text:  msg,
+			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
+		}
+	}
+}
+
+func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	if pl.Command == "/done" {
+		c.setExperimentModel(ctx, pl, experimentID, modelID)
+		c.showExperimentDetails(ctx, pl, experimentID)
+		return
+	}
+
+	dataset_folder, err := c.storage.GetOrCreateModelDatasetInDB(ctx, pl.UserID, modelID)
+	if err != nil {
+		c.storage.DeleteModelFromDB(ctx, pl.UserID, modelID)
+		res := Result{Text: "There is something wrong with dataset folder, please try to create another model.", Error: err}
+		res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
+		pl.ResultChan <- res
+		return
+	}
+
+	pl.ResultChan <- Result{
+		Text:  dataset_folder + " - " + pl.Command,
+		State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
+	}
+
 }
 
 func (c *ChangeVoiceCommand) deleteModelAsk(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
