@@ -60,7 +60,7 @@ func GetDownloadedFile(fileID string) (DownloadedFile, error) {
 func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, error) {
 	var rawURL, fileName string
 
-	if arg1 == "" {
+	if arg1 != "" {
 		rawURL = arg1
 		fileName = arg2
 	} else {
