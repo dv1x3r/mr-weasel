@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html"
 	"math"
 	"strconv"
 	"time"
@@ -114,19 +115,20 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func (c *CarCommand) formatCarDetails(car st.CarDetails) string {
-	html := fmt.Sprintf("🚘 <b>Car:</b> %s (%d)\n", car.Name, car.Year)
+	_s := html.EscapeString
+	str := fmt.Sprintf("🚘 <b>Car:</b> %s (%d)\n", _s(car.Name), car.Year)
 	if car.Price.Valid {
-		html += fmt.Sprintf("💲 <b>Price:</b> %d€\n", car.Price.Int64)
+		str += fmt.Sprintf("💲 <b>Price:</b> %d€\n", car.Price.Int64)
 	} else {
-		html += fmt.Sprintf("💲 <b>Price:</b> 🚫\n")
+		str += fmt.Sprintf("💲 <b>Price:</b> 🚫\n")
 	}
-	html += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
+	str += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
 	if car.Plate.Valid {
-		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> %s\n", car.Plate.String)
+		str += fmt.Sprintf("🧾 <b>Licence Plate:</b> %s\n", _s(car.Plate.String))
 	} else {
-		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> 🚫\n")
+		str += fmt.Sprintf("🧾 <b>Licence Plate:</b> 🚫\n")
 	}
-	return html
+	return str
 }
 
 func (c *CarCommand) showCarDetails(ctx context.Context, pl Payload, carID int64) {
@@ -364,12 +366,13 @@ func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) {
 }
 
 func (c *CarCommand) deleteCarAsk(ctx context.Context, pl Payload, carID int64) {
+	_s := html.EscapeString
 	car, err := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
 	if err != nil {
 		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
 		return
 	}
-	res := Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)?", car.Name, car.Year)}
+	res := Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)?", _s(car.Name), car.Year)}
 	res.InlineMarkup.AddKeyboardButton("Yes, delete the car", commandf(c, cmdCarDelYes, carID))
 	res.InlineMarkup.AddKeyboardRow()
 	res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdCarGet, carID))
@@ -391,12 +394,12 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, pl Payload, carID int
 }
 
 func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
-	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
-	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
-	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/100Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
-	html += fmt.Sprintf("🏭 <b>Total:</b> %dKm\n", fuel.Kilometers)
-	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
-	return html
+	str := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
+	str += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
+	str += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/100Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
+	str += fmt.Sprintf("🏭 <b>Total:</b> %dKm\n", fuel.Kilometers)
+	str += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
+	return str
 }
 
 func (c *CarCommand) showFuelDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
@@ -535,10 +538,11 @@ func (c *CarCommand) deleteFuelConfirm(ctx context.Context, pl Payload, carID in
 }
 
 func (c *CarCommand) formatServiceDetails(service st.ServiceDetails) string {
-	html := fmt.Sprintf("🛠️ %s\n", service.Description)
-	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", service.GetEuro())
-	html += fmt.Sprintf("📅 %s\n", service.GetTimestamp())
-	return html
+	_s := html.EscapeString
+	str := fmt.Sprintf("🛠️ %s\n", _s(service.Description))
+	str += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", service.GetEuro())
+	str += fmt.Sprintf("📅 %s\n", service.GetTimestamp())
+	return str
 }
 
 func (c *CarCommand) showServiceDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
@@ -649,12 +653,13 @@ func (c *CarCommand) deleteServiceConfirm(ctx context.Context, pl Payload, carID
 }
 
 func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
-	html := fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€ RT)\n", lease.GetEuro(), lease.GetEuroRT())
+	_s := html.EscapeString
+	str := fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€ RT)\n", lease.GetEuro(), lease.GetEuroRT())
 	if lease.Description.Valid {
-		html += fmt.Sprintf("🛠️ %s\n", lease.Description.String)
+		str += fmt.Sprintf("🛠️ %s\n", _s(lease.Description.String))
 	}
-	html += fmt.Sprintf("📅 %s\n", lease.GetTimestamp())
-	return html
+	str += fmt.Sprintf("📅 %s\n", lease.GetTimestamp())
+	return str
 }
 
 func (c *CarCommand) showLeaseDetails(ctx context.Context, pl Payload, carID int64, offset int64) {

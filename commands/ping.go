@@ -1,6 +1,9 @@
 package commands
 
-import "context"
+import (
+	"context"
+	"html"
+)
 
 type PingCommand struct{}
 
@@ -25,5 +28,6 @@ func (PingCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func personalized(ctx context.Context, pl Payload) {
-	pl.ResultChan <- Result{Text: "Pong to " + pl.Command + "!"}
+	_s := html.EscapeString
+	pl.ResultChan <- Result{Text: "Pong to " + _s(pl.Command) + "!"}
 }
