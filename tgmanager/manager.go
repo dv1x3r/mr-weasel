@@ -129,8 +129,12 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
 
-	// TODO: check if chat user is message owner
-	// fmt.Printf("\n%+v\n", callbackQuery.Message.Entities)
+	// Check if chat user is message owner (for groups)
+	if callbackQuery.Message.Chat.Type != "private" {
+		if callbackQuery.Message.Entities[0].User.ID != callbackQuery.From.ID {
+			return
+		}
+	}
 
 	if strings.HasPrefix(callbackQuery.Data, commands.CmdCancel) {
 		cancelFn, ok := m.getCancelFunc(callbackQuery.From.ID, callbackQuery.Data)
