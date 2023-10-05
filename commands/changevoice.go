@@ -472,7 +472,7 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 		res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 		pl.ResultChan <- res
 
-		err = c.changer.RunTrain(ctx, experiment.ModelID.Int64)
+		err = c.changer.RunTrain(ctx, experiment)
 		if errors.Is(err, context.Canceled) {
 			c.showExperimentDetails(context.WithoutCancel(ctx), pl, experiment.ID)
 			return
@@ -483,7 +483,20 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 		}
 	}
 
-	inferFile, err := c.changer.RunInfer(ctx, experiment, uvrFiles)
+	var inferFile utils.VoiceChangerResult
+
+	res = Result{}
+	res.InlineMarkup.AddKeyboardButton("Changing voice...", "-")
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
+	pl.ResultChan <- res
+
+	if experiment.SeparateUVR.Bool {
+		inferFile, err = c.changer.RunInfer(ctx, experiment, uvrFiles.VoicePath)
+	} else {
+		inferFile, err = c.changer.RunInfer(ctx, experiment, audioFile.Path)
+	}
+
 	if errors.Is(err, context.Canceled) {
 		c.showExperimentDetails(context.WithoutCancel(ctx), pl, experiment.ID)
 		return

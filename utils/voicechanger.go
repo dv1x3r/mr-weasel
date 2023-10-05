@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"mr-weasel/storage"
 )
@@ -19,6 +20,7 @@ type VoiceChanger struct {
 	PathDatasets string
 	PathWeights  string
 	PathLogs     string
+	PathOutput   string
 }
 
 type VoiceChangerResult struct {
@@ -36,6 +38,7 @@ func NewVoiceChanger() *VoiceChanger {
 			PathDatasets: "/mnt/d/rvc-project/assets/datasets",
 			PathWeights:  "/mnt/d/rvc-project/assets/weights",
 			PathLogs:     "/mnt/d/rvc-project/logs",
+			PathOutput:   "/mnt/d/rvc-project/TEMP",
 		}
 	} else {
 		return &VoiceChanger{
@@ -46,6 +49,7 @@ func NewVoiceChanger() *VoiceChanger {
 			PathDatasets: filepath.Join(GetExecutablePath(), "rvc-project", "assets", "datasets"),
 			PathWeights:  filepath.Join(GetExecutablePath(), "rvc-project", "assets", "weights"),
 			PathLogs:     filepath.Join(GetExecutablePath(), "rvc-project", "logs"),
+			PathOutput:   filepath.Join(GetExecutablePath(), "rvc-project", "TEMP"),
 		}
 	}
 }
@@ -65,16 +69,15 @@ func (vc *VoiceChanger) IsTrained(modelID int64) bool {
 	return errors.Join(err1, err2) == nil
 }
 
-func (vc *VoiceChanger) RunTrain(ctx context.Context, modelID int64) error {
-	modelName := fmt.Sprint(modelID)
+func (vc *VoiceChanger) RunTrain(ctx context.Context, experiment storage.RvcExperimentDetails) error {
+	modelFolder := fmt.Sprint(experiment.ModelID)
 
 	var cmd *exec.Cmd
-
 	switch vc.Mode {
 	case "CUDA":
 		cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathTrainCLI,
-			"--name", modelName,
-			"--dataset", filepath.Join("assets", "datasets", modelName),
+			"--name", modelFolder,
+			"--dataset", filepath.Join("assets", "datasets", modelFolder),
 			"--version", "v2",
 			"--sample_rate", "40k",
 			"--method", "rmvpe_gpu",
@@ -89,8 +92,8 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, modelID int64) error {
 		)
 	default:
 		cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathTrainCLI,
-			"--name", modelName,
-			"--dataset", filepath.Join("assets", "datasets", modelName),
+			"--name", modelFolder,
+			"--dataset", filepath.Join("assets", "datasets", modelFolder),
 			"--version", "v2",
 			"--sample_rate", "40k",
 			"--method", "rmvpe",
@@ -116,8 +119,8 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, modelID int64) error {
 
 	// move index to the weights folder, and remove logs
 	MoveCrossDevice(
-		filepath.Join(vc.PathLogs, modelName, "added_IVF136_Flat_nprobe_1_3_v2.index"),
-		filepath.Join(vc.PathWeights, fmt.Sprintf("%s.index", modelName)),
+		filepath.Join(vc.PathLogs, modelFolder, "added_IVF136_Flat_nprobe_1_3_v2.index"),
+		filepath.Join(vc.PathWeights, fmt.Sprintf("%s.index", modelFolder)),
 	)
 
 	// TODO: clear training data after some tests
@@ -127,56 +130,55 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, modelID int64) error {
 	return nil
 }
 
-func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExperimentDetails, uvrFiles AudioSeparatorResult) (VoiceChangerResult, error) {
-	// modelName := fmt.Sprint(experiment.ModelID)
+func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExperimentDetails, voicePath string) (VoiceChangerResult, error) {
+	audioFile, _ := GetDownloadedFile(experiment.Audio.String)
+	baseName := strings.TrimSuffix(filepath.Base(audioFile.Name), filepath.Ext(audioFile.Name))
+	outputName := fmt.Sprintf("%s.%s.wav", experiment.ModelName.String, baseName)
+	modelFolder := fmt.Sprint(experiment.ModelID)
 
-	// var cmd *exec.Cmd
+	var cmd *exec.Cmd
+	switch vc.Mode {
+	case "CUDA":
+		cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathInferCLI,
+			"--input", voicePath,
+			"--output", filepath.Join("TEMP", outputName),
+			"--model", modelFolder,
+			"--index", filepath.Join("assets", "weights", fmt.Sprintf("%s.index", modelFolder)),
+			"--method", "rmvpe",
+			"--ratio", "0.75",
+			"--transpose", fmt.Sprint(experiment.Transpose),
+			"--filter", "3",
+			"--resample", "0",
+			"--rms", "0.25",
+			"--protect", "0.33",
+		)
+	default:
+		cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathInferCLI,
+			"--input", voicePath,
+			"--output", filepath.Join("TEMP", outputName),
+			"--model", modelFolder,
+			"--index", filepath.Join("assets", "weights", fmt.Sprintf("%s.index", modelFolder)),
+			"--method", "pm",
+			"--ratio", "0.75",
+			"--transpose", fmt.Sprint(experiment.Transpose),
+			"--filter", "3",
+			"--resample", "0",
+			"--rms", "0.25",
+			"--protect", "0.33",
+		)
+	}
 
-	// switch vc.Mode {
-	// case "CUDA":
-	// 	cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathTrainCLI,
-	// 		"--name", modelName,
-	// 		"--dataset", filepath.Join("assets", "datasets", modelName),
-	// 		"--version", "v2",
-	// 		"--sample_rate", "40k",
-	// 		"--method", "rmvpe_gpu",
-	// 		"--gpu_rmvpe", "0-0",
-	// 		"--gpu", "0",
-	// 		"--batch_size", "8",
-	// 		"--total_epoch", "200",
-	// 		"--save_epoch", "20",
-	// 		"--save_latest", "1",
-	// 		"--cache_gpu", "0",
-	// 		"--save_every_weights", "0",
-	// 	)
-	// default:
-	// 	cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathTrainCLI,
-	// 		"--name", modelName,
-	// 		"--dataset", filepath.Join("assets", "datasets", modelName),
-	// 		"--version", "v2",
-	// 		"--sample_rate", "40k",
-	// 		"--method", "rmvpe",
-	// 		// "--gpu_rmvpe", "0-0",
-	// 		// "--gpu", "0",
-	// 		"--batch-size", "1",
-	// 		"--total_epoch", "10",
-	// 		"--save_epoch", "5",
-	// 		"--save_latest", "1",
-	// 		"--cache_gpu", "0",
-	// 		"--save_every_weights", "0",
-	// 	)
-	// }
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
-	// cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	err := cmd.Run()
+	if err != nil && err.Error() == "signal: killed" {
+		return VoiceChangerResult{}, context.Canceled
+	} else if err != nil {
+		return VoiceChangerResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
+	}
 
-	// err := cmd.Run()
-	// if err != nil && err.Error() == "signal: killed" {
-	// 	return VoiceChangerResult{}, context.Canceled
-	// } else if err != nil {
-	// 	return VoiceChangerResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
-	// }
-
-	return VoiceChangerResult{}, nil
+	res := VoiceChangerResult{Name: outputName, Path: filepath.Join(vc.PathOutput, outputName)}
+	return res, nil
 }
 
 // TODO:

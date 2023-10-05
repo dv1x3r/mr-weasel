@@ -35,7 +35,7 @@ func NewAudioSeparator() *AudioSeparator {
 			Model:      "UVR-MDX-NET-Voc_FT",
 			PathCLI:    filepath.Join(GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
 			PathModels: filepath.Join(GetExecutablePath(), "audio-separator", "models"),
-			PathOutput: GetDownloadFolderPath(),
+			PathOutput: filepath.Join(GetExecutablePath(), "audio-separator", "output"),
 		}
 	} else {
 		return &AudioSeparator{
@@ -43,7 +43,7 @@ func NewAudioSeparator() *AudioSeparator {
 			Model:      "UVR-MDX-NET-Voc_FT",
 			PathCLI:    filepath.Join(GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
 			PathModels: filepath.Join(GetExecutablePath(), "audio-separator", "models"),
-			PathOutput: GetDownloadFolderPath(),
+			PathOutput: filepath.Join(GetExecutablePath(), "audio-separator", "output"),
 		}
 	}
 }
