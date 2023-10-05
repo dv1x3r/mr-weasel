@@ -438,4 +438,19 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
+	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
+	if err != nil {
+		c.showExperimentDetails(ctx, pl, experimentID)
+		pl.ResultChan <- Result{Text: "There is a problem retrieving experiment date, please try again.", Error: err}
+		return
+	}
+
+	fmt.Println(experiment)
+
+	// 1. Check if .pth and .index are there
+	// 2. If not, then train
+	// 3. Check if vocals are prepared
+	// 4. If not, then prepare
+	// 5.
+
 }
