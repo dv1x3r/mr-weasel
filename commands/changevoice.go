@@ -22,6 +22,8 @@ type ChangeVoiceCommand struct {
 	pathInferCLI string
 	pathTrainCLI string
 	pathDatasets string
+	pathWeights  string
+	pathLogs     string
 }
 
 func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVoiceCommand {
@@ -34,6 +36,8 @@ func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVo
 			pathInferCLI: "/mnt/d/rvc-project/infer-cli.py",
 			pathTrainCLI: "/mnt/d/rvc-project/train-cli.py",
 			pathDatasets: "/mnt/d/rvc-project/assets/datasets",
+			pathWeights:  "/mnt/d/rvc-project/assets/weights",
+			pathLogs:     "/mnt/d/rvc-project/logs",
 		}
 	} else {
 		return &ChangeVoiceCommand{
@@ -44,6 +48,8 @@ func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVo
 			pathInferCLI: filepath.Join(utils.GetExecutablePath(), "rvc-project", "infer-cli.py"),
 			pathTrainCLI: filepath.Join(utils.GetExecutablePath(), "rvc-project", "train-cli.py"),
 			pathDatasets: filepath.Join(utils.GetExecutablePath(), "rvc-project", "assets", "datasets"),
+			pathWeights:  filepath.Join(utils.GetExecutablePath(), "rvc-project", "assets", "weights"),
+			pathLogs:     filepath.Join(utils.GetExecutablePath(), "rvc-project", "logs"),
 		}
 	}
 }
@@ -409,9 +415,10 @@ func (c *ChangeVoiceCommand) deleteModelConfirm(ctx context.Context, pl Payload,
 		res.Text, res.Error = "Model not found.", err
 	} else {
 		res.Text = "Model has been successfully deleted!"
-		os.RemoveAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID))) // delete datasets
-		// TODO: delete weights
-		// TODO: delete indexes
+		os.RemoveAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID)))          // delete datasets folder
+		os.RemoveAll(filepath.Join(c.pathLogs, fmt.Sprint(modelID)))              // delete logs folder
+		os.Remove(filepath.Join(c.pathWeights, fmt.Sprintf("%d.pth", modelID)))   // delete model weights
+		os.Remove(filepath.Join(c.pathWeights, fmt.Sprintf("%d.index", modelID))) // delete model index
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
 	pl.ResultChan <- res
