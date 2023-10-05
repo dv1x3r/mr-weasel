@@ -127,6 +127,7 @@ func (s *RvcStorage) GetModelFromDB(ctx context.Context, userID int64, offset in
 				0 as is_owner
 			from rvc_model m
 			join rvc_access a on a.model_id = m.id
+			where m.user_id <> a.user_id -- safety check
 		) t
 		left join (
 			select
@@ -150,7 +151,6 @@ func (s *RvcStorage) InsertNewModelIntoDB(ctx context.Context, userID int64, nam
 		return 0, err
 	}
 	return res.LastInsertId()
-
 }
 
 func (s *RvcStorage) DeleteModelFromDB(ctx context.Context, userID int64, modelID int64) (int64, error) {
@@ -160,6 +160,22 @@ func (s *RvcStorage) DeleteModelFromDB(ctx context.Context, userID int64, modelI
 		return 0, err
 	}
 	return res.RowsAffected()
+}
+
+func (s *RvcStorage) InsertNewAccessIntoDB(ctx context.Context, userID int64, modelID int64, accessUserID int64) (int64, error) {
+	stmt := `select id from rvc_model where user_id = ? and id = ?;`
+	var check int64
+	err := s.db.GetContext(ctx, &check, stmt, userID, modelID)
+	if err != nil {
+		return 0, err
+	}
+
+	stmt = `insert into rvc_access (user_id, model_id) values (?,?);`
+	res, err := s.db.ExecContext(ctx, stmt, accessUserID, modelID)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
 }
 
 func (s *RvcStorage) DeleteAccessFromDB(ctx context.Context, userID int64, modelID int64) (int64, error) {

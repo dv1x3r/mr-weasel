@@ -7,12 +7,29 @@ import (
 	"time"
 )
 
-func (kb *ReplyKeyboardMarkup) AddRequestUserButton() {
+func (kb *ReplyKeyboardMarkup) AddKeyboardRow() {
 	if kb.Keyboard == nil {
 		kb.Keyboard = make([][]KeyboardButton, 1)
+	} else {
+		kb.Keyboard = append(kb.Keyboard, make([]KeyboardButton, 0))
+	}
+}
+
+func (kb *ReplyKeyboardMarkup) AddRequestUserButton() {
+	if kb.Keyboard == nil {
+		kb.AddKeyboardRow()
 	}
 	i := len(kb.Keyboard) - 1
-	btn := KeyboardButton{Text: "Select User", RequestUser: &KeyboardButtonRequestUser{RequestID: 0}}
+	btn := KeyboardButton{Text: "Select User", RequestUser: &KeyboardButtonRequestUser{RequestID: 0, UserIsBot: new(bool)}}
+	kb.Keyboard[i] = append(kb.Keyboard[i], btn)
+}
+
+func (kb *ReplyKeyboardMarkup) AddButton(text string) {
+	if kb.Keyboard == nil {
+		kb.AddKeyboardRow()
+	}
+	i := len(kb.Keyboard) - 1
+	btn := KeyboardButton{Text: text}
 	kb.Keyboard[i] = append(kb.Keyboard[i], btn)
 }
 

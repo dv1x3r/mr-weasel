@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	st "mr-weasel/storage"
 	"mr-weasel/utils"
@@ -102,6 +103,8 @@ func (c *ChangeVoiceCommand) Execute(ctx context.Context, pl Payload) {
 		c.setExperimentTranspose(ctx, pl, safeGetInt64(args, 1), 12)
 	case cmdChangeVoiceModelAdd:
 		c.addModelStart(ctx, pl, safeGetInt64(args, 1))
+	case cmdChangeVoiceAccessAdd:
+		c.addAccessStart(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceModelDelAsk:
 		c.deleteModelAsk(ctx, pl, safeGetInt64(args, 1), safeGetInt64(args, 2))
 	case cmdChangeVoiceModelDelYes:
@@ -184,7 +187,7 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 	model, err := c.storage.GetModelFromDB(ctx, pl.UserID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "No models found."
-		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+		res.InlineMarkup.AddKeyboardButton("« New »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
 		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	} else if err != nil {
@@ -196,12 +199,13 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 		res.InlineMarkup.AddKeyboardRow()
 		if model.IsOwner {
 			res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdChangeVoiceModelDelAsk, experimentID, model.ID))
-			res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceAccessAdd, experimentID, model.ID))
+			if pl.IsPrivate {
+				res.InlineMarkup.AddKeyboardButton("Share", commandf(c, cmdChangeVoiceAccessAdd, experimentID, model.ID))
+			}
 			res.InlineMarkup.AddKeyboardRow()
 		}
-		// res.InlineMarkup.AddKeyboardRow()
 		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
-		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+		res.InlineMarkup.AddKeyboardButton("« New »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
 		res.InlineMarkup.AddKeyboardButton("Select", commandf(c, cmdChangeVoiceSetModel, experimentID, model.ID))
 	}
 	pl.ResultChan <- res
@@ -343,8 +347,47 @@ func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload
 		os.MkdirAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID)), os.ModePerm)
 		os.Rename(downloadedFile.Path, filepath.Join(c.pathDatasets, fmt.Sprint(modelID), filepath.Base(downloadedFile.Path)))
 		pl.ResultChan <- Result{
-			Text:  _es(fmt.Sprintf("%s has been imported!", downloadedFile.Name)),
+			Text:  _es(fmt.Sprintf("<b>%s</b> has been imported!", downloadedFile.Name)),
 			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
+		}
+	}
+}
+
+func (c *ChangeVoiceCommand) addAccessStart(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	res := Result{
+		Text:  "Select the contact with whom you would like to share the selected model. Use the button below the keyboard.",
+		State: func(ctx context.Context, pl Payload) { c.addAccessUser(ctx, pl, experimentID, modelID) },
+	}
+	res.ReplyMarkup.AddRequestUserButton()
+	res.ReplyMarkup.AddKeyboardRow()
+	res.ReplyMarkup.AddButton("Close")
+	pl.ResultChan <- res
+}
+
+func (c *ChangeVoiceCommand) addAccessUser(ctx context.Context, pl Payload, experimentID int64, modelID int64) {
+	if pl.Command == "Close" {
+		res := Result{Text: "Done!"}
+		res.RemoveMarkup.RemoveDefault()
+		pl.ResultChan <- res
+		return
+	}
+
+	accessUserID, err := strconv.Atoi(pl.Command)
+	if err != nil {
+		pl.ResultChan <- Result{
+			Text:  "You need to select the contact with button below.",
+			State: func(ctx context.Context, pl Payload) { c.addAccessUser(ctx, pl, experimentID, modelID) },
+			Error: err,
+		}
+		return
+	}
+
+	_, err = c.storage.InsertNewAccessIntoDB(ctx, pl.UserID, modelID, int64(accessUserID))
+	if err != nil {
+		pl.ResultChan <- Result{
+			Text:  "There is something wrong, please try again.",
+			State: func(ctx context.Context, pl Payload) { c.addAccessUser(ctx, pl, experimentID, modelID) },
+			Error: err,
 		}
 	}
 }
