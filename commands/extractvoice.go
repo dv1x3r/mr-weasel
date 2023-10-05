@@ -100,7 +100,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	err := c.separator.Run(ctx, downloadedFile)
+	resFiles, err := c.separator.Run(ctx, downloadedFile)
 	if err != nil {
 		res = Result{}
 		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
@@ -115,18 +115,10 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	res.InlineMarkup.AddKeyboardButton("Done!", "-")
 	pl.ResultChan <- res
 
-	baseName := strings.TrimSuffix(filepath.Base(downloadedFile.Path), filepath.Ext(downloadedFile.Name))
-
-	musicName := "Instrumental_" + downloadedFile.Name
-	musicPath := filepath.Join(c.separator.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.separator.Model))
-
-	voiceName := "Vocals_" + downloadedFile.Name
-	voicePath := filepath.Join(c.separator.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.separator.Model))
-
 	pl.ResultChan <- Result{
 		Audio: map[string]string{
-			musicName: musicPath,
-			voiceName: voicePath,
+			resFiles.MusicName: resFiles.MusicPath,
+			resFiles.VoiceName: resFiles.VoicePath,
 		},
 	}
 }
