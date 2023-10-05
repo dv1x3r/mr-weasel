@@ -115,8 +115,8 @@ func (c *ChangeVoiceCommand) formatExperimentDetails(experiment st.RvcExperiment
 	} else {
 		str += fmt.Sprintf("🗣️ <b>Model:</b> 🚫 Not Selected\n")
 	}
-	if experiment.AudioSourceID.Valid {
-		audioFile, _ := utils.GetDownloadedFile(experiment.AudioSourceID.String)
+	if experiment.Audio.Valid {
+		audioFile, _ := utils.GetDownloadedFile(experiment.Audio.String)
 		if experiment.SeparateUVR.Bool {
 			str += fmt.Sprintf("🎺 <b>Audio with music:</b> %s\n", _es(audioFile.Name))
 		} else {
@@ -210,13 +210,7 @@ func (c *ChangeVoiceCommand) setExperimentAudioSource(ctx context.Context, pl Pa
 
 	downloadedFile, err := utils.Download(ctx, pl.FileURL, pl.Command)
 	if errors.Is(err, context.Canceled) {
-		res = Result{
-			Text:  "Download cancelled, you can send another audio.",
-			State: func(ctx context.Context, pl Payload) { c.setExperimentAudioSource(ctx, pl, experimentID) },
-			Error: err,
-		}
-		res.InlineMarkup.AddKeyboardRow()
-		pl.ResultChan <- res
+		c.showExperimentDetails(context.WithoutCancel(ctx), pl, experimentID)
 	} else if err != nil {
 		res = Result{
 			Text:  "Whoops, download failed, try again :c",
@@ -226,7 +220,7 @@ func (c *ChangeVoiceCommand) setExperimentAudioSource(ctx context.Context, pl Pa
 		res.InlineMarkup.AddKeyboardRow()
 		pl.ResultChan <- res
 	} else {
-		err := c.storage.SetExperimentAudioSourceInDB(ctx, pl.UserID, experimentID, downloadedFile.ID)
+		err := c.storage.SetExperimentAudioInDB(ctx, pl.UserID, experimentID, downloadedFile.ID)
 		if err != nil {
 			pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 		} else {
@@ -390,10 +384,7 @@ func (c *ChangeVoiceCommand) deleteModelConfirm(ctx context.Context, pl Payload,
 		res.Text, res.Error = "Model not found.", err
 	} else {
 		res.Text = "Model has been successfully deleted!"
-		os.RemoveAll(filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID)))          // delete datasets folder
-		os.RemoveAll(filepath.Join(c.changer.PathLogs, fmt.Sprint(modelID)))              // delete logs folder
-		os.Remove(filepath.Join(c.changer.PathWeights, fmt.Sprintf("%d.pth", modelID)))   // delete model weights
-		os.Remove(filepath.Join(c.changer.PathWeights, fmt.Sprintf("%d.index", modelID))) // delete model index
+		c.changer.DeleteAll(modelID)
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
 	pl.ResultChan <- res
@@ -433,7 +424,7 @@ func (c *ChangeVoiceCommand) startProcessing(ctx context.Context, pl Payload, ex
 
 func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, experimentID int64) {
 	res := Result{}
-	res.InlineMarkup.AddKeyboardButton("Python goes brrr...", "-")
+	res.InlineMarkup.AddKeyboardButton("Starting...", "-")
 	res.InlineMarkup.AddKeyboardRow()
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
@@ -445,12 +436,31 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 		return
 	}
 
-	fmt.Println(experiment)
+	if experiment.SeparateUVR.Bool {
+		audioFile, err := utils.GetDownloadedFile(experiment.Audio.String)
+		if err != nil {
+			c.showExperimentDetails(ctx, pl, experimentID)
+			pl.ResultChan <- Result{Text: "There is a problem with audio file, please try to reupload.", Error: err}
+			return
+		}
 
-	// 1. Check if .pth and .index are there
-	// 2. If not, then train
-	// 3. Check if vocals are prepared
-	// 4. If not, then prepare
-	// 5.
+		// c.separator.CheckIfExists(audioFile)
+
+		res = Result{}
+		res.InlineMarkup.AddKeyboardButton("Splitting audio...", "-")
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
+		pl.ResultChan <- res
+
+		_, err = c.separator.Run(ctx, audioFile)
+		if errors.Is(err, context.Canceled) {
+			c.showExperimentDetails(context.WithoutCancel(ctx), pl, experimentID)
+			return
+		} else if err != nil {
+			c.showExperimentDetails(ctx, pl, experimentID)
+			pl.ResultChan <- Result{Text: "There is a problem with audio separation, please try again.", Error: err}
+			return
+		}
+	}
 
 }

@@ -100,14 +100,16 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	pl.ResultChan <- res
 
 	resFiles, err := c.separator.Run(ctx, downloadedFile)
-	if err != nil {
+	if errors.Is(err, context.Canceled) {
 		res = Result{}
 		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
 		pl.ResultChan <- res
-		if err.Error() != "signal: killed" {
-			pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
-		}
 		return
+	} else if err != nil {
+		res = Result{}
+		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
+		pl.ResultChan <- res
+		pl.ResultChan <- Result{Text: "Whoops, python script failed, try again :c", Error: err}
 	}
 
 	res = Result{}

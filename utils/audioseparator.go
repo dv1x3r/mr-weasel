@@ -17,7 +17,7 @@ type AudioSeparator struct {
 	PathOutput string
 }
 
-type AudioSeparatorResults struct {
+type AudioSeparatorResult struct {
 	MusicName string
 	MusicPath string
 	VoiceName string
@@ -44,7 +44,7 @@ func NewAudioSeparator() *AudioSeparator {
 	}
 }
 
-func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSeparatorResults, error) {
+func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSeparatorResult, error) {
 	var cmd *exec.Cmd
 
 	// "UVR-MDX-NET-Voc_FT" best for vocal
@@ -73,13 +73,15 @@ func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSep
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
 	err := cmd.Run()
-	if err != nil {
-		return AudioSeparatorResults{}, err
+	if err != nil && err.Error() == "signal: killed" {
+		return AudioSeparatorResult{}, context.Canceled
+	} else if err != nil {
+		return AudioSeparatorResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
 	}
 
 	baseName := strings.TrimSuffix(filepath.Base(file.Path), filepath.Ext(file.Name))
 
-	res := AudioSeparatorResults{
+	res := AudioSeparatorResult{
 		MusicName: fmt.Sprintf("Instrumental_%s", file.Name),
 		MusicPath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.Model)),
 		VoiceName: fmt.Sprintf("Vocals_%s", file.Name),

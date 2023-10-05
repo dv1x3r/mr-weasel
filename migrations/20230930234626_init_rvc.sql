@@ -16,9 +16,7 @@ create table rvc_experiment (
     id integer primary key,
     user_id integer not null,
     model_id integer references rvc_model(id) on delete set null,
-    audio_source_id text,
-    audio_voice_file text,
-    audio_music_file text,
+    audio text,
     separate_uvr integer not null default 0,
     transpose integer not null default 0
 ) strict;

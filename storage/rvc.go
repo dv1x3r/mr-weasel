@@ -16,13 +16,11 @@ func NewRvcStorage(db *sqlx.DB) *RvcStorage {
 }
 
 type RvcExperimentDetails struct {
-	UserID         int64          `db:"user_id"`
-	ModelName      sql.NullString `db:"model_name"`
-	AudioSourceID  sql.NullString `db:"audio_source_id"`
-	AudioVoiceFile sql.NullString `db:"audio_voice_file"`
-	AudioMusicFile sql.NullString `db:"audio_music_file"`
-	SeparateUVR    sql.NullBool   `db:"separate_uvr"`
-	Transpose      sql.NullInt64  `db:"transpose"`
+	UserID      int64          `db:"user_id"`
+	ModelName   sql.NullString `db:"model_name"`
+	Audio       sql.NullString `db:"audio"`
+	SeparateUVR sql.NullBool   `db:"separate_uvr"`
+	Transpose   sql.NullInt64  `db:"transpose"`
 }
 
 func (s *RvcStorage) InsertNewExperimentIntoDB(ctx context.Context, userID int64) (int64, error) {
@@ -40,9 +38,7 @@ func (s *RvcStorage) GetExperimentDetailsFromDB(ctx context.Context, userID int6
 		select
 			e.user_id,
 			m.name as model_name,
-			e.audio_source_id,
-			e.audio_voice_file,
-			e.audio_music_file,
+			e.audio,
 			e.separate_uvr,
 			e.transpose
 		from rvc_experiment e
@@ -71,15 +67,9 @@ func (s *RvcStorage) SetExperimentModelInDB(ctx context.Context, userID int64, e
 	return err
 }
 
-func (s *RvcStorage) SetExperimentAudioSourceInDB(ctx context.Context, userID int64, experimentID int64, audioSourceID string) error {
-	stmt := `update rvc_experiment set audio_source_id = ? where user_id = ? and id = ?;`
-	_, err := s.db.ExecContext(ctx, stmt, audioSourceID, userID, experimentID)
-	return err
-}
-
-func (s *RvcStorage) SetExperimentAudioPathInDB(ctx context.Context, userID int64, experimentID int64, audioVoicePath sql.NullString, audioMusicPath sql.NullString) error {
-	stmt := `update rvc_experiment set audio_voice_path = ?, audio_music_path = ? where user_id = ? and id = ?;`
-	_, err := s.db.ExecContext(ctx, stmt, audioVoicePath, audioMusicPath, userID, experimentID)
+func (s *RvcStorage) SetExperimentAudioInDB(ctx context.Context, userID int64, experimentID int64, audio string) error {
+	stmt := `update rvc_experiment set audio = ? where user_id = ? and id = ?;`
+	_, err := s.db.ExecContext(ctx, stmt, audio, userID, experimentID)
 	return err
 }
 
