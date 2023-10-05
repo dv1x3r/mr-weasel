@@ -16,7 +16,9 @@ func NewRvcStorage(db *sqlx.DB) *RvcStorage {
 }
 
 type RvcExperimentDetails struct {
+	ID          int64          `db:"id"`
 	UserID      int64          `db:"user_id"`
+	ModelID     sql.NullInt64  `db:"model_id"`
 	ModelName   sql.NullString `db:"model_name"`
 	Audio       sql.NullString `db:"audio"`
 	SeparateUVR sql.NullBool   `db:"separate_uvr"`
@@ -36,7 +38,9 @@ func (s *RvcStorage) GetExperimentDetailsFromDB(ctx context.Context, userID int6
 	var experiment RvcExperimentDetails
 	stmt := `
 		select
+			e.id,
 			e.user_id,
+			e.model_id,
 			m.name as model_name,
 			e.audio,
 			e.separate_uvr,

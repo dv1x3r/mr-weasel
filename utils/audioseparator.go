@@ -10,6 +10,9 @@ import (
 	"strings"
 )
 
+// "UVR-MDX-NET-Voc_FT" best for vocal
+//"UVR-MDX-NET-Inst_HQ_3" best for music
+
 type AudioSeparator struct {
 	Mode       string
 	Model      string
@@ -46,10 +49,23 @@ func NewAudioSeparator() *AudioSeparator {
 }
 
 func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSeparatorResult, error) {
-	var cmd *exec.Cmd
+	baseName := strings.TrimSuffix(filepath.Base(file.Path), filepath.Ext(file.Name))
+	res := AudioSeparatorResult{
+		MusicName: fmt.Sprintf("Instrumental_%s", file.Name),
+		MusicPath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.Model)),
+		VoiceName: fmt.Sprintf("Vocals_%s", file.Name),
+		VoicePath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.Model)),
+	}
 
-	// "UVR-MDX-NET-Voc_FT" best for vocal
-	//"UVR-MDX-NET-Inst_HQ_3" best for music
+	_, err1 := os.Stat(res.MusicPath)
+	_, err2 := os.Stat(res.VoicePath)
+
+	exists := errors.Join(err1, err2) == nil
+	if exists {
+		return res, nil
+	}
+
+	var cmd *exec.Cmd
 
 	switch c.Mode {
 	case "CUDA":
@@ -80,23 +96,5 @@ func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSep
 		return AudioSeparatorResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
 	}
 
-	baseName := strings.TrimSuffix(filepath.Base(file.Path), filepath.Ext(file.Name))
-
-	res := AudioSeparatorResult{
-		MusicName: fmt.Sprintf("Instrumental_%s", file.Name),
-		MusicPath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.Model)),
-		VoiceName: fmt.Sprintf("Vocals_%s", file.Name),
-		VoicePath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.Model)),
-	}
-
 	return res, nil
-}
-
-func (c *AudioSeparator) Exists(file DownloadedFile) bool {
-	baseName := strings.TrimSuffix(filepath.Base(file.Path), filepath.Ext(file.Name))
-	musicPath := filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.Model))
-	voicePath := filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.Model))
-	_, err1 := os.Stat(musicPath)
-	_, err2 := os.Stat(voicePath)
-	return errors.Join(err1, err2) == nil
 }

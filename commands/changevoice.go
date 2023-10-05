@@ -168,7 +168,7 @@ func (c *ChangeVoiceCommand) showModelDetails(ctx context.Context, pl Payload, e
 	model, err := c.storage.GetModelFromDB(ctx, pl.UserID, offset)
 	if errors.Is(err, sql.ErrNoRows) {
 		res.Text = "No models found."
-		res.InlineMarkup.AddKeyboardButton("« New »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
+		res.InlineMarkup.AddKeyboardButton("« New Model »", commandf(c, cmdChangeVoiceModelAdd, experimentID))
 		res.InlineMarkup.AddKeyboardRow()
 		res.InlineMarkup.AddKeyboardButton("« Back", commandf(c, cmdChangeVoiceExperimentGet, experimentID))
 	} else if err != nil {
@@ -320,9 +320,9 @@ func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload
 	} else {
 		// Move downloaded file to the datasets directory
 		os.MkdirAll(filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID)), os.ModePerm)
-		os.Rename(downloadedFile.Path, filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID), filepath.Base(downloadedFile.Path)))
+		utils.MoveCrossDevice(downloadedFile.Path, filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID), filepath.Base(downloadedFile.Path)))
 		pl.ResultChan <- Result{
-			Text:  _es(fmt.Sprintf("<b>%s</b> has been imported!", downloadedFile.Name)),
+			Text:  fmt.Sprintf("<b>%s</b> has been imported!", _es(downloadedFile.Name)),
 			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
 		}
 	}
@@ -403,6 +403,15 @@ func (c *ChangeVoiceCommand) deleteAccessConfirm(ctx context.Context, pl Payload
 }
 
 func (c *ChangeVoiceCommand) startProcessing(ctx context.Context, pl Payload, experimentID int64) {
+	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
+	if err != nil {
+		pl.ResultChan <- Result{Text: "There is a problem retrieving experiment date, please try again.", Error: err}
+		return
+	} else if !(experiment.ModelID.Valid && experiment.Audio.Valid) {
+		pl.ResultChan <- Result{Text: "You need to select both model and audio.", Error: err}
+		return
+	}
+
 	res := Result{}
 	res.InlineMarkup.AddKeyboardButton("Queued...", "-")
 	res.InlineMarkup.AddKeyboardRow()
@@ -411,7 +420,7 @@ func (c *ChangeVoiceCommand) startProcessing(ctx context.Context, pl Payload, ex
 
 	if c.queue.Lock(ctx) {
 		defer c.queue.Unlock()
-		c.processExperiment(ctx, pl, experimentID)
+		c.processExperiment(ctx, pl, experiment)
 	} else {
 		res = Result{}
 		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdChangeVoiceStart, experimentID))
@@ -422,46 +431,77 @@ func (c *ChangeVoiceCommand) startProcessing(ctx context.Context, pl Payload, ex
 	}
 }
 
-func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, experimentID int64) {
+func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, experiment st.RvcExperimentDetails) {
 	res := Result{}
 	res.InlineMarkup.AddKeyboardButton("Starting...", "-")
 	res.InlineMarkup.AddKeyboardRow()
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	experiment, err := c.storage.GetExperimentDetailsFromDB(ctx, pl.UserID, experimentID)
-	if err != nil {
-		c.showExperimentDetails(ctx, pl, experimentID)
-		pl.ResultChan <- Result{Text: "There is a problem retrieving experiment date, please try again.", Error: err}
-		return
-	}
-
 	audioFile, err := utils.GetDownloadedFile(experiment.Audio.String)
 	if err != nil {
-		c.showExperimentDetails(ctx, pl, experimentID)
+		c.showExperimentDetails(ctx, pl, experiment.ID)
 		pl.ResultChan <- Result{Text: "There is a problem with audio file, please try to reupload.", Error: err}
 		return
 	}
 
-	if experiment.SeparateUVR.Bool && !c.separator.Exists(audioFile) {
+	var uvrFiles utils.AudioSeparatorResult
+
+	if experiment.SeparateUVR.Bool {
 		res = Result{}
 		res.InlineMarkup.AddKeyboardButton("Splitting audio...", "-")
 		res.InlineMarkup.AddKeyboardRow()
 		res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 		pl.ResultChan <- res
 
-		_, err = c.separator.Run(ctx, audioFile)
+		uvrFiles, err = c.separator.Run(ctx, audioFile)
 		if errors.Is(err, context.Canceled) {
-			c.showExperimentDetails(context.WithoutCancel(ctx), pl, experimentID)
+			c.showExperimentDetails(context.WithoutCancel(ctx), pl, experiment.ID)
 			return
 		} else if err != nil {
-			c.showExperimentDetails(ctx, pl, experimentID)
+			c.showExperimentDetails(ctx, pl, experiment.ID)
 			pl.ResultChan <- Result{Text: "There is a problem with audio separation, please try again.", Error: err}
 			return
 		}
 	}
 
-	c.showExperimentDetails(ctx, pl, experimentID)
-	pl.ResultChan <- Result{Text: "Looks fine to me."}
+	if !c.changer.IsTrained(experiment.ModelID.Int64) {
+		res = Result{}
+		res.InlineMarkup.AddKeyboardButton("Training new model...", "-")
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
+		pl.ResultChan <- res
 
+		err = c.changer.RunTrain(ctx, experiment.ModelID.Int64)
+		if errors.Is(err, context.Canceled) {
+			c.showExperimentDetails(context.WithoutCancel(ctx), pl, experiment.ID)
+			return
+		} else if err != nil {
+			c.showExperimentDetails(ctx, pl, experiment.ID)
+			pl.ResultChan <- Result{Text: "There is a problem with model training, please try again.", Error: err}
+			return
+		}
+	}
+
+	inferFile, err := c.changer.RunInfer(ctx, experiment, uvrFiles)
+	if errors.Is(err, context.Canceled) {
+		c.showExperimentDetails(context.WithoutCancel(ctx), pl, experiment.ID)
+		return
+	} else if err != nil {
+		c.showExperimentDetails(ctx, pl, experiment.ID)
+		pl.ResultChan <- Result{Text: "There is a problem with model infer, please try again.", Error: err}
+		return
+	}
+
+	if experiment.SeparateUVR.Bool {
+		c.showExperimentDetails(ctx, pl, experiment.ID)
+		pl.ResultChan <- Result{Audio: map[string]string{
+			uvrFiles.MusicName: uvrFiles.MusicPath,
+			uvrFiles.VoiceName: uvrFiles.VoicePath,
+			inferFile.Name:     inferFile.Path,
+		}}
+	} else {
+		c.showExperimentDetails(ctx, pl, experiment.ID)
+		pl.ResultChan <- Result{Audio: map[string]string{inferFile.Name: inferFile.Path}}
+	}
 }
