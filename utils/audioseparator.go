@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -89,4 +90,13 @@ func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSep
 	}
 
 	return res, nil
+}
+
+func (c *AudioSeparator) Exists(file DownloadedFile) bool {
+	baseName := strings.TrimSuffix(filepath.Base(file.Path), filepath.Ext(file.Name))
+	musicPath := filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.Model))
+	voicePath := filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.Model))
+	_, err1 := os.Stat(musicPath)
+	_, err2 := os.Stat(voicePath)
+	return errors.Join(err1, err2) == nil
 }

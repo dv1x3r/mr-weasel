@@ -436,16 +436,14 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 		return
 	}
 
-	if experiment.SeparateUVR.Bool {
-		audioFile, err := utils.GetDownloadedFile(experiment.Audio.String)
-		if err != nil {
-			c.showExperimentDetails(ctx, pl, experimentID)
-			pl.ResultChan <- Result{Text: "There is a problem with audio file, please try to reupload.", Error: err}
-			return
-		}
+	audioFile, err := utils.GetDownloadedFile(experiment.Audio.String)
+	if err != nil {
+		c.showExperimentDetails(ctx, pl, experimentID)
+		pl.ResultChan <- Result{Text: "There is a problem with audio file, please try to reupload.", Error: err}
+		return
+	}
 
-		// c.separator.CheckIfExists(audioFile)
-
+	if experiment.SeparateUVR.Bool && !c.separator.Exists(audioFile) {
 		res = Result{}
 		res.InlineMarkup.AddKeyboardButton("Splitting audio...", "-")
 		res.InlineMarkup.AddKeyboardRow()
@@ -462,5 +460,8 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 			return
 		}
 	}
+
+	c.showExperimentDetails(ctx, pl, experimentID)
+	pl.ResultChan <- Result{Text: "Looks fine to me."}
 
 }
