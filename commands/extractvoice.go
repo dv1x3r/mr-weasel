@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -13,31 +11,12 @@ import (
 )
 
 type ExtractVoiceCommand struct {
-	queue      *utils.Queue
-	mode       string
-	pathCLI    string
-	pathModels string
-	pathOutput string
+	queue     *utils.Queue
+	separator *utils.AudioSeparator
 }
 
-func NewExtractVoiceCommand(queue *utils.Queue) *ExtractVoiceCommand {
-	if _, err := exec.LookPath("nvidia-smi"); err == nil {
-		return &ExtractVoiceCommand{
-			queue:      queue,
-			mode:       "CUDA",
-			pathCLI:    filepath.Join(utils.GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
-			pathModels: filepath.Join(utils.GetExecutablePath(), "audio-separator", "models"),
-			pathOutput: utils.GetDownloadFolderPath(),
-		}
-	} else {
-		return &ExtractVoiceCommand{
-			queue:      queue,
-			mode:       "CPU",
-			pathCLI:    filepath.Join(utils.GetExecutablePath(), "audio-separator", "bin", "audio-separator"),
-			pathModels: filepath.Join(utils.GetExecutablePath(), "audio-separator", "models"),
-			pathOutput: utils.GetDownloadFolderPath(),
-		}
-	}
+func NewExtractVoiceCommand(queue *utils.Queue, separator *utils.AudioSeparator) *ExtractVoiceCommand {
+	return &ExtractVoiceCommand{queue: queue, separator: separator}
 }
 
 func (ExtractVoiceCommand) Prefix() string {
@@ -80,7 +59,7 @@ func (c *ExtractVoiceCommand) downloadSong(ctx context.Context, pl Payload) {
 		pl.ResultChan <- res
 	} else {
 		res = Result{Text: fmt.Sprintf("📂 %s\n", _es(downloadedFile.Name))}
-		res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.mode), commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
+		res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("Start Processing %s", c.separator.Mode), commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
 		pl.ResultChan <- res
 	}
 }
@@ -121,34 +100,7 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	res.InlineMarkup.AddKeyboardButton("Cancel", cancelf(ctx))
 	pl.ResultChan <- res
 
-	model := "UVR-MDX-NET-Voc_FT" // best for vocal
-	// model := "UVR-MDX-NET-Inst_HQ_3" // best for music
-
-	var cmd *exec.Cmd
-
-	switch c.mode {
-	case "CUDA":
-		cmd = exec.CommandContext(ctx, c.pathCLI, downloadedFile.Path,
-			"--model_name", model,
-			"--model_file_dir", c.pathModels,
-			"--output_dir", c.pathOutput,
-			"--output_format=MP3",
-			"--log_level=DEBUG",
-			"--use_cuda",
-		)
-	default:
-		cmd = exec.CommandContext(ctx, c.pathCLI, downloadedFile.Path,
-			"--model_name", model,
-			"--model_file_dir", c.pathModels,
-			"--output_dir", c.pathOutput,
-			"--output_format=MP3",
-			"--log_level=DEBUG",
-		)
-	}
-
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-
-	err := cmd.Run()
+	err := c.separator.Run(ctx, downloadedFile)
 	if err != nil {
 		res = Result{}
 		res.InlineMarkup.AddKeyboardButton("Retry", commandf(c, cmdExtractVoiceStart, downloadedFile.ID))
@@ -166,10 +118,10 @@ func (c *ExtractVoiceCommand) processFile(ctx context.Context, pl Payload, downl
 	baseName := strings.TrimSuffix(filepath.Base(downloadedFile.Path), filepath.Ext(downloadedFile.Name))
 
 	musicName := "Instrumental_" + downloadedFile.Name
-	musicPath := filepath.Join(c.pathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, model))
+	musicPath := filepath.Join(c.separator.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.separator.Model))
 
 	voiceName := "Vocals_" + downloadedFile.Name
-	voicePath := filepath.Join(c.pathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, model))
+	voicePath := filepath.Join(c.separator.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.separator.Model))
 
 	pl.ResultChan <- Result{
 		Audio: map[string]string{

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 
@@ -15,42 +14,18 @@ import (
 )
 
 type ChangeVoiceCommand struct {
-	storage      *st.RvcStorage
-	queue        *utils.Queue
-	mode         string
-	pathPython   string
-	pathInferCLI string
-	pathTrainCLI string
-	pathDatasets string
-	pathWeights  string
-	pathLogs     string
+	storage   *st.RvcStorage
+	queue     *utils.Queue
+	separator *utils.AudioSeparator
+	changer   *utils.VoiceChanger
 }
 
-func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue) *ChangeVoiceCommand {
-	if _, err := exec.LookPath("nvidia-smi"); err == nil {
-		return &ChangeVoiceCommand{
-			storage:      storage,
-			queue:        queue,
-			mode:         "CUDA",
-			pathPython:   "/mnt/d/rvc-project/.venv/Scripts/python.exe",
-			pathInferCLI: "/mnt/d/rvc-project/infer-cli.py",
-			pathTrainCLI: "/mnt/d/rvc-project/train-cli.py",
-			pathDatasets: "/mnt/d/rvc-project/assets/datasets",
-			pathWeights:  "/mnt/d/rvc-project/assets/weights",
-			pathLogs:     "/mnt/d/rvc-project/logs",
-		}
-	} else {
-		return &ChangeVoiceCommand{
-			storage:      storage,
-			queue:        queue,
-			mode:         "CPU",
-			pathPython:   filepath.Join(utils.GetExecutablePath(), "rvc-project", ".venv", "bin", "python"),
-			pathInferCLI: filepath.Join(utils.GetExecutablePath(), "rvc-project", "infer-cli.py"),
-			pathTrainCLI: filepath.Join(utils.GetExecutablePath(), "rvc-project", "train-cli.py"),
-			pathDatasets: filepath.Join(utils.GetExecutablePath(), "rvc-project", "assets", "datasets"),
-			pathWeights:  filepath.Join(utils.GetExecutablePath(), "rvc-project", "assets", "weights"),
-			pathLogs:     filepath.Join(utils.GetExecutablePath(), "rvc-project", "logs"),
-		}
+func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue, separator *utils.AudioSeparator, changer *utils.VoiceChanger) *ChangeVoiceCommand {
+	return &ChangeVoiceCommand{
+		storage:   storage,
+		queue:     queue,
+		separator: separator,
+		changer:   changer,
 	}
 }
 
@@ -350,8 +325,8 @@ func (c *ChangeVoiceCommand) addModelDatasetFile(ctx context.Context, pl Payload
 		}
 	} else {
 		// Move downloaded file to the datasets directory
-		os.MkdirAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID)), os.ModePerm)
-		os.Rename(downloadedFile.Path, filepath.Join(c.pathDatasets, fmt.Sprint(modelID), filepath.Base(downloadedFile.Path)))
+		os.MkdirAll(filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID)), os.ModePerm)
+		os.Rename(downloadedFile.Path, filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID), filepath.Base(downloadedFile.Path)))
 		pl.ResultChan <- Result{
 			Text:  _es(fmt.Sprintf("<b>%s</b> has been imported!", downloadedFile.Name)),
 			State: func(ctx context.Context, pl Payload) { c.addModelDatasetFile(ctx, pl, experimentID, modelID) },
@@ -415,10 +390,10 @@ func (c *ChangeVoiceCommand) deleteModelConfirm(ctx context.Context, pl Payload,
 		res.Text, res.Error = "Model not found.", err
 	} else {
 		res.Text = "Model has been successfully deleted!"
-		os.RemoveAll(filepath.Join(c.pathDatasets, fmt.Sprint(modelID)))          // delete datasets folder
-		os.RemoveAll(filepath.Join(c.pathLogs, fmt.Sprint(modelID)))              // delete logs folder
-		os.Remove(filepath.Join(c.pathWeights, fmt.Sprintf("%d.pth", modelID)))   // delete model weights
-		os.Remove(filepath.Join(c.pathWeights, fmt.Sprintf("%d.index", modelID))) // delete model index
+		os.RemoveAll(filepath.Join(c.changer.PathDatasets, fmt.Sprint(modelID)))          // delete datasets folder
+		os.RemoveAll(filepath.Join(c.changer.PathLogs, fmt.Sprint(modelID)))              // delete logs folder
+		os.Remove(filepath.Join(c.changer.PathWeights, fmt.Sprintf("%d.pth", modelID)))   // delete model weights
+		os.Remove(filepath.Join(c.changer.PathWeights, fmt.Sprintf("%d.index", modelID))) // delete model index
 	}
 	res.InlineMarkup.AddKeyboardButton("« Back to my models", commandf(c, cmdChangeVoiceModelGet, experimentID))
 	pl.ResultChan <- res
