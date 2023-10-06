@@ -512,9 +512,9 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 			c.showExperimentDetails(ctx, pl, experiment.ID)
 			pl.ResultChan <- Result{
 				Audio: map[string]string{
-					uvrFiles.MusicName: uvrFiles.MusicPath,
-					uvrFiles.VoiceName: uvrFiles.VoicePath,
-					inferFile.Name:     inferFile.Path,
+					// uvrFiles.MusicName: uvrFiles.MusicPath,
+					// uvrFiles.VoiceName: uvrFiles.VoicePath,
+					inferFile.Name: inferFile.Path,
 				},
 				Error: err,
 			}
@@ -522,10 +522,10 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 			c.showExperimentDetails(ctx, pl, experiment.ID)
 			pl.ResultChan <- Result{
 				Audio: map[string]string{
-					uvrFiles.MusicName: uvrFiles.MusicPath,
-					uvrFiles.VoiceName: uvrFiles.VoicePath,
-					inferFile.Name:     inferFile.Path,
-					mixFile.Name:       mixFile.Path,
+					// uvrFiles.MusicName:     uvrFiles.MusicPath,
+					// uvrFiles.VoiceName:     uvrFiles.VoicePath,
+					inferFile.Name: inferFile.Path,
+					mixFile.Name:   mixFile.Path,
 				},
 			}
 		}

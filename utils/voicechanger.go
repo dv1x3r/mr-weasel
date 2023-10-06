@@ -85,8 +85,8 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, experiment storage.RvcExpe
 			"--gpu_rmvpe", "0-0",
 			"--gpu", "0",
 			"--batch_size", "8",
-			"--total_epoch", "200",
-			"--save_epoch", "20",
+			"--total_epoch", "150",
+			"--save_epoch", "10",
 			"--save_latest", "1",
 			"--cache_gpu", "0",
 			"--save_every_weights", "0",
@@ -102,7 +102,7 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, experiment storage.RvcExpe
 			"--gpu", "",
 			"--batch_size", "1",
 			"--total_epoch", "10",
-			"--save_epoch", "5",
+			"--save_epoch", "2",
 			"--save_latest", "1",
 			"--cache_gpu", "0",
 			"--save_every_weights", "0",
@@ -138,7 +138,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 
 	baseName := strings.TrimSuffix(filepath.Base(audioFile.Name), filepath.Ext(audioFile.Name))
 	outputNameWav := fmt.Sprintf("%s.%s.wav", experiment.ModelName.String, regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(baseName, ""))
-	outputNameMp3 := fmt.Sprintf("Vocals2_%s.%s.mp3", experiment.ModelName.String, baseName)
+	outputNameMp3 := fmt.Sprintf("%s.%s.mp3", experiment.ModelName.String, baseName)
 
 	CopyCrossDevice(voicePath, filepath.Join(vc.PathOutput, inputName))
 	defer os.Remove(filepath.Join(vc.PathOutput, inputName))
