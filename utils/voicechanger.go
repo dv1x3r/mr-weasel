@@ -138,7 +138,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 
 	baseName := strings.TrimSuffix(filepath.Base(audioFile.Name), filepath.Ext(audioFile.Name))
 	outputNameWav := fmt.Sprintf("%s.%s.wav", experiment.ModelName.String, regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(baseName, ""))
-	outputNameMp3 := fmt.Sprintf("Vocals_%s.%s.mp3", experiment.ModelName.String, baseName)
+	outputNameMp3 := fmt.Sprintf("Vocals2_%s.%s.mp3", experiment.ModelName.String, baseName)
 
 	CopyCrossDevice(voicePath, filepath.Join(vc.PathOutput, inputName))
 	defer os.Remove(filepath.Join(vc.PathOutput, inputName))
@@ -224,7 +224,7 @@ func (vc *VoiceChanger) RunMix(ctx context.Context, musicPath string, voicePath 
 	cmd := exec.CommandContext(ctx, ffmpeg,
 		"-i", musicPath,
 		"-i", voicePath,
-		"-filter_complex", "amix=inputs=2:duration=longest",
+		"-filter_complex", "[0:a]volume=0.7[a1];[1:a]volume=1[a2];[a1][a2]amix=inputs=2:duration=longest",
 		"-b:a", "320k",
 		"-y",
 		filepath.Join(vc.PathOutput, mixNameMp3),
