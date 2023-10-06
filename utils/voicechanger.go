@@ -193,6 +193,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 	cmd = exec.CommandContext(ctx, ffmpeg,
 		"-i", filepath.Join(vc.PathOutput, outputNameWav),
 		"-b:a", "320k",
+		"-filter_complex", "compand=attacks=0:points=-80/-900|-45/-15|-27/-9|0/-7|20/-7:gain=5",
 		"-y",
 		filepath.Join(vc.PathOutput, outputNameMp3),
 	)
@@ -224,7 +225,8 @@ func (vc *VoiceChanger) RunMix(ctx context.Context, musicPath string, voicePath 
 	cmd := exec.CommandContext(ctx, ffmpeg,
 		"-i", musicPath,
 		"-i", voicePath,
-		"-filter_complex", "[0:a]volume=0.5[a1];[1:a]volume=1[a2];[a1][a2]amix=inputs=2:duration=longest",
+		"-filter_complex", "amix=inputs=2:duration=longest",
+		// "-filter_complex", "[0:a]volume=0.5[a1];[1:a]volume=1[a2];[a1][a2]amix=inputs=2:duration=longest",
 		"-b:a", "320k",
 		"-y",
 		filepath.Join(vc.PathOutput, mixNameMp3),
