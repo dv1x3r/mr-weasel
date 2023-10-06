@@ -214,7 +214,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 }
 
 func (vc *VoiceChanger) RunMix(ctx context.Context, musicPath string, voicePath string) (VoiceChangerResult, error) {
-	mixNameMp3 := fmt.Sprintf("Auto_%s", filepath.Base(voicePath))
+	mixNameMp3 := fmt.Sprintf("Mix %s", filepath.Base(voicePath))
 
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {
