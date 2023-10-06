@@ -507,12 +507,28 @@ func (c *ChangeVoiceCommand) processExperiment(ctx context.Context, pl Payload, 
 	}
 
 	if experiment.SeparateUVR.Bool {
-		c.showExperimentDetails(ctx, pl, experiment.ID)
-		pl.ResultChan <- Result{Audio: map[string]string{
-			uvrFiles.MusicName: uvrFiles.MusicPath,
-			uvrFiles.VoiceName: uvrFiles.VoicePath,
-			inferFile.Name:     inferFile.Path,
-		}}
+		mixFile, err := c.changer.RunMix(ctx, uvrFiles.MusicPath, inferFile.Path)
+		if err != nil {
+			c.showExperimentDetails(ctx, pl, experiment.ID)
+			pl.ResultChan <- Result{
+				Audio: map[string]string{
+					uvrFiles.MusicName: uvrFiles.MusicPath,
+					uvrFiles.VoiceName: uvrFiles.VoicePath,
+					inferFile.Name:     inferFile.Path,
+				},
+				Error: err,
+			}
+		} else {
+			c.showExperimentDetails(ctx, pl, experiment.ID)
+			pl.ResultChan <- Result{
+				Audio: map[string]string{
+					uvrFiles.MusicName: uvrFiles.MusicPath,
+					uvrFiles.VoiceName: uvrFiles.VoicePath,
+					inferFile.Name:     inferFile.Path,
+					mixFile.Name:       mixFile.Path,
+				},
+			}
+		}
 	} else {
 		c.showExperimentDetails(ctx, pl, experiment.ID)
 		pl.ResultChan <- Result{Audio: map[string]string{inferFile.Name: inferFile.Path}}

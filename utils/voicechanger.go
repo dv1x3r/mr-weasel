@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"mr-weasel/storage"
@@ -70,7 +71,7 @@ func (vc *VoiceChanger) IsTrained(modelID int64) bool {
 }
 
 func (vc *VoiceChanger) RunTrain(ctx context.Context, experiment storage.RvcExperimentDetails) error {
-	modelFolder := fmt.Sprint(experiment.ModelID)
+	modelFolder := fmt.Sprint(experiment.ModelID.Int64)
 
 	var cmd *exec.Cmd
 	switch vc.Mode {
@@ -132,39 +133,46 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, experiment storage.RvcExpe
 
 func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExperimentDetails, voicePath string) (VoiceChangerResult, error) {
 	audioFile, _ := GetDownloadedFile(experiment.Audio.String)
+	modelFolder := fmt.Sprint(experiment.ModelID.Int64)
+	inputName := regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(filepath.Base(voicePath), "")
+
 	baseName := strings.TrimSuffix(filepath.Base(audioFile.Name), filepath.Ext(audioFile.Name))
-	outputName := fmt.Sprintf("%s.%s.wav", experiment.ModelName.String, baseName)
-	modelFolder := fmt.Sprint(experiment.ModelID)
+	outputNameWav := fmt.Sprintf("%s.%s.wav", experiment.ModelName.String, regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(baseName, ""))
+	outputNameMp3 := fmt.Sprintf("%s.%s.mp3", experiment.ModelName.String, baseName)
+
+	CopyCrossDevice(voicePath, filepath.Join(vc.PathOutput, inputName))
+	defer os.Remove(filepath.Join(vc.PathOutput, inputName))
+	defer os.Remove(filepath.Join(vc.PathOutput, outputNameWav))
 
 	var cmd *exec.Cmd
 	switch vc.Mode {
 	case "CUDA":
 		cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathInferCLI,
-			"--input", voicePath,
-			"--output", filepath.Join("TEMP", outputName),
-			"--model", modelFolder,
+			"--input", filepath.Join("TEMP", inputName),
+			"--output", filepath.Join("TEMP", outputNameWav),
+			"--model", fmt.Sprintf("%s.pth", modelFolder),
 			"--index", filepath.Join("assets", "weights", fmt.Sprintf("%s.index", modelFolder)),
 			"--method", "rmvpe",
-			"--ratio", "0.75",
-			"--transpose", fmt.Sprint(experiment.Transpose),
-			"--filter", "3",
-			"--resample", "0",
-			"--rms", "0.25",
-			"--protect", "0.33",
+			"--transpose", fmt.Sprint(experiment.Transpose.Int64),
+			// "--ratio", "0.75",
+			// "--filter", "3",
+			// "--resample", "0",
+			// "--rms", "0.25",
+			// "--protect", "0.33",
 		)
 	default:
 		cmd = exec.CommandContext(ctx, vc.PathPython, vc.PathInferCLI,
-			"--input", voicePath,
-			"--output", filepath.Join("TEMP", outputName),
-			"--model", modelFolder,
+			"--input", filepath.Join("TEMP", inputName),
+			"--output", filepath.Join("TEMP", outputNameWav),
+			"--model", fmt.Sprintf("%s.pth", modelFolder),
 			"--index", filepath.Join("assets", "weights", fmt.Sprintf("%s.index", modelFolder)),
 			"--method", "pm",
-			"--ratio", "0.75",
-			"--transpose", fmt.Sprint(experiment.Transpose),
-			"--filter", "3",
-			"--resample", "0",
-			"--rms", "0.25",
-			"--protect", "0.33",
+			"--transpose", fmt.Sprint(experiment.Transpose.Int64),
+			// "--ratio", "0.75",
+			// "--filter", "3",
+			// "--resample", "0",
+			// "--rms", "0.25",
+			// "--protect", "0.33",
 		)
 	}
 
@@ -177,11 +185,61 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 		return VoiceChangerResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
 	}
 
-	res := VoiceChangerResult{Name: outputName, Path: filepath.Join(vc.PathOutput, outputName)}
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return VoiceChangerResult{}, err
+	}
+
+	cmd = exec.CommandContext(ctx, ffmpeg,
+		"-i", filepath.Join(vc.PathOutput, outputNameWav),
+		"-b:a", "320k",
+		filepath.Join(vc.PathOutput, outputNameMp3),
+	)
+
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+
+	err = cmd.Run()
+	if err != nil && err.Error() == "signal: killed" {
+		return VoiceChangerResult{}, context.Canceled
+	} else if err != nil {
+		return VoiceChangerResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
+	}
+
+	res := VoiceChangerResult{
+		Name: outputNameMp3,
+		Path: filepath.Join(vc.PathOutput, outputNameMp3),
+	}
 	return res, nil
 }
 
-// TODO:
-// func (vc *VoiceChanger) RunMix(ctx context.Context, experiment storage.RvcExperimentDetails) (VoiceChangerResult, error) {
-// 	return VoiceChangerResult{}, nil
-// }
+func (vc *VoiceChanger) RunMix(ctx context.Context, musicPath string, voicePath string) (VoiceChangerResult, error) {
+	mixNameMp3 := fmt.Sprintf("Mix_%s", filepath.Base(voicePath))
+
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		return VoiceChangerResult{}, err
+	}
+
+	cmd := exec.CommandContext(ctx, ffmpeg,
+		"-i", musicPath,
+		"-i", voicePath,
+		"-filter_complex", "amix=inputs=2:duration=longest",
+		"-b:a", "320k",
+		filepath.Join(vc.PathOutput, mixNameMp3),
+	)
+
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+
+	err = cmd.Run()
+	if err != nil && err.Error() == "signal: killed" {
+		return VoiceChangerResult{}, context.Canceled
+	} else if err != nil {
+		return VoiceChangerResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
+	}
+
+	res := VoiceChangerResult{
+		Name: mixNameMp3,
+		Path: filepath.Join(vc.PathOutput, mixNameMp3),
+	}
+	return res, nil
+}
