@@ -120,7 +120,7 @@ func (vc *VoiceChanger) RunTrain(ctx context.Context, experiment storage.RvcExpe
 
 	// move index to the weights folder, and remove logs
 	MoveCrossDevice(
-		filepath.Join(vc.PathLogs, modelFolder, "added_IVF136_Flat_nprobe_1_3_v2.index"),
+		filepath.Join(vc.PathLogs, modelFolder, "added.index"),
 		filepath.Join(vc.PathWeights, fmt.Sprintf("%s.index", modelFolder)),
 	)
 
