@@ -18,6 +18,7 @@ func (kb *ReplyKeyboardMarkup) AddKeyboardRow() {
 func (kb *ReplyKeyboardMarkup) AddRequestUserButton() {
 	if kb.Keyboard == nil {
 		kb.AddKeyboardRow()
+		kb.OneTimeKeyboard = true
 	}
 	i := len(kb.Keyboard) - 1
 	btn := KeyboardButton{Text: "Select User", RequestUser: &KeyboardButtonRequestUser{RequestID: 0, UserIsBot: new(bool)}}
