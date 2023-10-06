@@ -197,6 +197,11 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
 		}
 
+		if previousResponse.Chat == nil {
+			log.Println("[WARN]", "Chat no longer exists, bot has been kicked!")
+			return
+		}
+
 		if result.Audio != nil {
 			media := []tgclient.InputMedia{}
 
