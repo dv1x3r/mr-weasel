@@ -138,7 +138,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 
 	baseName := strings.TrimSuffix(filepath.Base(audioFile.Name), filepath.Ext(audioFile.Name))
 	outputNameWav := fmt.Sprintf("%s.%s.wav", experiment.ModelName.String, regexp.MustCompile(`[^a-zA-Z0-9 ]+`).ReplaceAllString(baseName, ""))
-	outputNameMp3 := fmt.Sprintf("%s.%s.mp3", experiment.ModelName.String, baseName)
+	outputNameMp3 := fmt.Sprintf("Vocals_%s.%s.mp3", experiment.ModelName.String, baseName)
 
 	CopyCrossDevice(voicePath, filepath.Join(vc.PathOutput, inputName))
 	defer os.Remove(filepath.Join(vc.PathOutput, inputName))
@@ -193,6 +193,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 	cmd = exec.CommandContext(ctx, ffmpeg,
 		"-i", filepath.Join(vc.PathOutput, outputNameWav),
 		"-b:a", "320k",
+		"-y",
 		filepath.Join(vc.PathOutput, outputNameMp3),
 	)
 
@@ -213,7 +214,7 @@ func (vc *VoiceChanger) RunInfer(ctx context.Context, experiment storage.RvcExpe
 }
 
 func (vc *VoiceChanger) RunMix(ctx context.Context, musicPath string, voicePath string) (VoiceChangerResult, error) {
-	mixNameMp3 := fmt.Sprintf("AutoMix_%s", filepath.Base(voicePath))
+	mixNameMp3 := fmt.Sprintf("Auto_%s", filepath.Base(voicePath))
 
 	ffmpeg, err := exec.LookPath("ffmpeg")
 	if err != nil {
@@ -225,6 +226,7 @@ func (vc *VoiceChanger) RunMix(ctx context.Context, musicPath string, voicePath 
 		"-i", voicePath,
 		"-filter_complex", "amix=inputs=2:duration=longest",
 		"-b:a", "320k",
+		"-y",
 		filepath.Join(vc.PathOutput, mixNameMp3),
 	)
 

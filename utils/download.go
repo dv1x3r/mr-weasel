@@ -110,7 +110,7 @@ func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, er
 				return DownloadedFile{}, err
 			}
 
-			cmd := exec.Command(ffmpeg, "-i", filePath, "-b:a", "320k", filePathNew)
+			cmd := exec.Command(ffmpeg, "-i", filePath, "-b:a", "320k", "-y", filePathNew)
 			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
 			err = cmd.Run()
