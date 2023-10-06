@@ -79,6 +79,9 @@ func (m *Manager) Start(ctx context.Context) {
 func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 	const op = "telegram.Manager.processMessage"
 
+	// command has /prefix@bot_username syntax
+	message.Text = strings.TrimSuffix(message.Text, fmt.Sprintf("@%s", m.tgClient.Me.Username))
+
 	execFn, ok := m.getExecuteFunc(message.From.ID, message.Text)
 	if !ok {
 		return

@@ -21,6 +21,7 @@ const apiEndpoint = "https://api.telegram.org/bot%s/%s"
 const apiFileEndpoint = "https://api.telegram.org/file/bot%s/%s"
 
 type Client struct {
+	Me         User
 	httpClient *http.Client
 	token      string
 	debug      bool
@@ -37,6 +38,7 @@ func Connect(token string, debug bool) (*Client, error) {
 	if err != nil {
 		log.Println("[ERROR] Failed to start the bot")
 	} else {
+		client.Me = me
 		log.Printf("[INFO] Logged in as [%s]\n", me.Username)
 	}
 	return client, utils.WrapIfErr(op, err)
