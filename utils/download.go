@@ -103,7 +103,7 @@ func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, er
 
 		if strings.HasSuffix(fileName, ".oga") {
 			fileNameNew := fmt.Sprintf("%s.mp3", strings.TrimSuffix(fileName, ".oga"))
-			filePathNew := fmt.Sprintf("%s.%s", fileID, filepath.Join(filepath.Dir(filePath), fileNameNew))
+			filePathNew := filepath.Join(filepath.Dir(filePath), fmt.Sprintf("%s.%s", fileID, fileNameNew))
 
 			ffmpeg, err := exec.LookPath("ffmpeg")
 			if err != nil {
