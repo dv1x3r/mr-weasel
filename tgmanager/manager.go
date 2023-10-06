@@ -235,7 +235,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = previousResponse.Text
 			}
 
-			if !pl.IsPrivate {
+			if !pl.IsPrivate && result.Text != previousResponse.Text {
 				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
 			}
 
