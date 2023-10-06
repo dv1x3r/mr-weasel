@@ -94,12 +94,39 @@ func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, er
 		}
 		defer file.Close()
 
+		filePath := file.Name()
+
 		_, err = io.Copy(file, res.Body)
+		if err != nil {
+			return DownloadedFile{}, err
+		}
+
+		if strings.HasSuffix(fileName, ".oga") {
+			fileNameNew := fmt.Sprintf("%s.mp3", strings.TrimSuffix(fileName, ".oga"))
+			filePathNew := filepath.Join(filepath.Dir(filePath), fileNameNew)
+
+			ffmpeg, err := exec.LookPath("ffmpeg")
+			if err != nil {
+				return DownloadedFile{}, err
+			}
+
+			cmd := exec.Command(ffmpeg, "-i", filePath, "-b:a", "320k", filePathNew)
+			cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+
+			err = cmd.Run()
+			if err != nil {
+				return DownloadedFile{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
+			}
+
+			os.Remove(filePath)
+			filePath = filePathNew
+			fileName = fileNameNew
+		}
 
 		df := DownloadedFile{
 			ID:   fileID,
 			Name: fileName,
-			Path: file.Name(),
+			Path: filePath,
 		}
 
 		return df, err

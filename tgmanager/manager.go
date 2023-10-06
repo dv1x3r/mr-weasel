@@ -105,6 +105,14 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 		}
 		pl.FileURL = fileURL
 		pl.Command = message.Audio.FileName
+	} else if message.Voice != nil {
+		fileURL, err := m.tgClient.GetFileURL(ctx, tgclient.GetFileConfig{FileID: message.Voice.FileID})
+		if err != nil {
+			log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			return
+		}
+		pl.FileURL = fileURL
+		pl.Command = fmt.Sprintf("%s.oga", message.Voice.FileUniqueID)
 	}
 
 	if message.UserShared != nil {

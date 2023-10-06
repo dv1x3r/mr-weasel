@@ -97,6 +97,8 @@ type Message struct {
 	Entities []MessageEntity `json:"entities,omitempty"`
 	// Optional. Message is an audio file, information about the file.
 	Audio *Audio `json:"audio,omitempty"`
+	// Optional. Message is a voice message, information about the file.
+	Voice *Voice `json:"voice,omitempty"`
 	// Optional. Service message: a user was shared with the bot.
 	UserShared *UserShared `json:"user_shared,omitempty"`
 	// Optional. Inline keyboard attached to the message. login_url buttons are represented as ordinary url buttons.
@@ -152,11 +154,24 @@ type Audio struct {
 	FileName string `json:"file_name,omitempty"`
 	// Optional. MIME type of the file as defined by sender.
 	MimeType string `json:"mime_type,omitempty"`
-	// Optional. File size in bytes. It can be bigger than 2^31 and some programming languages may have difficulty/silent defects in interpreting it.
-	// But it has at most 52 significant bits, so a signed 64-bit integer or double-precision float type are safe for storing this value.
+	// Optional. File size in bytes.
 	FileSize int64 `json:"file_size,omitempty"`
 	// Optional. Thumbnail of the album cover to which the music file belongs.
 	Thumbnail *PhotoSize `json:"thumbnail,omitempty"`
+}
+
+// This object represents a voice note.
+type Voice struct {
+	// Identifier for this file, which can be used to download or reuse the file.
+	FileID string `json:"file_id"`
+	// Unique identifier for this file, which is supposed to be the same over time and for different bots. Can't be used to download or reuse the file.
+	FileUniqueID string `json:"file_unique_id"`
+	// Duration of the audio in seconds as defined by sender.
+	Duration int64 `json:"duration"`
+	// Optional. MIME type of the file as defined by sender.
+	MimeType string `json:"mime_type,omitempty"`
+	// Optional. File size in bytes.
+	FileSize int64 `json:"file_size,omitempty"`
 }
 
 // This object contains information about the user whose identifier was shared with the bot using a KeyboardButtonRequestUser button.
