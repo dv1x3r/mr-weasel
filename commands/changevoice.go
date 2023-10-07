@@ -224,10 +224,10 @@ func (c *ChangeVoiceCommand) setExperimentAudioSource(ctx context.Context, pl Pa
 		if err != nil {
 			pl.ResultChan <- Result{Text: "There is something wrong, please try again.", Error: err}
 		} else {
-			res = Result{Text: "Does it contain music, or voice only?"}
-			res.InlineMarkup.AddKeyboardButton("Music and Voice", commandf(c, cmdChangeVoiceEnableUVR, experimentID))
+			res = Result{Text: "Does it contain music?"}
+			res.InlineMarkup.AddKeyboardButton("Yes", commandf(c, cmdChangeVoiceEnableUVR, experimentID))
 			res.InlineMarkup.AddKeyboardRow()
-			res.InlineMarkup.AddKeyboardButton("Voice only", commandf(c, cmdChangeVoiceDisableUVR, experimentID))
+			res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdChangeVoiceDisableUVR, experimentID))
 			pl.ResultChan <- res
 		}
 	}
