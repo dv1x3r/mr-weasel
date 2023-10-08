@@ -54,7 +54,7 @@ func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSep
 		MusicName: fmt.Sprintf("Instrumental_%s", file.Name),
 		MusicPath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Instrumental)_%s.mp3", baseName, c.Model)),
 		VoiceName: fmt.Sprintf("Vocals_%s", file.Name),
-		VoicePath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals C)_%s.mp3", baseName, c.Model)),
+		VoicePath: filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.Model)),
 	}
 
 	_, err1 := os.Stat(res.MusicPath)
@@ -90,28 +90,6 @@ func (c *AudioSeparator) Run(ctx context.Context, file DownloadedFile) (AudioSep
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 
 	err := cmd.Run()
-	if err != nil && err.Error() == "signal: killed" {
-		return AudioSeparatorResult{}, context.Canceled
-	} else if err != nil {
-		return AudioSeparatorResult{}, fmt.Errorf("%w: %s", err, cmd.Stderr)
-	}
-
-	ffmpeg, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		return AudioSeparatorResult{}, err
-	}
-
-	cmd = exec.CommandContext(ctx, ffmpeg,
-		"-i", filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals)_%s.mp3", baseName, c.Model)),
-		"-filter_complex", "compand=attacks=0:points=-80/-900|-45/-15|-27/-9|0/-7|20/-7:gain=5",
-		"-b:a", "320k",
-		"-y",
-		filepath.Join(c.PathOutput, fmt.Sprintf("%s_(Vocals C)_%s.mp3", baseName, c.Model)),
-	)
-
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-
-	err = cmd.Run()
 	if err != nil && err.Error() == "signal: killed" {
 		return AudioSeparatorResult{}, context.Canceled
 	} else if err != nil {
