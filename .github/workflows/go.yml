@@ -35,24 +35,34 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: self-hosted-teh
+    runs-on: ubuntu-latest
     steps:
-      - name: Stop service
-        run: sudo systemctl stop mr-weasel.service
+      #- name: Stop service
+        #run: sudo systemctl stop mr-weasel.service
         # weasel ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
 
       - name: Download app artifacts
         uses: actions/download-artifact@v3
         with:
           name: build
-          path: ~/app/mr-weasel
+          path: build
 
-      - name: Migrage database
-        working-directory: /home/weasel/app/mr-weasel
-        run: |
-          source .env
-          goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
+      - name: copy file to server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: build/*
+          target: ~/app/mr-weasel
 
-      - name: Restart service
-        run: sudo systemctl start mr-weasel.service
+      #- name: Migrage database
+        #working-directory: /home/weasel/app/mr-weasel
+        #run: |
+          #source .env
+          #goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
+
+      #- name: Restart service
+        #run: sudo systemctl start mr-weasel.service
         # weasel ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
