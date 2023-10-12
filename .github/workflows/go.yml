@@ -44,7 +44,7 @@ jobs:
           name: build
           path: build
 
-      - name: copy file to server
+      - name: Copy app to server
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -55,7 +55,7 @@ jobs:
           target: ~/app/mr-weasel
           strip_components: 1
 
-      - name: Migrage database and Restart service
+      - name: Migrage database and restart service
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
