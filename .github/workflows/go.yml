@@ -61,7 +61,8 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_KEY }}  
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
           script: |
             cd ~/app/mr-weasel
             source .env
