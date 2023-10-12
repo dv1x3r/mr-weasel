@@ -114,19 +114,19 @@ func (c *CarCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func (c *CarCommand) formatCarDetails(car st.CarDetails) string {
-	html := fmt.Sprintf("🚘 <b>Car:</b> %s (%d)\n", car.Name, car.Year)
+	str := fmt.Sprintf("🚘 <b>Car:</b> %s (%d)\n", _es(car.Name), car.Year)
 	if car.Price.Valid {
-		html += fmt.Sprintf("💲 <b>Price:</b> %d€\n", car.Price.Int64)
+		str += fmt.Sprintf("💲 <b>Price:</b> %d€\n", car.Price.Int64)
 	} else {
-		html += fmt.Sprintf("💲 <b>Price:</b> 🚫\n")
+		str += fmt.Sprintf("💲 <b>Price:</b> 🚫\n")
 	}
-	html += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
+	str += fmt.Sprintf("📍 <b>Mileage:</b> %dKm\n", car.Kilometers)
 	if car.Plate.Valid {
-		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> %s\n", car.Plate.String)
+		str += fmt.Sprintf("🧾 <b>Licence Plate:</b> %s\n", _es(car.Plate.String))
 	} else {
-		html += fmt.Sprintf("🧾 <b>Licence Plate:</b> 🚫\n")
+		str += fmt.Sprintf("🧾 <b>Licence Plate:</b> 🚫\n")
 	}
-	return html
+	return str
 }
 
 func (c *CarCommand) showCarDetails(ctx context.Context, pl Payload, carID int64) {
@@ -138,14 +138,14 @@ func (c *CarCommand) showCarDetails(ctx context.Context, pl Payload, carID int64
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatCarDetails(car)
-		res.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
-		res.AddKeyboardButton("Service", commandf(c, cmdCarServiceGet, carID))
-		res.AddKeyboardButton("Lease", commandf(c, cmdCarLeaseGet, carID))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
-		res.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Fuel", commandf(c, cmdCarFuelGet, carID))
+		res.InlineMarkup.AddKeyboardButton("Service", commandf(c, cmdCarServiceGet, carID))
+		res.InlineMarkup.AddKeyboardButton("Lease", commandf(c, cmdCarLeaseGet, carID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Edit Car", commandf(c, cmdCarUpd, carID))
+		res.InlineMarkup.AddKeyboardRow()
 	}
-	res.AddKeyboardButton("« Back to my cars", c.Prefix())
+	res.InlineMarkup.AddKeyboardButton("« Back to my cars", c.Prefix())
 	pl.ResultChan <- res
 }
 
@@ -158,13 +158,13 @@ func (c *CarCommand) showCarList(ctx context.Context, pl Payload) {
 
 	res := Result{Text: "Choose your car from the list below:"}
 	for i, v := range cars {
-		res.AddKeyboardButton(fmt.Sprintf("%s (%d)", v.Name, v.Year), commandf(c, cmdCarGet, v.ID))
+		res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("%s (%d)", v.Name, v.Year), commandf(c, cmdCarGet, v.ID))
 		if (i+1)%2 == 0 {
-			res.AddKeyboardRow()
+			res.InlineMarkup.AddKeyboardRow()
 		}
 	}
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("« New Car »", commandf(c, cmdCarAdd, nil))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("« New Car »", commandf(c, cmdCarAdd, nil))
 	pl.ResultChan <- res
 }
 
@@ -264,16 +264,16 @@ func (c *CarCommand) showCarUpdate(ctx context.Context, pl Payload, carID int64)
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatCarDetails(car)
-		res.AddKeyboardButton("Set Name", commandf(c, cmdCarUpdName, carID))
-		res.AddKeyboardButton("Set Year", commandf(c, cmdCarUpdYear, carID))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Set Plate", commandf(c, cmdCarUpdPlate, carID))
-		res.AddKeyboardButton("Set Price", commandf(c, cmdCarUpdPrice, carID))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
-		res.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Set Name", commandf(c, cmdCarUpdName, carID))
+		res.InlineMarkup.AddKeyboardButton("Set Year", commandf(c, cmdCarUpdYear, carID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Set Plate", commandf(c, cmdCarUpdPlate, carID))
+		res.InlineMarkup.AddKeyboardButton("Set Price", commandf(c, cmdCarUpdPrice, carID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Delete Car", commandf(c, cmdCarDelAsk, carID))
+		res.InlineMarkup.AddKeyboardRow()
 	}
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -317,7 +317,7 @@ func (c *CarCommand) updateCarSaveName(ctx context.Context, pl Payload) {
 	}
 	res := Result{Text: "Car name has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	pl.ResultChan <- res
 }
 
@@ -332,7 +332,7 @@ func (c *CarCommand) updateCarSaveYear(ctx context.Context, pl Payload) {
 	}
 	res := Result{Text: "Car year has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	pl.ResultChan <- res
 }
 
@@ -344,7 +344,7 @@ func (c *CarCommand) updateCarSavePlate(ctx context.Context, pl Payload) {
 	}
 	res := Result{Text: "Car plate has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	pl.ResultChan <- res
 }
 
@@ -359,7 +359,7 @@ func (c *CarCommand) updateCarSavePrice(ctx context.Context, pl Payload) {
 	}
 	res := Result{Text: "Car price has been successfully updated!"}
 	car := c.draftCars[pl.UserID]
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, car.ID))
 	pl.ResultChan <- res
 }
 
@@ -369,12 +369,12 @@ func (c *CarCommand) deleteCarAsk(ctx context.Context, pl Payload, carID int64) 
 		pl.ResultChan <- Result{Text: "Car not found.", Error: err}
 		return
 	}
-	res := Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)?", car.Name, car.Year)}
-	res.AddKeyboardButton("Yes, delete the car", commandf(c, cmdCarDelYes, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("No", commandf(c, cmdCarGet, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarGet, carID))
+	res := Result{Text: fmt.Sprintf("Are you sure you want to delete %s (%d)?", _es(car.Name), car.Year)}
+	res.InlineMarkup.AddKeyboardButton("Yes, delete the car", commandf(c, cmdCarDelYes, carID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdCarGet, carID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -386,17 +386,17 @@ func (c *CarCommand) deleteCarConfirm(ctx context.Context, pl Payload, carID int
 	} else {
 		res.Text = "Car has been successfully deleted!"
 	}
-	res.AddKeyboardButton("« Back to my cars", c.Prefix())
+	res.InlineMarkup.AddKeyboardButton("« Back to my cars", c.Prefix())
 	pl.ResultChan <- res
 }
 
 func (c *CarCommand) formatFuelDetails(fuel st.FuelDetails) string {
-	html := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
-	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
-	html += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/100Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
-	html += fmt.Sprintf("🏭 <b>Total:</b> %dKm\n", fuel.Kilometers)
-	html += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
-	return html
+	str := fmt.Sprintf("⛽ <b>Liters:</b> %.2fL (%s)\n", fuel.GetLiters(), fuel.Type)
+	str += fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2fEur/L)\n", fuel.GetEuro(), fuel.GetEurPerLiter())
+	str += fmt.Sprintf("📍 <b>Traveled:</b> %dKm (%.2fL/100Km)\n", fuel.KilometersR, fuel.GetLitersPerKilometer())
+	str += fmt.Sprintf("🏭 <b>Total:</b> %dKm\n", fuel.Kilometers)
+	str += fmt.Sprintf("📅 %s\n", fuel.GetTimestamp())
+	return str
 }
 
 func (c *CarCommand) showFuelDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
@@ -408,14 +408,14 @@ func (c *CarCommand) showFuelDetails(ctx context.Context, pl Payload, carID int6
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatFuelDetails(fuel)
-		res.AddKeyboardPagination(offset, fuel.CountRows, commandf(c, cmdCarFuelGet, carID))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Delete", commandf(c, cmdCarFuelDelAsk, carID, fuel.ID))
+		res.InlineMarkup.AddKeyboardPagination(offset, fuel.CountRows, commandf(c, cmdCarFuelGet, carID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdCarFuelDelAsk, carID, fuel.ID))
 	}
-	res.AddKeyboardButton("Add", commandf(c, cmdCarFuelAdd, carID))
-	res.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Add", commandf(c, cmdCarFuelAdd, carID))
+	res.InlineMarkup.AddKeyboardRow()
 	car, _ := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -458,13 +458,13 @@ func (c *CarCommand) setDraftFuelEuros(userID int64, input string) error {
 func (c *CarCommand) addFuelStart(ctx context.Context, pl Payload, carID int64) {
 	c.newDraftFuel(pl.UserID, carID)
 	res := Result{Text: "Please pick a receipt date.", State: c.addFuelTimestamp}
-	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	res.InlineMarkup.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	pl.ResultChan <- res
 }
 
 func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
-	if res.UpdateKeyboardCalendar(pl.Command) {
+	if res.InlineMarkup.UpdateKeyboardCalendar(pl.Command) {
 		pl.ResultChan <- res // new month is selected
 		return
 	}
@@ -473,7 +473,7 @@ func (c *CarCommand) addFuelTimestamp(ctx context.Context, pl Payload) {
 		return
 	}
 	res.Text = "Date: " + c.draftFuel[pl.UserID].GetTimestamp()
-	res.AddKeyboardRow() // remove calendar keyboard
+	res.InlineMarkup.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "What is the fuel type?", State: c.addFuelType}
 	pl.ResultChan <- res
@@ -514,11 +514,11 @@ func (c *CarCommand) addFuelEurosAndSave(ctx context.Context, pl Payload) {
 
 func (c *CarCommand) deleteFuelAsk(ctx context.Context, pl Payload, carID int64, fuelID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
-	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarFuelDelYes, carID, fuelID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("No", commandf(c, cmdCarFuelGet, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarFuelGet, carID))
+	res.InlineMarkup.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarFuelDelYes, carID, fuelID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdCarFuelGet, carID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarFuelGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -530,15 +530,15 @@ func (c *CarCommand) deleteFuelConfirm(ctx context.Context, pl Payload, carID in
 	} else {
 		res.Text = "Receipt has been successfully deleted!"
 	}
-	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID))
+	res.InlineMarkup.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarFuelGet, carID))
 	pl.ResultChan <- res
 }
 
 func (c *CarCommand) formatServiceDetails(service st.ServiceDetails) string {
-	html := fmt.Sprintf("🛠️ %s\n", service.Description)
-	html += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", service.GetEuro())
-	html += fmt.Sprintf("📅 %s\n", service.GetTimestamp())
-	return html
+	str := fmt.Sprintf("🛠️ %s\n", _es(service.Description))
+	str += fmt.Sprintf("💲 <b>Paid:</b> %.2f€\n", service.GetEuro())
+	str += fmt.Sprintf("📅 %s\n", service.GetTimestamp())
+	return str
 }
 
 func (c *CarCommand) showServiceDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
@@ -550,14 +550,14 @@ func (c *CarCommand) showServiceDetails(ctx context.Context, pl Payload, carID i
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatServiceDetails(service)
-		res.AddKeyboardPagination(offset, service.CountRows, commandf(c, cmdCarServiceGet, carID))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Delete", commandf(c, cmdCarServiceDelAsk, carID, service.ID))
+		res.InlineMarkup.AddKeyboardPagination(offset, service.CountRows, commandf(c, cmdCarServiceGet, carID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdCarServiceDelAsk, carID, service.ID))
 	}
-	res.AddKeyboardButton("Add", commandf(c, cmdCarServiceAdd, carID))
-	res.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Add", commandf(c, cmdCarServiceAdd, carID))
+	res.InlineMarkup.AddKeyboardRow()
 	car, _ := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -588,13 +588,13 @@ func (c *CarCommand) setDraftServiceEuros(userID int64, input string) error {
 func (c *CarCommand) addServiceStart(ctx context.Context, pl Payload, carID int64) {
 	c.newDraftService(pl.UserID, carID)
 	res := Result{Text: "Please pick a receipt date.", State: c.addServiceTimestamp}
-	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	res.InlineMarkup.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	pl.ResultChan <- res
 }
 
 func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
-	if res.UpdateKeyboardCalendar(pl.Command) {
+	if res.InlineMarkup.UpdateKeyboardCalendar(pl.Command) {
 		pl.ResultChan <- res // new month is selected
 		return
 	}
@@ -603,7 +603,7 @@ func (c *CarCommand) addServiceTimestamp(ctx context.Context, pl Payload) {
 		return
 	}
 	res.Text = "Date: " + c.draftService[pl.UserID].GetTimestamp()
-	res.AddKeyboardRow() // remove calendar keyboard
+	res.InlineMarkup.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Provide service description.", State: c.addServiceDescription}
 	pl.ResultChan <- res
@@ -628,11 +628,11 @@ func (c *CarCommand) addServiceEurosAndSave(ctx context.Context, pl Payload) {
 
 func (c *CarCommand) deleteServiceAsk(ctx context.Context, pl Payload, carID int64, serviceID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
-	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarServiceDelYes, carID, serviceID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("No", commandf(c, cmdCarServiceGet, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarServiceGet, carID))
+	res.InlineMarkup.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarServiceDelYes, carID, serviceID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdCarServiceGet, carID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarServiceGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -644,17 +644,17 @@ func (c *CarCommand) deleteServiceConfirm(ctx context.Context, pl Payload, carID
 	} else {
 		res.Text = "Receipt has been successfully deleted!"
 	}
-	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarServiceGet, carID))
+	res.InlineMarkup.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarServiceGet, carID))
 	pl.ResultChan <- res
 }
 
 func (c *CarCommand) formatLeaseDetails(lease st.LeaseDetails) string {
-	html := fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€ RT)\n", lease.GetEuro(), lease.GetEuroRT())
+	str := fmt.Sprintf("💲 <b>Paid:</b> %.2f€ (%.2f€ RT)\n", lease.GetEuro(), lease.GetEuroRT())
 	if lease.Description.Valid {
-		html += fmt.Sprintf("🛠️ %s\n", lease.Description.String)
+		str += fmt.Sprintf("🛠️ %s\n", _es(lease.Description.String))
 	}
-	html += fmt.Sprintf("📅 %s\n", lease.GetTimestamp())
-	return html
+	str += fmt.Sprintf("📅 %s\n", lease.GetTimestamp())
+	return str
 }
 
 func (c *CarCommand) showLeaseDetails(ctx context.Context, pl Payload, carID int64, offset int64) {
@@ -666,14 +666,14 @@ func (c *CarCommand) showLeaseDetails(ctx context.Context, pl Payload, carID int
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatLeaseDetails(lease)
-		res.AddKeyboardPagination(offset, lease.CountRows, commandf(c, cmdCarLeaseGet, carID))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Delete", commandf(c, cmdCarLeaseDelAsk, carID, lease.ID))
+		res.InlineMarkup.AddKeyboardPagination(offset, lease.CountRows, commandf(c, cmdCarLeaseGet, carID))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdCarLeaseDelAsk, carID, lease.ID))
 	}
-	res.AddKeyboardButton("Add", commandf(c, cmdCarLeaseAdd, carID))
-	res.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Add", commandf(c, cmdCarLeaseAdd, carID))
+	res.InlineMarkup.AddKeyboardRow()
 	car, _ := c.storage.GetCarFromDB(ctx, pl.UserID, carID)
-	res.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
+	res.InlineMarkup.AddKeyboardButton(fmt.Sprintf("« Back to %s (%d)", car.Name, car.Year), commandf(c, cmdCarGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -709,13 +709,13 @@ func (c *CarCommand) setDraftLeaseEuros(userID int64, input string) error {
 func (c *CarCommand) addLeaseStart(ctx context.Context, pl Payload, carID int64) {
 	c.newDraftLease(pl.UserID, carID)
 	res := Result{Text: "Please pick a receipt date.", State: c.addLeaseTimestamp}
-	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	res.InlineMarkup.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	pl.ResultChan <- res
 }
 
 func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) {
 	res := Result{}
-	if res.UpdateKeyboardCalendar(pl.Command) {
+	if res.InlineMarkup.UpdateKeyboardCalendar(pl.Command) {
 		pl.ResultChan <- res // new month is selected
 		return
 	}
@@ -724,7 +724,7 @@ func (c *CarCommand) addLeaseTimestamp(ctx context.Context, pl Payload) {
 		return
 	}
 	res.Text = "Date: " + c.draftLease[pl.UserID].GetTimestamp()
-	res.AddKeyboardRow() // remove calendar keyboard
+	res.InlineMarkup.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Provide lease description. /skip", State: c.addLeaseDescription}
 	pl.ResultChan <- res
@@ -749,11 +749,11 @@ func (c *CarCommand) addLeaseEurosAndSave(ctx context.Context, pl Payload) {
 
 func (c *CarCommand) deleteLeaseAsk(ctx context.Context, pl Payload, carID int64, leaseID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected receipt?"}
-	res.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarLeaseDelYes, carID, leaseID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("No", commandf(c, cmdCarLeaseGet, carID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarLeaseGet, carID))
+	res.InlineMarkup.AddKeyboardButton("Yes, delete the receipt", commandf(c, cmdCarLeaseDelYes, carID, leaseID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdCarLeaseGet, carID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Nope, nevermind", commandf(c, cmdCarLeaseGet, carID))
 	pl.ResultChan <- res
 }
 
@@ -765,6 +765,6 @@ func (c *CarCommand) deleteLeaseConfirm(ctx context.Context, pl Payload, carID i
 	} else {
 		res.Text = "Receipt has been successfully deleted!"
 	}
-	res.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarLeaseGet, carID))
+	res.InlineMarkup.AddKeyboardButton("« Back to my receipts", commandf(c, cmdCarLeaseGet, carID))
 	pl.ResultChan <- res
 }

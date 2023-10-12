@@ -1,24 +1,26 @@
-package telegram
+package tgmanager
 
 import (
 	"context"
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 
 	"mr-weasel/commands"
+	"mr-weasel/tgclient"
 	"mr-weasel/utils"
 )
 
 type Manager struct {
-	tgClient *Client                        // Telegram API Client
+	tgClient *tgclient.Client               // Telegram API Client
 	handlers map[string]commands.Handler    // Map of registered command handlers.
 	states   map[int64]commands.ExecuteFunc // Map of active user states.
 	tokens   map[string]context.CancelFunc  // Map of cancellation tokens.
 }
 
-func NewManager(tgClient *Client) *Manager {
+func NewManager(tgClient *tgclient.Client) *Manager {
 	return &Manager{
 		tgClient: tgClient,
 		handlers: make(map[string]commands.Handler),
@@ -27,14 +29,14 @@ func NewManager(tgClient *Client) *Manager {
 	}
 }
 
-func (m *Manager) AddCommands(handlers ...commands.Handler) []BotCommand {
-	botCommands := make([]BotCommand, 0, len(handlers))
+func (m *Manager) AddCommands(handlers ...commands.Handler) []tgclient.BotCommand {
+	botCommands := make([]tgclient.BotCommand, 0, len(handlers))
 
 	for _, handler := range handlers {
 		prefix := handler.Prefix()
 		m.handlers[prefix] = handler
 
-		botCommands = append(botCommands, BotCommand{
+		botCommands = append(botCommands, tgclient.BotCommand{
 			Command:     handler.Prefix(),
 			Description: handler.Description(),
 		})
@@ -45,8 +47,8 @@ func (m *Manager) AddCommands(handlers ...commands.Handler) []BotCommand {
 	return botCommands
 }
 
-func (m *Manager) PublishCommands(botCommands []BotCommand) {
-	cfg := SetMyCommandsConfig{Commands: botCommands}
+func (m *Manager) PublishCommands(botCommands []tgclient.BotCommand) {
+	cfg := tgclient.SetMyCommandsConfig{Commands: botCommands}
 	_, err := m.tgClient.SetMyCommands(context.Background(), cfg)
 	if err != nil {
 		log.Println("[ERROR]", err)
@@ -54,7 +56,7 @@ func (m *Manager) PublishCommands(botCommands []BotCommand) {
 }
 
 func (m *Manager) Start(ctx context.Context) {
-	cfg := GetUpdatesConfig{
+	cfg := tgclient.GetUpdatesConfig{
 		Offset:         -1,
 		Timeout:        60,
 		AllowedUpdates: []string{"message", "callback_query"},
@@ -66,7 +68,7 @@ func (m *Manager) Start(ctx context.Context) {
 		} else if update.CallbackQuery != nil {
 			m.onCallbackQuery(ctx, *update.CallbackQuery)
 			// Answer to the callback query just to dismiss "Loading..." prompt on the top
-			_, err := m.tgClient.AnswerCallbackQuery(ctx, AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
+			_, err := m.tgClient.AnswerCallbackQuery(ctx, tgclient.AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
 			if err != nil {
 				log.Println("[ERROR]", err)
 			}
@@ -74,28 +76,50 @@ func (m *Manager) Start(ctx context.Context) {
 	}
 }
 
-func (m *Manager) onMessage(ctx context.Context, message Message) {
+func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 	const op = "telegram.Manager.processMessage"
+
+	// command has /prefix@bot_username syntax
+	message.Text = strings.TrimSuffix(message.Text, fmt.Sprintf("@%s", m.tgClient.Me.Username))
 
 	execFn, ok := m.getExecuteFunc(message.From.ID, message.Text)
 	if !ok {
 		return
 	}
 
+	userName := "@" + message.From.Username
+	if userName == "@" {
+		userName = message.From.FirstName
+	}
+
 	pl := commands.Payload{
 		UserID:     message.From.ID,
+		UserName:   userName,
+		IsPrivate:  message.Chat.Type == "private",
 		Command:    message.Text,
 		ResultChan: make(chan commands.Result),
 	}
 
 	if message.Audio != nil {
-		fileURL, err := m.tgClient.GetFileURL(ctx, GetFileConfig{FileID: message.Audio.FileID})
+		fileURL, err := m.tgClient.GetFileURL(ctx, tgclient.GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
 			log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			return
 		}
 		pl.FileURL = fileURL
 		pl.Command = message.Audio.FileName
+	} else if message.Voice != nil {
+		fileURL, err := m.tgClient.GetFileURL(ctx, tgclient.GetFileConfig{FileID: message.Voice.FileID})
+		if err != nil {
+			log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			return
+		}
+		pl.FileURL = fileURL
+		pl.Command = fmt.Sprintf("%s.oga", message.Voice.FileUniqueID)
+	}
+
+	if message.UserShared != nil {
+		pl.Command = strconv.FormatInt(message.UserShared.UserID, 10)
 	}
 
 	go func() {
@@ -113,8 +137,15 @@ func (m *Manager) onMessage(ctx context.Context, message Message) {
 	go m.processResults(ctx, pl, message)
 }
 
-func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery CallbackQuery) {
+func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
+
+	// Check if chat user is message owner (for groups)
+	if callbackQuery.Message.Chat.Type != "private" {
+		if callbackQuery.Message.Entities[0].User.ID != callbackQuery.From.ID {
+			return
+		}
+	}
 
 	if strings.HasPrefix(callbackQuery.Data, commands.CmdCancel) {
 		cancelFn, ok := m.getCancelFunc(callbackQuery.From.ID, callbackQuery.Data)
@@ -129,8 +160,15 @@ func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery CallbackQue
 		return
 	}
 
+	userName := "@" + callbackQuery.From.Username
+	if userName == "@" {
+		userName = callbackQuery.From.FirstName
+	}
+
 	pl := commands.Payload{
 		UserID:     callbackQuery.From.ID,
+		UserName:   userName,
+		IsPrivate:  callbackQuery.Message.Chat.Type == "private",
 		Command:    callbackQuery.Data,
 		ResultChan: make(chan commands.Result),
 	}
@@ -150,7 +188,7 @@ func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery CallbackQue
 	go m.processResults(ctx, pl, *callbackQuery.Message)
 }
 
-func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse Message) {
+func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse tgclient.Message) {
 	const op = "telegram.Manager.processResults"
 	var err error
 
@@ -159,9 +197,13 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
 		}
 
+		if previousResponse.Chat == nil {
+			log.Println("[WARN]", "Chat no longer exists, bot has been kicked!")
+			return
+		}
+
 		if result.Audio != nil {
-			form := Form{}
-			media := []InputMedia{}
+			media := []tgclient.InputMedia{}
 
 			keys := make([]string, 0, len(result.Audio))
 			for k := range result.Audio {
@@ -170,22 +212,22 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			sort.Strings(keys)
 
 			for _, name := range keys {
-				path := result.Audio[name]
-				form[name] = FormFile{Name: name, Path: path}
-				media = append(media, &InputMediaAudio{Media: "attach://" + name})
+				media = append(media, &tgclient.InputMediaAudio{Media: "attach://" + name})
 			}
 
-			_, err = m.tgClient.SendMediaGroup(ctx, SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, form)
+			_, err = m.tgClient.SendMediaGroup(ctx, tgclient.SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, result.Audio)
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
 			}
 
-		} else if result.Keyboard != nil && previousResponse.ReplyMarkup != nil {
-			// if both previous and new response contain a keyboard, then it is update
+		} else if result.InlineMarkup.InlineKeyboard != nil && previousResponse.ReplyMarkup != nil {
+			// if both previous and new response contain an inline keyboard, then it is update
 
-			// in case of update we can change states only
+			// in case of update we can change states only, or if requested explicitly
 			if result.State != nil {
 				m.states[pl.UserID] = result.State
+			} else if result.ClearState {
+				delete(m.states, pl.UserID)
 			}
 
 			// in case of update, keep original text if not specified explicitly
@@ -193,12 +235,21 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = previousResponse.Text
 			}
 
-			previousResponse, err = m.tgClient.EditMessageText(ctx, EditMessageTextConfig{
+			if !pl.IsPrivate && result.Text != previousResponse.Text {
+				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
+			}
+
+			var replyMarkup *tgclient.InlineKeyboardMarkup
+			if len(result.InlineMarkup.InlineKeyboard[0]) != 0 {
+				replyMarkup = &result.InlineMarkup
+			}
+
+			previousResponse, err = m.tgClient.EditMessageText(ctx, tgclient.EditMessageTextConfig{
 				ChatID:      previousResponse.Chat.ID,
 				MessageID:   previousResponse.MessageID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
-				ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+				ReplyMarkup: replyMarkup,
 			})
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
@@ -214,11 +265,24 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				delete(m.states, pl.UserID)
 			}
 
-			previousResponse, err = m.tgClient.SendMessage(ctx, SendMessageConfig{
+			var replyMarkup tgclient.ReplyMarkup
+			if result.InlineMarkup.InlineKeyboard != nil {
+				replyMarkup = result.InlineMarkup
+			} else if result.ReplyMarkup.Keyboard != nil {
+				replyMarkup = result.ReplyMarkup
+			} else if result.RemoveMarkup.RemoveKeyboard {
+				replyMarkup = result.RemoveMarkup
+			}
+
+			if !pl.IsPrivate {
+				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
+			}
+
+			previousResponse, err = m.tgClient.SendMessage(ctx, tgclient.SendMessageConfig{
 				ChatID:      previousResponse.Chat.ID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
-				ReplyMarkup: m.commandKeyboardToInlineMarkup(result.Keyboard),
+				ReplyMarkup: replyMarkup,
 			})
 			if err != nil {
 				log.Println("[ERROR]", utils.WrapIfErr(op, err))
@@ -259,15 +323,4 @@ func (m *Manager) getCancelFunc(userID int64, text string) (context.CancelFunc, 
 	}
 
 	return cancel, ok
-}
-
-func (m *Manager) commandKeyboardToInlineMarkup(keyboard [][]commands.Button) *InlineKeyboardMarkup {
-	markup := &InlineKeyboardMarkup{InlineKeyboard: make([][]InlineKeyboardButton, len(keyboard))}
-	for r, row := range keyboard {
-		markup.InlineKeyboard[r] = make([]InlineKeyboardButton, len(row))
-		for b, btn := range row {
-			markup.InlineKeyboard[r][b] = InlineKeyboardButton{Text: btn.Label, CallbackData: btn.Data}
-		}
-	}
-	return markup
 }

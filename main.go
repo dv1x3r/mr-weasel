@@ -9,7 +9,8 @@ import (
 
 	"mr-weasel/commands"
 	"mr-weasel/storage"
-	"mr-weasel/telegram"
+	"mr-weasel/tgclient"
+	"mr-weasel/tgmanager"
 	"mr-weasel/utils"
 
 	"github.com/jmoiron/sqlx"
@@ -31,15 +32,18 @@ func main() {
 	}
 
 	queue := utils.NewQueue(queuePool, queueParallel)
+	audioSeparator := utils.NewAudioSeparator()
+	voiceChanger := utils.NewVoiceChanger()
 
-	tgClient := telegram.MustConnect(os.Getenv("TG_TOKEN"), false)
-	tgManager := telegram.NewManager(tgClient)
+	tgClient := tgclient.MustConnect(os.Getenv("TG_TOKEN"), false)
+	tgManager := tgmanager.NewManager(tgClient)
 
 	if os.Getenv("RTX_MODE") == "on" {
 		commands := tgManager.AddCommands(
 			commands.NewPingCommand(),
 			commands.NewYTMP3Command(),
-			commands.NewExtractVoiceCommand(queue),
+			commands.NewExtractVoiceCommand(queue, audioSeparator),
+			commands.NewChangeVoiceCommand(storage.NewRvcStorage(db), queue, audioSeparator, voiceChanger),
 		)
 		tgManager.PublishCommands(commands)
 	} else {
@@ -48,7 +52,7 @@ func main() {
 			commands.NewCarCommand(storage.NewCarStorage(db)),
 			commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
 			commands.NewYTMP3Command(),
-			commands.NewExtractVoiceCommand(queue),
+			commands.NewExtractVoiceCommand(queue, audioSeparator),
 		)
 		tgManager.PublishCommands(commands)
 	}

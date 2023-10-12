@@ -25,5 +25,5 @@ func (PingCommand) Execute(ctx context.Context, pl Payload) {
 }
 
 func personalized(ctx context.Context, pl Payload) {
-	pl.ResultChan <- Result{Text: "Pong to " + pl.Command + "!"}
+	pl.ResultChan <- Result{Text: "Pong to " + _es(pl.Command) + "!"}
 }

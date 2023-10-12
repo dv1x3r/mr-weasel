@@ -70,13 +70,13 @@ func (c *HolidayCommand) showHolidayDetails(ctx context.Context, pl Payload, off
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else {
 		res.Text = c.formatHolidayDetails(holiday)
-		res.AddKeyboardPagination(offset, holiday.CountRows, commandf(c, cmdHolidayGet))
-		res.AddKeyboardRow()
-		res.AddKeyboardButton("Delete", commandf(c, cmdHolidayDelAsk, holiday.ID))
+		res.InlineMarkup.AddKeyboardPagination(offset, holiday.CountRows, commandf(c, cmdHolidayGet))
+		res.InlineMarkup.AddKeyboardRow()
+		res.InlineMarkup.AddKeyboardButton("Delete", commandf(c, cmdHolidayDelAsk, holiday.ID))
 	}
-	res.AddKeyboardButton("Add", commandf(c, cmdHolidayAdd))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("« Back", commandf(c))
+	res.InlineMarkup.AddKeyboardButton("Add", commandf(c, cmdHolidayAdd))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("« Back", commandf(c))
 	pl.ResultChan <- res
 }
 
@@ -87,10 +87,10 @@ func (c *HolidayCommand) showHolodayDaysByYear(ctx context.Context, pl Payload) 
 		res.Text, res.Error = "There is something wrong, please try again.", err
 	} else if len(holidays) == 0 {
 		res.Text = "Holidays not found, add one?"
-		res.AddKeyboardButton("Add", commandf(c, cmdHolidayAdd))
+		res.InlineMarkup.AddKeyboardButton("Add", commandf(c, cmdHolidayAdd))
 	} else {
 		res.Text = "Holiday days by year:"
-		res.AddKeyboardButton("Manage", commandf(c, cmdHolidayGet))
+		res.InlineMarkup.AddKeyboardButton("Manage", commandf(c, cmdHolidayGet))
 		for _, v := range holidays {
 			res.Text += fmt.Sprintf("\n<b>%d</b> - %d offline days", v.Year, v.Days)
 		}
@@ -127,13 +127,13 @@ func (c *HolidayCommand) setDraftHolidayDays(userID int64, input string) error {
 func (c *HolidayCommand) addHolidayStart(ctx context.Context, pl Payload) {
 	c.newDraftHoliday(pl.UserID)
 	res := Result{Text: "Please pick holiday start date.", State: c.addHolidayStartDate}
-	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	res.InlineMarkup.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	pl.ResultChan <- res
 }
 
 func (c *HolidayCommand) addHolidayStartDate(ctx context.Context, pl Payload) {
 	res := Result{}
-	if res.UpdateKeyboardCalendar(pl.Command) {
+	if res.InlineMarkup.UpdateKeyboardCalendar(pl.Command) {
 		pl.ResultChan <- res // new month is selected
 		return
 	}
@@ -142,16 +142,16 @@ func (c *HolidayCommand) addHolidayStartDate(ctx context.Context, pl Payload) {
 		return
 	}
 	res.Text = "Start: " + c.draftHolidays[pl.UserID].GetStartTimestamp()
-	res.AddKeyboardRow() // remove calendar keyboard
+	res.InlineMarkup.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Please pick holiday end date.", State: c.addHolidayEndDate}
-	res.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
+	res.InlineMarkup.AddKeyboardCalendar(time.Now().Year(), time.Now().Month())
 	pl.ResultChan <- res
 }
 
 func (c *HolidayCommand) addHolidayEndDate(ctx context.Context, pl Payload) {
 	res := Result{}
-	if res.UpdateKeyboardCalendar(pl.Command) {
+	if res.InlineMarkup.UpdateKeyboardCalendar(pl.Command) {
 		pl.ResultChan <- res
 		return
 	}
@@ -160,7 +160,7 @@ func (c *HolidayCommand) addHolidayEndDate(ctx context.Context, pl Payload) {
 		return
 	}
 	res.Text = "End: " + c.draftHolidays[pl.UserID].GetEndTimestamp()
-	res.AddKeyboardRow() // remove calendar keyboard
+	res.InlineMarkup.AddKeyboardRow() // remove calendar keyboard
 	pl.ResultChan <- res
 	res = Result{Text: "Enter number of working days.", State: c.addHolidayDaysAndSave}
 	pl.ResultChan <- res
@@ -181,11 +181,11 @@ func (c *HolidayCommand) addHolidayDaysAndSave(ctx context.Context, pl Payload) 
 
 func (c *HolidayCommand) deleteHolidayAsk(ctx context.Context, pl Payload, holidayID int64) {
 	res := Result{Text: "Are you sure you want to delete the selected holiday?"}
-	res.AddKeyboardButton("Yes, delete the holiday", commandf(c, cmdHolidayDelYes, holidayID))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("No", commandf(c, cmdHolidayGet))
-	res.AddKeyboardRow()
-	res.AddKeyboardButton("Nope, nevermind", commandf(c, cmdHolidayGet))
+	res.InlineMarkup.AddKeyboardButton("Yes, delete the holiday", commandf(c, cmdHolidayDelYes, holidayID))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("No", commandf(c, cmdHolidayGet))
+	res.InlineMarkup.AddKeyboardRow()
+	res.InlineMarkup.AddKeyboardButton("Nope, nevermind", commandf(c, cmdHolidayGet))
 	pl.ResultChan <- res
 }
 
@@ -196,6 +196,6 @@ func (c *HolidayCommand) deleteHolidayConfirm(ctx context.Context, pl Payload, h
 		return
 	}
 	res := Result{Text: "Holiday has been successfully deleted!"}
-	res.AddKeyboardButton("« Back to my holidays", c.Prefix())
+	res.InlineMarkup.AddKeyboardButton("« Back to my holidays", c.Prefix())
 	pl.ResultChan <- res
 }

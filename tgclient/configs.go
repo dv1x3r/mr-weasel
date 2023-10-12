@@ -1,4 +1,4 @@
-package telegram
+package tgclient
 
 type Config interface {
 	Method() string
@@ -49,7 +49,7 @@ type SendMessageConfig struct {
 	// Optional. Pass True if the message should be sent even if the specified replied-to message is not found.
 	AllowSendingWithoutReply bool `json:"allow_sending_without_reply,omitempty"`
 	// Optional. Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
-	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	ReplyMarkup ReplyMarkup `json:"reply_markup,omitempty"`
 }
 
 func (SendMessageConfig) Method() string {
@@ -89,7 +89,7 @@ type SendAudioConfig struct {
 	// Pass True if the message should be sent even if the specified replied-to message is not found.
 	AllowSendingWithoutReply bool `json:"allow_sending_without_reply,omitempty"`
 	// Additional interface options. A JSON-serialized object for an inline keyboard, custom reply keyboard, instructions to remove reply keyboard or to force a reply from the user.
-	ReplyMarkup *InlineKeyboardMarkup `json:"reply_markup,omitempty"`
+	ReplyMarkup *ReplyMarkup `json:"reply_markup,omitempty"`
 }
 
 func (SendAudioConfig) Method() string {
