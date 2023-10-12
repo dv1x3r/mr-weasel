@@ -67,7 +67,7 @@ jobs:
             cd ~/app/mr-weasel
             source .env
             sudo systemctl stop mr-weasel.service
-            goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
+            ~/go/bin/goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
             sudo systemctl start mr-weasel.service
           # dev ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
           # dev ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
