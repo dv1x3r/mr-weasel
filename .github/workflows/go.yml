@@ -65,6 +65,7 @@ jobs:
           script_stop: true
           script: |
             cd ~/app/mr-weasel
+            chmod +x ./mr-weasel
             source .env
             sudo systemctl stop mr-weasel.service
             ~/go/bin/goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
