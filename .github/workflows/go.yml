@@ -55,8 +55,9 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          source: build/*
+          source: build/
           target: ~/app/mr-weasel
+          strip_components: 1
 
       #- name: Migrage database
         #working-directory: /home/weasel/app/mr-weasel
