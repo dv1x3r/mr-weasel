@@ -38,10 +38,6 @@ jobs:
     runs-on: ubuntu-20.04
     environment: dev
     steps:
-      #- name: Stop service
-        #run: sudo systemctl stop mr-weasel.service
-        # weasel ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
-
       - name: Download app artifacts
         uses: actions/download-artifact@v3
         with:
@@ -52,19 +48,25 @@ jobs:
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
           source: build/
           target: ~/app/mr-weasel
           strip_components: 1
 
-      #- name: Migrage database
-        #working-directory: /home/weasel/app/mr-weasel
-        #run: |
-          #source .env
-          #goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
-
-      #- name: Restart service
-        #run: sudo systemctl start mr-weasel.service
-        # weasel ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
+      - name: Migrage database and Restart service
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}  
+          script: |
+            cd ~/app/mr-weasel
+            source .env
+            sudo systemctl stop mr-weasel.service
+            goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
+            sudo systemctl start mr-weasel.service
+          # dev ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
+          # dev ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
