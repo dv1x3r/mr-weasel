@@ -8,7 +8,7 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-go@v4
@@ -35,8 +35,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-20.04
-    environment: dev
+    runs-on: ubuntu-22.04
     steps:
       - name: Download app artifacts
         uses: actions/download-artifact@v3
@@ -70,5 +69,5 @@ jobs:
             sudo systemctl stop mr-weasel.service
             ~/go/bin/goose -dir=./migrations ${GOOSE_DRIVER} ${GOOSE_DBSTRING} up
             sudo systemctl start mr-weasel.service
-          # dev ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
-          # dev ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
+          # weasel ALL = NOPASSWD: /bin/systemctl stop mr-weasel.service
+          # weasel ALL = NOPASSWD: /bin/systemctl start mr-weasel.service
