@@ -4,14 +4,14 @@ ConditionPathExists=/home/weasel/app/mr-weasel/mr-weasel
 After = network.target
 
 [Service]
-User = dev
-Group = dev
+User = weasel
+Group = weasel
 
 WorkingDirectory = /home/weasel/app/mr-weasel
 ExecStart = /home/weasel/app/mr-weasel/mr-weasel
 
-StandardOutput=append:/home/weasel/logs/mr-weasel/out.log
-StandardError=append:/home/weasel/logs/mr-weasel/err.log
+StandardOutput=append:/home/weasel/app/mr-weasel/stdout.log
+StandardError=append:/home/weasel/app/mr-weasel/stderr.log
 
 KillSignal=SIGINT
 Restart=on-failure
