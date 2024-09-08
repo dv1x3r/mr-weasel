@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	dbDriver, dbString := os.Getenv("GOOSE_DRIVER"), os.Getenv("GOOSE_DBSTRING")
+	dbDriver, dbString := os.Getenv("DB_DRIVER"), os.Getenv("DB_STRING")
 	if dbDriver == "sqlite3" {
 		dbString += "?_journal=WAL&_fk=1"
 	}
@@ -52,7 +52,6 @@ func main() {
 			commands.NewCarCommand(storage.NewCarStorage(db)),
 			commands.NewHolidayCommand(storage.NewHolidayStorage(db)),
 			commands.NewYTMP3Command(),
-			commands.NewExtractVoiceCommand(queue, audioSeparator),
 		)
 		tgManager.PublishCommands(commands)
 	}
