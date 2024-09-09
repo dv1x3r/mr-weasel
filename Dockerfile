@@ -15,6 +15,8 @@ RUN go test -v ./...
 
 FROM debian:bookworm-slim
 
+RUN apt update && apt install -y ca-certificates && update-ca-certificates
+
 WORKDIR /app
 
 COPY --from=build /app/migrations /app/migrations
