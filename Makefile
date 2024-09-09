@@ -1,13 +1,10 @@
-include .env
-
-APP_NAME ?= main
-GOOSE=goose -dir=${GOOSE_MIGRATION_DIR} ${GOOSE_DRIVER} ${GOOSE_DBSTRING}
+GOOSE=goose -dir=./migrations sqlite ./bin/mr-weasel.db
 
 build:
-	go build -o bin/$(APP_NAME)
+	go build -o ./bin/mr-weasel
 
 run:
-	go build -o ./bin/$(APP_NAME) && ./bin/$(APP_NAME)
+	go build -o ./bin/mr-weasel && ./bin/mr-weasel
 
 test:
 	go test -v ./...

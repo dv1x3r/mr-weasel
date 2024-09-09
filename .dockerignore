@@ -1,3 +1,19 @@
+node_modules
+Dockerfile*
+docker-compose*
+.dockerignore
 .git
-/bin
+.gitignore
+README.md
+LICENSE
+.vscode
+Makefile
+helm-charts
+.env
+.editorconfig
+.idea
+coverage*
+docs
+bin
+tmp
 
