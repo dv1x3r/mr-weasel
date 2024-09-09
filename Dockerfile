@@ -1,4 +1,8 @@
-FROM golang:1.21 as build
+# syntax=docker/dockerfile:1
+
+ARG GO_VERSION="1.23"
+
+FROM golang:${GO_VERSION} AS build
 
 WORKDIR /app
 
@@ -6,17 +10,14 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o /app/server
+RUN CGO_ENABLED=0 GOOS=linux go build -o ./bin/mr-weasel
+RUN go test -v ./...
 
-FROM debian:bookworm-slim
+FROM alpine:latest
 
 WORKDIR /app
 
-RUN apt update && \
-    apt install -y curl && \
-    curl -fsSL https://raw.githubusercontent.com/pressly/goose/master/install.sh | sh
-
-COPY --from=build /app/server /app/server
 COPY --from=build /app/migrations /app/migrations
+COPY --from=build /app/bin/mr-weasel /app/mr-weasel
 
-CMD ["sh", "-c", "goose up && exec /app/server"]
+CMD ["/app/mr-weasel"]
