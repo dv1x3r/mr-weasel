@@ -15,7 +15,7 @@ RUN go test -v ./...
 
 FROM debian:bookworm-slim
 
-RUN apt update && apt install -y ca-certificates && update-ca-certificates
+RUN apt update && apt install -y libicu-dev ca-certificates && update-ca-certificates
 
 WORKDIR /app
 
