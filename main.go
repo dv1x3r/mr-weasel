@@ -15,25 +15,26 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/joho/godotenv/autoload"
-
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
-	_ "modernc.org/sqlite"
 )
 
 func main() {
 	dbDriver, dbString := os.Getenv("DB_DRIVER"), os.Getenv("DB_STRING")
+	var db *sqlx.DB
 
 	if dbDriver == "sqlite3" {
-		// const params = "?_journal=WAL&_fk=1&_busy_timeout=10000" // mattn/go-sqlite3 (cgo)
-		panic(errors.New("mattn/go-sqlite3 (cgo driver) is not supported, switch to cgo-free"))
-	} else if dbDriver != "sqlite" {
-		panic(errors.New(dbDriver + " (db driver) is not supported, switch to modernc.org/sqlite"))
+		// mattn/go-sqlite3 (cgo)
+		db = sqlx.MustConnect(dbDriver, dbString+"?_journal=WAL&_fk=1&_busy_timeout=10000")
+	} else if dbDriver == "sqlite" {
+		// modernc.org/sqlite (cgo-free)
+		// db = sqlx.MustConnect(dbDriver, dbString+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)")
+		panic(errors.New("modernc.org/sqlite (cgo-free) is not supported, switch to mattn/go-sqlite3"))
+	} else {
+		panic(errors.New(dbDriver + " (db driver) is not supported, switch to mattn/go-sqlite3"))
 	}
 
-	const params = "?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)" // modernc.org/sqlite (cgo-free)
-	db := sqlx.MustConnect(dbDriver, dbString+params)
-
-	if err := goose.SetDialect("sqlite"); err != nil {
+	if err := goose.SetDialect(dbDriver); err != nil {
 		panic(err)
 	}
 
