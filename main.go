@@ -26,9 +26,11 @@ func main() {
 	if dbDriver == "sqlite3" {
 		// mattn/go-sqlite3 (cgo)
 		db = sqlx.MustConnect(dbDriver, dbString+"?_journal=WAL&_fk=1&_busy_timeout=10000")
+		db.SetMaxOpenConns(1)
 	} else if dbDriver == "sqlite" {
 		// modernc.org/sqlite (cgo-free)
 		// db = sqlx.MustConnect(dbDriver, dbString+"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)")
+		// db.SetMaxOpenConns(1)
 		panic(errors.New("modernc.org/sqlite (cgo-free) is not supported, switch to mattn/go-sqlite3"))
 	} else {
 		panic(errors.New(dbDriver + " (db driver) is not supported, switch to mattn/go-sqlite3"))
