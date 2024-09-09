@@ -13,7 +13,7 @@ COPY . .
 RUN CGO_ENABLED=1 GOOS=linux go build -o ./bin/mr-weasel
 RUN go test -v ./...
 
-FROM alpine:latest
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
