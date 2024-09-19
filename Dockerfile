@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION="1.23"
+ARG GO_VERSION="1.23-alpine"
 
 FROM golang:${GO_VERSION} AS build
+
+RUN apk add --no-cache --update build-base
 
 WORKDIR /app
 
@@ -14,9 +16,9 @@ COPY . .
 RUN CGO_ENABLED=1 GOOS=linux go build -o ./bin/mr-weasel
 RUN go test -v ./...
 
-FROM debian:bookworm-slim
+FROM alpine:latest
 
-RUN apt update && apt install -y ca-certificates && update-ca-certificates
+RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
