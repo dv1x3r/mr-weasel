@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"strings"
 
-	"mr-weasel/utils"
+	"mr-weasel/internal/lib/queue"
+	"mr-weasel/internal/utils"
 )
 
 type ExtractVoiceCommand struct {
-	queue     *utils.Queue
+	queue     *queue.Queue
 	separator *utils.AudioSeparator
 }
 
-func NewExtractVoiceCommand(queue *utils.Queue, separator *utils.AudioSeparator) *ExtractVoiceCommand {
+func NewExtractVoiceCommand(queue *queue.Queue, separator *utils.AudioSeparator) *ExtractVoiceCommand {
 	return &ExtractVoiceCommand{queue: queue, separator: separator}
 }
 

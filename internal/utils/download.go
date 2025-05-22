@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -72,7 +73,10 @@ func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, er
 		return DownloadedFile{}, err
 	}
 
-	fileID := UUID()
+	b := make([]byte, 16)
+	rand.Read(b)
+	fileID := fmt.Sprintf("%X-%X-%X-%X-%X", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+
 	downloadFolderPath := GetDownloadFolderPath()
 	os.MkdirAll(downloadFolderPath, os.ModePerm)
 
@@ -96,8 +100,7 @@ func Download(ctx context.Context, arg1 string, arg2 string) (DownloadedFile, er
 
 		filePath := file.Name()
 
-		_, err = io.Copy(file, res.Body)
-		if err != nil {
+		if _, err = io.Copy(file, res.Body); err != nil {
 			return DownloadedFile{}, err
 		}
 

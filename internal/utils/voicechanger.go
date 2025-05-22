@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"mr-weasel/storage"
+	"mr-weasel/internal/storage"
 )
 
 type VoiceChanger struct {

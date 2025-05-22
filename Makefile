@@ -1,42 +1,48 @@
-GOOSE=./build/tools/goose -dir=./migrations sqlite ./build/data.db
-.PHONY: go-tools build run test db-up db-up-to db-up-by-one db-down db-down-to db-status db-reset db-create
-
-go-tools:
-	GOBIN=$(shell pwd)/build/tools go install github.com/pressly/goose/v3/cmd/goose@v3.22.0
-
+.PHONY: build
 build:
-	go build -o ./build/app ./main.go
+	go build -o ./build/app ./cmd/app/main.go
 
+.PHONY: run
 run:
-	go build -o ./build/app ./main.go && ./build/app
+	go run ./cmd/app/main.go
 
+.PHONY: test
 test:
 	go test -v ./...
 
+GOOSE=go tool goose -dir=./migrations sqlite ./build/data.db
+
+.PHONY: db-up
 db-up:
 	$(GOOSE) up
 
+.PHONY: db-up-to
 db-up-to:
 	@read -p "Up to version: " VALUE; \
 	$(GOOSE) up-to $$VALUE
 
+.PHONY: db-up-by-one
 db-up-by-one:
 	$(GOOSE) up-by-one
 
+.PHONY: db-down
 db-down:
 	$(GOOSE) down
 
+.PHONY: db-down-to
 db-down-to:
 	@read -p "Down to version: " VALUE; \
 	$(GOOSE) down-to $$VALUE
 
+.PHONY: db-status
 db-status:
-	$(GOOSE) status 
+	$(GOOSE) status
 
+.PHONY: db-reset
 db-reset:
 	$(GOOSE) reset
 
+.PHONY: db-create
 db-create:
 	@read -p "Migration name: " VALUE; \
 	$(GOOSE) create "$$VALUE" sql
-
