@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	st "mr-weasel/storage"
+	st "mr-weasel/internal/storage"
 )
 
 type HolidayCommand struct {

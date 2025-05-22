@@ -1,24 +1,24 @@
-package utils
+package queue
 
 import "context"
 
 type Queue struct {
-	queueChan chan int
-	execChan  chan int
+	queueChan chan struct{}
+	execChan  chan struct{}
 }
 
 func NewQueue(queueBuffer, execBuffer int) *Queue {
 	return &Queue{
-		queueChan: make(chan int, queueBuffer),
-		execChan:  make(chan int, execBuffer),
+		queueChan: make(chan struct{}, queueBuffer),
+		execChan:  make(chan struct{}, execBuffer),
 	}
 }
 
 func (q *Queue) Lock(ctx context.Context) bool {
 	select {
-	case q.queueChan <- 0:
+	case q.queueChan <- struct{}{}:
 		select {
-		case q.execChan <- 0:
+		case q.execChan <- struct{}{}:
 			return true
 		case <-ctx.Done():
 			<-q.queueChan

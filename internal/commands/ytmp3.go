@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"mr-weasel/utils"
+	"mr-weasel/internal/utils"
 )
 
 type YTMP3Command struct {

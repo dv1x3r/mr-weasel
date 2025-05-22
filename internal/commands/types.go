@@ -3,7 +3,7 @@ package commands
 import (
 	"context"
 	"html"
-	"mr-weasel/tgclient"
+	"mr-weasel/internal/lib/telegram"
 )
 
 var _es = html.EscapeString
@@ -30,9 +30,9 @@ type Payload struct {
 type Result struct {
 	Text         string
 	State        ExecuteFunc
-	InlineMarkup tgclient.InlineKeyboardMarkup
-	ReplyMarkup  tgclient.ReplyKeyboardMarkup
-	RemoveMarkup tgclient.ReplyKeyboardRemove
+	InlineMarkup telegram.InlineKeyboardMarkup
+	ReplyMarkup  telegram.ReplyKeyboardMarkup
+	RemoveMarkup telegram.ReplyKeyboardRemove
 	Audio        map[string]string
 	ClearState   bool
 	Error        error

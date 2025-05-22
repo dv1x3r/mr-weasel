@@ -9,18 +9,19 @@ import (
 	"path/filepath"
 	"strconv"
 
-	st "mr-weasel/storage"
-	"mr-weasel/utils"
+	"mr-weasel/internal/lib/queue"
+	st "mr-weasel/internal/storage"
+	"mr-weasel/internal/utils"
 )
 
 type ChangeVoiceCommand struct {
 	storage   *st.RvcStorage
-	queue     *utils.Queue
+	queue     *queue.Queue
 	separator *utils.AudioSeparator
 	changer   *utils.VoiceChanger
 }
 
-func NewChangeVoiceCommand(storage *st.RvcStorage, queue *utils.Queue, separator *utils.AudioSeparator, changer *utils.VoiceChanger) *ChangeVoiceCommand {
+func NewChangeVoiceCommand(storage *st.RvcStorage, queue *queue.Queue, separator *utils.AudioSeparator, changer *utils.VoiceChanger) *ChangeVoiceCommand {
 	return &ChangeVoiceCommand{
 		storage:   storage,
 		queue:     queue,

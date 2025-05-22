@@ -1,42 +1,44 @@
-package tgmanager
+package bot
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 
-	"mr-weasel/commands"
-	"mr-weasel/tgclient"
-	"mr-weasel/utils"
+	"mr-weasel/internal/commands"
+	"mr-weasel/internal/lib/telegram"
+	"mr-weasel/internal/lib/wrap"
 )
 
 type Manager struct {
-	tgClient *tgclient.Client               // Telegram API Client
-	handlers map[string]commands.Handler    // Map of registered command handlers.
-	states   map[int64]commands.ExecuteFunc // Map of active user states.
-	tokens   map[string]context.CancelFunc  // Map of cancellation tokens.
+	client   *telegram.Client               // telegram api client
+	handlers map[string]commands.Handler    // registered command handlers
+	states   map[int64]commands.ExecuteFunc // active user states
+	tokens   map[string]context.CancelFunc  // cancellation tokens
 }
 
-func NewManager(tgClient *tgclient.Client) *Manager {
+func NewManager(client *telegram.Client) *Manager {
 	return &Manager{
-		tgClient: tgClient,
-		handlers: make(map[string]commands.Handler),
-		states:   make(map[int64]commands.ExecuteFunc),
-		tokens:   make(map[string]context.CancelFunc),
+		client:   client,
+		handlers: map[string]commands.Handler{},
+		states:   map[int64]commands.ExecuteFunc{},
+		tokens:   map[string]context.CancelFunc{},
 	}
 }
 
-func (m *Manager) AddCommands(handlers ...commands.Handler) []tgclient.BotCommand {
-	botCommands := make([]tgclient.BotCommand, 0, len(handlers))
+func (m *Manager) AddCommands(handlers ...commands.Handler) []telegram.BotCommand {
+	botCommands := make([]telegram.BotCommand, 0, len(handlers))
 
 	for _, handler := range handlers {
 		prefix := handler.Prefix()
 		m.handlers[prefix] = handler
 
-		botCommands = append(botCommands, tgclient.BotCommand{
+		botCommands = append(botCommands, telegram.BotCommand{
 			Command:     handler.Prefix(),
 			Description: handler.Description(),
 		})
@@ -47,40 +49,38 @@ func (m *Manager) AddCommands(handlers ...commands.Handler) []tgclient.BotComman
 	return botCommands
 }
 
-func (m *Manager) PublishCommands(botCommands []tgclient.BotCommand) {
-	cfg := tgclient.SetMyCommandsConfig{Commands: botCommands}
-	_, err := m.tgClient.SetMyCommands(context.Background(), cfg)
-	if err != nil {
+func (m *Manager) PublishCommands(botCommands []telegram.BotCommand) {
+	cfg := telegram.SetMyCommandsConfig{Commands: botCommands}
+	if _, err := m.client.SetMyCommands(context.Background(), cfg); err != nil {
 		log.Println("[ERROR]", err)
 	}
 }
 
 func (m *Manager) Start(ctx context.Context) {
-	cfg := tgclient.GetUpdatesConfig{
+	cfg := telegram.GetUpdatesConfig{
 		Offset:         -1,
 		Timeout:        60,
 		AllowedUpdates: []string{"message", "callback_query"},
 	}
-	updates := m.tgClient.GetUpdatesChan(ctx, cfg, 100)
+	updates := m.client.GetUpdatesChan(ctx, cfg, 100)
 	for update := range updates {
 		if update.Message != nil && update.Message.From != nil {
 			m.onMessage(ctx, *update.Message)
 		} else if update.CallbackQuery != nil {
 			m.onCallbackQuery(ctx, *update.CallbackQuery)
 			// Answer to the callback query just to dismiss "Loading..." prompt on the top
-			_, err := m.tgClient.AnswerCallbackQuery(ctx, tgclient.AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID})
-			if err != nil {
+			if _, err := m.client.AnswerCallbackQuery(ctx, telegram.AnswerCallbackQueryConfig{CallbackQueryID: update.CallbackQuery.ID}); err != nil {
 				log.Println("[ERROR]", err)
 			}
 		}
 	}
 }
 
-func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
-	const op = "telegram.Manager.processMessage"
+func (m *Manager) onMessage(ctx context.Context, message telegram.Message) {
+	const op = "bot.Manager.processMessage"
 
 	// command has /prefix@bot_username syntax
-	message.Text = strings.TrimSuffix(message.Text, fmt.Sprintf("@%s", m.tgClient.Me.Username))
+	message.Text = strings.TrimSuffix(message.Text, fmt.Sprintf("@%s", m.client.Me.Username))
 
 	execFn, ok := m.getExecuteFunc(message.From.ID, message.Text)
 	if !ok {
@@ -101,17 +101,17 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 	}
 
 	if message.Audio != nil {
-		fileURL, err := m.tgClient.GetFileURL(ctx, tgclient.GetFileConfig{FileID: message.Audio.FileID})
+		fileURL, err := m.client.GetFileURL(ctx, telegram.GetFileConfig{FileID: message.Audio.FileID})
 		if err != nil {
-			log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			log.Println("[ERROR]", wrap.IfErr(op, err))
 			return
 		}
 		pl.FileURL = fileURL
 		pl.Command = message.Audio.FileName
 	} else if message.Voice != nil {
-		fileURL, err := m.tgClient.GetFileURL(ctx, tgclient.GetFileConfig{FileID: message.Voice.FileID})
+		fileURL, err := m.client.GetFileURL(ctx, telegram.GetFileConfig{FileID: message.Voice.FileID})
 		if err != nil {
-			log.Println("[ERROR]", utils.WrapIfErr(op, err))
+			log.Println("[ERROR]", wrap.IfErr(op, err))
 			return
 		}
 		pl.FileURL = fileURL
@@ -137,7 +137,7 @@ func (m *Manager) onMessage(ctx context.Context, message tgclient.Message) {
 	go m.processResults(ctx, pl, message)
 }
 
-func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.CallbackQuery) {
+func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery telegram.CallbackQuery) {
 	const op = "telegram.Manager.processCallbackQuery"
 
 	// Check if chat user is message owner (for groups)
@@ -188,13 +188,13 @@ func (m *Manager) onCallbackQuery(ctx context.Context, callbackQuery tgclient.Ca
 	go m.processResults(ctx, pl, *callbackQuery.Message)
 }
 
-func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse tgclient.Message) {
-	const op = "telegram.Manager.processResults"
+func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previousResponse telegram.Message) {
+	const op = "bot.Manager.processResults"
 	var err error
 
 	for result := range pl.ResultChan {
 		if result.Error != nil {
-			log.Println("[ERROR]", utils.WrapIfErr(op, result.Error))
+			log.Println("[ERROR]", wrap.IfErr(op, result.Error))
 		}
 
 		if previousResponse.Chat == nil {
@@ -203,7 +203,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 		}
 
 		if result.Audio != nil {
-			media := []tgclient.InputMedia{}
+			media := []telegram.InputMedia{}
 
 			keys := make([]string, 0, len(result.Audio))
 			for k := range result.Audio {
@@ -212,12 +212,12 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 			sort.Strings(keys)
 
 			for _, name := range keys {
-				media = append(media, &tgclient.InputMediaAudio{Media: "attach://" + name})
+				media = append(media, &telegram.InputMediaAudio{Media: "attach://" + name})
 			}
 
-			_, err = m.tgClient.SendMediaGroup(ctx, tgclient.SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, result.Audio)
+			_, err = m.client.SendMediaGroup(ctx, telegram.SendMediaGroupConfig{ChatID: previousResponse.Chat.ID, Media: media}, result.Audio)
 			if err != nil {
-				log.Println("[ERROR]", utils.WrapIfErr(op, err))
+				log.Println("[ERROR]", wrap.IfErr(op, err))
 			}
 
 		} else if result.InlineMarkup.InlineKeyboard != nil && previousResponse.ReplyMarkup != nil {
@@ -239,12 +239,12 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
 			}
 
-			var replyMarkup *tgclient.InlineKeyboardMarkup
+			var replyMarkup *telegram.InlineKeyboardMarkup
 			if len(result.InlineMarkup.InlineKeyboard[0]) != 0 {
 				replyMarkup = &result.InlineMarkup
 			}
 
-			previousResponse, err = m.tgClient.EditMessageText(ctx, tgclient.EditMessageTextConfig{
+			previousResponse, err = m.client.EditMessageText(ctx, telegram.EditMessageTextConfig{
 				ChatID:      previousResponse.Chat.ID,
 				MessageID:   previousResponse.MessageID,
 				Text:        result.Text,
@@ -252,7 +252,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				ReplyMarkup: replyMarkup,
 			})
 			if err != nil {
-				log.Println("[ERROR]", utils.WrapIfErr(op, err))
+				log.Println("[ERROR]", wrap.IfErr(op, err))
 			}
 
 		} else if result.Text != "" {
@@ -265,7 +265,7 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				delete(m.states, pl.UserID)
 			}
 
-			var replyMarkup tgclient.ReplyMarkup
+			var replyMarkup telegram.ReplyMarkup
 			if result.InlineMarkup.InlineKeyboard != nil {
 				replyMarkup = result.InlineMarkup
 			} else if result.ReplyMarkup.Keyboard != nil {
@@ -278,14 +278,14 @@ func (m *Manager) processResults(ctx context.Context, pl commands.Payload, previ
 				result.Text = fmt.Sprintf("<a href=\"tg://user?id=%d\">%s</a>\n\n%s", pl.UserID, pl.UserName, result.Text)
 			}
 
-			previousResponse, err = m.tgClient.SendMessage(ctx, tgclient.SendMessageConfig{
+			previousResponse, err = m.client.SendMessage(ctx, telegram.SendMessageConfig{
 				ChatID:      previousResponse.Chat.ID,
 				Text:        result.Text,
 				ParseMode:   "HTML",
 				ReplyMarkup: replyMarkup,
 			})
 			if err != nil {
-				log.Println("[ERROR]", utils.WrapIfErr(op, err))
+				log.Println("[ERROR]", wrap.IfErr(op, err))
 			}
 		}
 
@@ -304,7 +304,7 @@ func (m *Manager) getExecuteFunc(userID int64, text string) (commands.ExecuteFun
 
 	fn, ok := m.states[userID] // Stateful command
 	if ok {
-		log.Printf("[VERB] %d: %s\n", userID, utils.GetFunctionName(fn))
+		log.Printf("[VERB] %d: %s\n", userID, runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 	}
 
 	return fn, ok
